@@ -1,5 +1,6 @@
 'use client';
 import { useState } from "react";
+import Link from "next/link";
 import { getDeviceFingerprint } from "./lib/fingerprint";
 
 export default function Home() {
