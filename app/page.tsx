@@ -150,12 +150,12 @@ export default function Home() {
           <a href="#faq" className="hover:text-white transition">FAQ</a>
         </div>
         <div className="flex items-center gap-3">
-          <button className="text-gray-400 hover:text-white text-sm font-semibold py-2 px-5 rounded-full border border-white/20 hover:border-white/40 transition">
+          <Link href="/login" className="text-gray-400 hover:text-white text-sm font-semibold py-2 px-5 rounded-full border border-white/20 hover:border-white/40 transition">
             Sign In
-          </button>
-          <button className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold py-2 px-5 rounded-full transition">
+          </Link>
+          <Link href="/signup" className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold py-2 px-5 rounded-full transition">
             Sign Up Free
-          </button>
+          </Link>
         </div>
       </nav>
 
