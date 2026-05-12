@@ -316,6 +316,110 @@ export default function Home() {
         </div>
       </section>
 
+      {/* STAR YOURSELF SECTION */}
+      <section className="px-8 py-24 bg-gradient-to-b from-black to-purple-950/20">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <div className="inline-block bg-pink-900/40 border border-pink-500/30 text-pink-300 text-xs font-semibold px-4 py-1.5 rounded-full mb-4">
+              📸 Star Yourself in Any Scene
+            </div>
+            <h2 className="text-4xl md:text-5xl font-extrabold mb-6">
+              Put Yourself in <br />
+              <span className="bg-gradient-to-r from-pink-400 to-purple-500 bg-clip-text text-transparent">
+                Any Scene on Earth.
+              </span>
+            </h2>
+            <p className="text-gray-400 text-xl max-w-2xl mx-auto">
+              Upload your photo. Appear anywhere in the world. Change your outfit, your look, your entire environment — all AI generated. No filming. No travel. No limits.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-4 gap-4 mb-16">
+            {[
+              { scene: "🏖️", title: "Maldives Beach", desc: "Crystal water, white sand, golden sun" },
+              { scene: "🏙️", title: "NYC Penthouse", desc: "Manhattan skyline, luxury interior" },
+              { scene: "🎬", title: "Film Studio", desc: "Professional lighting, cinematic setup" },
+              { scene: "🌌", title: "Space Station", desc: "Zero gravity, Earth in the background" },
+              { scene: "🏔️", title: "Mountain Peak", desc: "Snow-capped summit, dramatic clouds" },
+              { scene: "🎭", title: "Red Carpet", desc: "Hollywood premiere, paparazzi lights" },
+              { scene: "🏰", title: "Royal Palace", desc: "Grand architecture, regal atmosphere" },
+              { scene: "🌆", title: "Tokyo Streets", desc: "Neon lights, futuristic cityscape" }
+            ].map((s, i) => (
+              <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-5 text-center hover:border-pink-500/50 transition">
+                <div className="text-4xl mb-2">{s.scene}</div>
+                <div className="font-bold text-sm mb-1">{s.title}</div>
+                <div className="text-gray-500 text-xs">{s.desc}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8 mb-16">
+            {[
+              {
+                icon: "📸",
+                title: "Upload Your Photo — Star in Any Scene",
+                desc: "Upload a single photo of yourself or your talent. Our AI places you in any environment you can imagine — beach, penthouse, studio, outer space. Photorealistic results every time. No green screen. No studio. No travel budget.",
+                badge: "Most Popular Feature"
+              },
+              {
+                icon: "🌍",
+                title: "Any Environment You Can Imagine",
+                desc: "From the streets of Tokyo to the surface of Mars. Describe any environment and our AI generates it with you inside. Every scene is unique, cinematic, and completely owned by you.",
+                badge: "Unlimited Scenes"
+              },
+              {
+                icon: "👥",
+                title: "Multiple People in One Scene",
+                desc: "Need a group shot? A brand team photo? A crowd scene? Generate videos and images with multiple AI-generated people alongside you. Perfect for brand campaigns, testimonials, and social content.",
+                badge: "New Feature"
+              },
+              {
+                icon: "👗",
+                title: "Change Your Outfit & Look Instantly",
+                desc: "Try any outfit without owning it. Business suit, streetwear, formal gown, branded merchandise — our AI dresses you in any style. Change your hair, age, accessories, and entire aesthetic with one prompt.",
+                badge: "Outfit Customization"
+              }
+            ].map((f, i) => (
+              <div key={i} className="bg-black border border-white/10 rounded-2xl p-8 hover:border-pink-500/30 transition">
+                <div className="flex items-start gap-4">
+                  <div className="text-4xl">{f.icon}</div>
+                  <div>
+                    <div className="inline-block bg-purple-900/40 border border-purple-500/20 text-purple-300 text-xs font-bold px-3 py-1 rounded-full mb-3">{f.badge}</div>
+                    <h3 className="text-xl font-bold mb-3">{f.title}</h3>
+                    <p className="text-gray-400 text-sm leading-relaxed">{f.desc}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-white/5 border border-white/10 rounded-3xl p-10">
+            <h3 className="text-2xl font-bold text-center mb-8">How It Works</h3>
+            <div className="grid md:grid-cols-4 gap-6">
+              {[
+                { step: "1", icon: "📸", title: "Upload Your Photo", desc: "Any clear photo of yourself or your talent" },
+                { step: "2", icon: "🌍", title: "Describe Your Scene", desc: "Any environment, any outfit, any number of people" },
+                { step: "3", icon: "✨", title: "AI Generates It", desc: "Photorealistic video or image in minutes" },
+                { step: "4", icon: "⬇️", title: "Download & Use", desc: "For ads, social media, or any campaign" }
+              ].map((s, i) => (
+                <div key={i} className="text-center">
+                  <div className="w-12 h-12 rounded-full bg-purple-600 flex items-center justify-center text-lg font-bold mx-auto mb-3">{s.step}</div>
+                  <div className="text-2xl mb-2">{s.icon}</div>
+                  <div className="font-bold text-sm mb-1">{s.title}</div>
+                  <div className="text-gray-500 text-xs">{s.desc}</div>
+                </div>
+              ))}
+            </div>
+            <div className="text-center mt-8">
+              <button className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-12 rounded-full text-lg transition">
+                Try It Free — 25 Tokens →
+              </button>
+              <p className="text-gray-600 text-xs mt-3">No credit card required</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* LIVE DEMO */}
       <section className="px-8 py-20 bg-white/5">
         <div className="max-w-4xl mx-auto">
