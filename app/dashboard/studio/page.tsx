@@ -7,7 +7,6 @@ export default function Studio() {
   const [duration, setDuration] = useState("5");
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [loading, setLoading] = useState(false);
-  const [taskId, setTaskId] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
@@ -29,11 +28,9 @@ export default function Studio() {
       setError("Please enter a prompt.");
       return;
     }
-
     setLoading(true);
     setError("");
     setVideoUrl(null);
-    setTaskId(null);
     setStatus("Starting generation...");
 
     try {
@@ -58,10 +55,8 @@ export default function Studio() {
         return;
       }
 
-      setTaskId(data.task_id);
       setStatus("Video generating... this takes 1-3 minutes.");
 
-      // Poll for status
       const pollInterval = setInterval(async () => {
         try {
           const statusRes = await fetch(`/api/video-status?task_id=${data.task_id}`);
@@ -84,19 +79,24 @@ export default function Studio() {
         }
       }, 5000);
 
-      // Stop polling after 5 minutes
       setTimeout(() => {
         clearInterval(pollInterval);
-        if (!videoUrl) {
-          setError("Generation timed out. Please try again.");
-          setLoading(false);
-        }
+        setLoading(false);
       }, 300000);
 
     } catch (err) {
       setError('Something went wrong. Please try again.');
       setLoading(false);
     }
+  };
+
+  const resetForm = () => {
+    setActiveModule(null);
+    setPrompt("");
+    setError("");
+    setVideoUrl(null);
+    setStatus("");
+    setImageUrl("");
   };
 
   return (
@@ -106,7 +106,6 @@ export default function Studio() {
         <p className="text-gray-400 text-sm">9 AI modules — every plan includes all features</p>
       </div>
 
-      {/* TOKEN BALANCE */}
       <div className="bg-purple-900/20 border border-purple-500/30 rounded-2xl p-4 flex items-center justify-between">
         <div>
           <p className="text-purple-300 font-semibold text-sm">🪙 Token Balance: 25 tokens</p>
@@ -117,7 +116,6 @@ export default function Studio() {
         </a>
       </div>
 
-      {/* MODULE GRID */}
       {!activeModule && (
         <div className="grid md:grid-cols-3 gap-4">
           {modules.map((mod) => (
@@ -141,10 +139,122 @@ export default function Studio() {
         </div>
       )}
 
-      {/* GENERATION FORM */}
       {activeModule && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
+            <button onClick={resetForm} className="text-gray-400 hover:text-white text-sm transition">
+              ← Back
+            </button>
+            <h2 className="font-bold">
+              {modules.find(m => m.id === activeModule)?.icon}{" "}
+              {modules.find(m => m.id === activeModule)?.title}
+            </h2>
+          </div>
+
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-4">
+            {activeModule === 'image_to_video' && (
+              <div>
+                <label className="text-gray-400 text-sm mb-1 block">Image URL</label>
+                <input
+                  type="url"
+                  placeholder="https://example.com/image.jpg"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition text-sm"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="text-gray-400 text-sm mb-1 block">
+                {activeModule === 'script' ? 'Describe your video topic' :
+                 activeModule === 'prompt' ? 'Simple idea to expand' :
+                 'Describe your video'}
+              </label>
+              <textarea
+                placeholder={
+                  activeModule === 'text_to_video' ? 'A luxury watch rotating slowly on a marble surface, golden hour lighting, cinematic...' :
+                  activeModule === 'image_to_video' ? 'Describe how you want the image to move...' :
+                  'Describe what you want to create...'
+                }
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                rows={4}
+                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition text-sm resize-none"
+              />
+            </div>
+
+            {(activeModule === 'text_to_video' || activeModule === 'image_to_video') && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-gray-400 text-sm mb-1 block">Duration</label>
+                  <select
+                    value={duration}
+                    onChange={(e) => setDuration(e.target.value)}
+                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition text-sm"
+                  >
+                    <option value="5">5 seconds</option>
+                    <option value="10">10 seconds</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-gray-400 text-sm mb-1 block">Aspect Ratio</label>
+                  <select
+                    value={aspectRatio}
+                    onChange={(e) => setAspectRatio(e.target.value)}
+                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition text-sm"
+                  >
+                    <option value="16:9">16:9 (YouTube)</option>
+                    <option value="9:16">9:16 (TikTok/Reels)</option>
+                    <option value="1:1">1:1 (Feed)</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {error && <p className="text-red-400 text-sm">{error}</p>}
+
+            {status && !error && (
+              <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3">
+                <p className="text-purple-300 text-sm">
+                  {loading && <span className="animate-pulse">⏳ </span>}
+                  {status}
+                </p>
+              </div>
+            )}
+
             <button
-              onClick={() => {
-                s
+              onClick={handleGenerate}
+              disabled={loading}
+              className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition"
+            >
+              {loading ? 'Generating...' : 'Generate — 10 tokens'}
+            </button>
+          </div>
+
+          {videoUrl && (
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+              <h3 className="font-bold mb-4">✅ Your Video is Ready!</h3>
+              <video src={videoUrl} controls className="w-full rounded-xl mb-4" />
+              <div className="flex gap-3">
+                
+                  href={videoUrl}
+                  download
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition text-center text-sm"
+                >
+                  ⬇️ Download Video
+                </a>
+                <button
+                  onClick={resetForm}
+                  className="flex-1 bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition text-sm"
+                >
+                  Generate Another
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

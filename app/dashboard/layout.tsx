@@ -97,7 +97,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="text-gray-500 text-xs mb-1 truncate">{user?.email}</div>
           <button
             onClick={handleSignOut}
-            className="flex items-center gap-2 text-gray-500 hover:text-white text-xs transition"
+            className="flex items-center gap-2 text-red-400 hover:text-red-300 text-xs transition font-semibold"
           >
             <span>🚪</span> Sign Out
           </button>
