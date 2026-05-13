@@ -51,9 +51,19 @@ export default function Dashboard() {
         <h1 className="text-2xl font-extrabold mb-1">
           Welcome Back! 👋
         </h1>
-        <p className="text-gray-400 text-sm">
+        <p className="text-gray-400 text-sm mb-4">
           {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
+        <div className="flex items-center justify-between bg-black/20 rounded-xl px-4 py-3">
+          <div className="flex items-center gap-2">
+            <span className="text-yellow-400">🪙</span>
+            <span className="text-white font-bold">{tokens}</span>
+            <span className="text-gray-400 text-sm">tokens remaining</span>
+          </div>
+          <a href="/dashboard/billing" className="text-purple-400 hover:text-white text-xs font-semibold transition">
+            Top Up →
+          </a>
+        </div>
       </div>
 
       {/* FREE TRIAL BANNER */}

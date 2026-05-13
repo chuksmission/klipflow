@@ -127,12 +127,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {plan}
             </div>
 
-            {/* TOKEN BALANCE */}
-            <div className="bg-white/5 border border-white/10 rounded-full px-4 py-1.5 flex items-center gap-2">
-              <span className="text-yellow-400 text-sm">🪙</span>
-              <span className="text-white font-bold text-sm">{tokens.toLocaleString()}</span>
-              <span className="text-gray-500 text-xs">tokens</span>
-            </div>
+            
 
             {/* NOTIFICATIONS */}
             <button className="relative w-9 h-9 bg-white/5 border border-white/10 rounded-full flex items-center justify-center hover:bg-white/10 transition">
