@@ -16,6 +16,7 @@ export default function Studio() {
   const [progress, setProgress] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [tokenBalance, setTokenBalance] = useState(25);
+  const [selectedModel, setSelectedModel] = useState("kling-v1");
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -52,6 +53,57 @@ export default function Studio() {
     return "Almost ready, finalizing...";
   };
 
+  const models = [
+    {
+      id: "kling-v1",
+      name: "Kling v1",
+      desc: "Fast & affordable",
+      tokens: 10,
+      badge: "",
+      available: true
+    },
+    {
+      id: "kling-v2",
+      name: "Kling v2",
+      desc: "Better quality + sound",
+      tokens: 15,
+      badge: "With Sound",
+      available: true
+    },
+    {
+      id: "kling-v3",
+      name: "Kling v3",
+      desc: "Highest Kling quality",
+      tokens: 20,
+      badge: "Best Quality",
+      available: true
+    },
+    {
+      id: "runway-gen4",
+      name: "Runway Gen-4",
+      desc: "Professional cinematic",
+      tokens: 20,
+      badge: "Coming Soon",
+      available: false
+    },
+    {
+      id: "veo3",
+      name: "Google Veo 3",
+      desc: "Cinematic + audio",
+      tokens: 25,
+      badge: "Coming Soon",
+      available: false
+    },
+    {
+      id: "sora",
+      name: "OpenAI Sora",
+      desc: "Creative & surreal",
+      tokens: 25,
+      badge: "Coming Soon",
+      available: false
+    },
+  ];
+
   const modules = [
     { id: "text_to_video", icon: "📝", title: "Text to Video", desc: "Generate cinematic videos from text", tokens: "10 tokens", badge: "Most Popular" },
     { id: "image_to_video", icon: "🖼️", title: "Image to Video", desc: "Animate any still image into video", tokens: "10 tokens", badge: "" },
@@ -82,6 +134,9 @@ export default function Studio() {
         return;
       }
 
+      const selectedModelData = models.find(m => m.id === selectedModel);
+      const tokenCost = selectedModelData?.tokens || 10;
+
       // Deduct tokens first
       const tokenRes = await fetch('/api/tokens', {
         method: 'POST',
@@ -89,7 +144,7 @@ export default function Studio() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({ amount: 10 })
+        body: JSON.stringify({ amount: tokenCost })
       });
 
       const tokenData = await tokenRes.json();
@@ -114,7 +169,7 @@ export default function Studio() {
           image_url: imageUrl || undefined,
           duration,
           aspect_ratio: aspectRatio,
-          model: 'kling-v1'
+          model: selectedModel
         })
       });
 
@@ -151,9 +206,10 @@ export default function Studio() {
                   prompt: finalPrompt,
                   video_url: statusData.video_url,
                   status: 'completed',
-                  tokens_used: 10,
+                  tokens_used: tokenCost,
                   duration,
-                  aspect_ratio: aspectRatio
+                  aspect_ratio: aspectRatio,
+                  model: selectedModel
                 })
               });
               const saveData = await saveRes.json();
@@ -318,6 +374,39 @@ export default function Studio() {
                   </div>
                 </div>
 
+                {/* MODEL SELECTOR */}
+                <div>
+                  <label className="text-gray-400 text-xs mb-2 block">AI Model</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {models.map((model) => (
+                      <button
+                        key={model.id}
+                        onClick={() => model.available && setSelectedModel(model.id)}
+                        disabled={!model.available}
+                        className={`relative p-3 rounded-xl border text-left transition ${
+                          selectedModel === model.id
+                            ? 'border-purple-500 bg-purple-900/30'
+                            : model.available
+                            ? 'border-white/10 bg-white/5 hover:border-purple-500/50'
+                            : 'border-white/5 bg-white/3 opacity-50 cursor-not-allowed'
+                        }`}
+                      >
+                        {model.badge && (
+                          <div className={`text-xs font-bold px-1.5 py-0.5 rounded-full mb-1 inline-block ${
+                            model.available
+                              ? 'bg-purple-900/40 text-purple-300'
+                              : 'bg-gray-900/40 text-gray-500'
+                          }`}>
+                            {model.badge}
+                          </div>
+                        )}
+                        <div className="font-bold text-xs mb-0.5">{model.name}</div>
+                        <div className="text-gray-500 text-xs">{model.tokens} tokens</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* SOUND TOGGLE */}
                 <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-3">
                   <div>
@@ -341,7 +430,7 @@ export default function Studio() {
               disabled={loading}
               className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition"
             >
-              Generate — 10 tokens
+              Generate — {models.find(m => m.id === selectedModel)?.tokens || 10} tokens
             </button>
           </div>
         </div>

@@ -35,14 +35,21 @@ export async function POST(req: NextRequest) {
     const token = await generateKlingToken();
 
     // Build request body based on mode
-    const withAudio = prompt.includes('Include natural ambient sound');
+    const withAudio = prompt.includes('Include natural ambient sound') || model === 'kling-v2' || model === 'kling-v3';
+    
+    const modelMap: Record<string, string> = {
+      'kling-v1': 'kling-v1',
+      'kling-v2': 'kling-v2',
+      'kling-v3': 'kling-v2-master',
+    };
+
     const body: any = {
-      model_name: withAudio ? 'kling-v2' : model,
+      model_name: modelMap[model] || 'kling-v1',
       prompt,
       duration,
       aspect_ratio,
       cfg_scale: 0.5,
-      mode: 'std',
+      mode: model === 'kling-v3' ? 'pro' : 'std',
       ...(withAudio && { with_audio: true })
     };
 
