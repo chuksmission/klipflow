@@ -170,7 +170,7 @@ export default function SignUp() {
             onClick={async () => {
               await supabase.auth.signInWithOAuth({
                 provider: 'google',
-                options: { redirectTo: `${window.location.origin}/verify` }
+                options: { redirectTo: `https://klipflowai.com/verify` }
               });
             }}
             className="w-full flex items-center justify-center gap-3 bg-white text-gray-800 font-bold py-3 rounded-xl transition hover:bg-gray-100"
