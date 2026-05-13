@@ -35,13 +35,15 @@ export async function POST(req: NextRequest) {
     const token = await generateKlingToken();
 
     // Build request body based on mode
+    const withAudio = prompt.includes('Include natural ambient sound');
     const body: any = {
-      model_name: model,
+      model_name: withAudio ? 'kling-v2' : model,
       prompt,
       duration,
       aspect_ratio,
       cfg_scale: 0.5,
-      mode: 'std'
+      mode: 'std',
+      ...(withAudio && { with_audio: true })
     };
 
     if (mode === 'image_to_video' && image_url) {
