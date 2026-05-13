@@ -108,7 +108,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="flex-1 md:ml-64 flex flex-col">
 
         {/* TOP HEADER */}
-        <header className="sticky top-0 z-40 bg-gray-950 border-b border-white/10 px-6 py-4 flex items-center justify-between">
+        <header className="sticky top-0 z-40 bg-gray-950 border-b border-white/10 px-4 py-3 flex items-center justify-between">
           {/* MOBILE LOGO */}
           <Link href="/" className="md:hidden text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
             KlipflowAI
@@ -193,7 +193,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         )}
 
         {/* PAGE CONTENT */}
-        <main className="flex-1 p-6 md:p-8">
+        <main className="flex-1 p-4 md:p-8 overflow-x-hidden">
           {children}
         </main>
       </div>

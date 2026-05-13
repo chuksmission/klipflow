@@ -90,6 +90,22 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* SIGN OUT */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+        <h2 className="font-bold mb-2">Sign Out</h2>
+        <p className="text-gray-400 text-sm mb-4">Sign out of your KlipflowAI account on this device.</p>
+        <button
+          onClick={async () => {
+            const { supabase } = await import('../../lib/supabase');
+            await supabase.auth.signOut();
+            window.location.href = '/';
+          }}
+          className="bg-white/10 hover:bg-white/20 text-white font-bold py-2 px-6 rounded-xl transition text-sm"
+        >
+          Sign Out
+        </button>
+      </div>
+
       {/* DANGER ZONE */}
       <div className="bg-red-900/10 border border-red-500/20 rounded-2xl p-6">
         <h2 className="font-bold text-red-400 mb-2">Danger Zone</h2>
