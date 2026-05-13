@@ -138,22 +138,27 @@ export default function Studio() {
             clearInterval(pollInterval);
 
             // Save generation to database
-            await fetch('/api/generations', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${session.access_token}`
-              },
-              body: JSON.stringify({
-                type: activeModule,
-                prompt: finalPrompt,
-                video_url: statusData.video_url,
-                status: 'completed',
-                tokens_used: 10,
-                duration,
-                aspect_ratio: aspectRatio
-              })
-            });
+            const { data: { session: freshSession } } = await supabase.auth.getSession();
+            if (freshSession) {
+              const saveRes = await fetch('/api/generations', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${freshSession.access_token}`
+                },
+                body: JSON.stringify({
+                  type: activeModule,
+                  prompt: finalPrompt,
+                  video_url: statusData.video_url,
+                  status: 'completed',
+                  tokens_used: 10,
+                  duration,
+                  aspect_ratio: aspectRatio
+                })
+              });
+              const saveData = await saveRes.json();
+              console.log('Generation saved:', saveData);
+            }
 
           } else if (statusData.failed) {
             setError("Generation failed. Please try again.");
