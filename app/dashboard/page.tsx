@@ -5,40 +5,7 @@ import { supabase } from "../lib/supabase";
 
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
-  const [tokens] = useState(25);
-
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      setUser(session.user);
-
-      // Fetch real token balance
-      const tokenRes = await fetch('/api/tokens', {
-        headers: { 'Authorization': `Bearer ${session.access_token}` }
-      });
-      const tokenData = await tokenRes.json();
-      if (tokenData.balance !== undefined) setTokens(tokenData.balance);
-
-      // Fetch real generations count
-      const genRes = await fetch('/api/generations', {
-        headers: { 'Authorization': `Bearer ${session.access_token}` }
-      });
-      const genData = await genRes.json();
-      const generations = genData.generations || [];
-      const videos = generations.filter((g: any) => g.type?.includes('video')).length;
-      const images = generations.filter((g: any) => g.type?.includes('image')).length;
-
-      setStats([
-        { icon: "🎬", label: "Videos Generated", value: videos, sub: `${videos} completed`, color: "text-purple-400" },
-        { icon: "🖼️", label: "Images Generated", value: images, sub: `${images} completed`, color: "text-pink-400" },
-        { icon: "📡", label: "Posts Published", value: 0, sub: "0 this week", color: "text-blue-400" },
-        { icon: "🕵️", label: "Ads Spied", value: 0, sub: "0 saved", color: "text-green-400" },
-      ]);
-    };
-    getUser();
-  }, []);
-
+  const [tokens, setTokens] = useState(25);
   const [stats, setStats] = useState([
     { icon: "🎬", label: "Videos Generated", value: 0, sub: "0 completed", color: "text-purple-400" },
     { icon: "🖼️", label: "Images Generated", value: 0, sub: "0 completed", color: "text-pink-400" },
@@ -67,14 +34,50 @@ export default function Dashboard() {
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const maxUsage = Math.max(...weeklyUsage, 1);
 
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      setUser(session.user);
+
+      try {
+        const tokenRes = await fetch('/api/tokens', {
+          headers: { 'Authorization': `Bearer ${session.access_token}` }
+        });
+        const tokenData = await tokenRes.json();
+        if (tokenData.balance !== undefined) setTokens(tokenData.balance);
+      } catch (e) {
+        console.error('Token fetch error:', e);
+      }
+
+      try {
+        const genRes = await fetch('/api/generations', {
+          headers: { 'Authorization': `Bearer ${session.access_token}` }
+        });
+        const genData = await genRes.json();
+        const generations = genData.generations || [];
+        const videos = generations.filter((g: any) => g.type?.includes('video')).length;
+        const images = generations.filter((g: any) => g.type?.includes('image')).length;
+
+        setStats([
+          { icon: "🎬", label: "Videos Generated", value: videos, sub: `${videos} completed`, color: "text-purple-400" },
+          { icon: "🖼️", label: "Images Generated", value: images, sub: `${images} completed`, color: "text-pink-400" },
+          { icon: "📡", label: "Posts Published", value: 0, sub: "0 this week", color: "text-blue-400" },
+          { icon: "🕵️", label: "Ads Spied", value: 0, sub: "0 saved", color: "text-green-400" },
+        ]);
+      } catch (e) {
+        console.error('Generations fetch error:', e);
+      }
+    };
+    getUser();
+  }, []);
+
   return (
     <div className="space-y-6">
 
       {/* WELCOME */}
       <div className="bg-gradient-to-r from-purple-900/30 to-pink-900/20 border border-purple-500/20 rounded-2xl p-6">
-        <h1 className="text-2xl font-extrabold mb-1">
-          Welcome Back! 👋
-        </h1>
+        <h1 className="text-2xl font-extrabold mb-1">Welcome Back! 👋</h1>
         <p className="text-gray-400 text-sm mb-4">
           {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
@@ -130,8 +133,6 @@ export default function Dashboard() {
 
       {/* CHARTS ROW */}
       <div className="grid md:grid-cols-2 gap-6">
-
-        {/* WEEKLY USAGE CHART */}
         <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
           <h3 className="font-bold mb-1">Credits Spent (7 days)</h3>
           <p className="text-gray-500 text-xs mb-6">Successful tasks only</p>
@@ -154,7 +155,6 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* TASK BREAKDOWN */}
         <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
           <h3 className="font-bold mb-1">Task Breakdown</h3>
           <p className="text-gray-500 text-xs mb-6">Credits used per feature</p>
