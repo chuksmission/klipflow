@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from "react";
+import { supabase } from "../lib/supabase";
 
 export default function Studio() {
   const [activeModule, setActiveModule] = useState<string | null>(null);
@@ -14,6 +15,7 @@ export default function Studio() {
   const [imageUrl, setImageUrl] = useState("");
   const [progress, setProgress] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [tokenBalance, setTokenBalance] = useState(25);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -73,6 +75,32 @@ export default function Studio() {
     setProgress(0);
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setError("Please sign in to generate videos.");
+        setLoading(false);
+        return;
+      }
+
+      // Deduct tokens first
+      const tokenRes = await fetch('/api/tokens', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ amount: 10 })
+      });
+
+      const tokenData = await tokenRes.json();
+      if (!tokenRes.ok) {
+        setError(tokenData.error || 'Insufficient tokens.');
+        setLoading(false);
+        return;
+      }
+
+      setTokenBalance(tokenData.balance);
+
       const finalPrompt = withSound
         ? `${prompt}. Include natural ambient sound and audio.`
         : prompt;
@@ -108,6 +136,25 @@ export default function Studio() {
             setProgress(100);
             setLoading(false);
             clearInterval(pollInterval);
+
+            // Save generation to database
+            await fetch('/api/generations', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+              },
+              body: JSON.stringify({
+                type: activeModule,
+                prompt: finalPrompt,
+                video_url: statusData.video_url,
+                status: 'completed',
+                tokens_used: 10,
+                duration,
+                aspect_ratio: aspectRatio
+              })
+            });
+
           } else if (statusData.failed) {
             setError("Generation failed. Please try again.");
             setLoading(false);
@@ -120,10 +167,7 @@ export default function Studio() {
 
       setTimeout(() => {
         clearInterval(pollInterval);
-        if (!videoUrl) {
-          setLoading(false);
-          setError("Timed out. Please try again.");
-        }
+        setLoading(false);
       }, 300000);
 
     } catch (err) {
@@ -171,7 +215,7 @@ export default function Studio() {
       {/* TOKEN BALANCE */}
       <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3 flex items-center justify-between">
         <div>
-          <p className="text-purple-300 font-semibold text-sm">🪙 25 tokens remaining</p>
+          <p className="text-purple-300 font-semibold text-sm">🪙 {tokenBalance} tokens remaining</p>
           <p className="text-gray-500 text-xs">1 video = 10 tokens · Top up from $5</p>
         </div>
         <a href="/dashboard/billing" className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold py-1.5 px-3 rounded-full transition">
@@ -379,12 +423,15 @@ export default function Studio() {
 
           {/* MOBILE SAVE TIP */}
           <div className="bg-blue-900/20 border border-blue-500/20 rounded-xl p-3 space-y-2">
-            <p className="text-blue-300 text-xs font-semibold">📱 Saving on Mobile</p>
+            <p className="text-blue-300 text-xs font-semibold">📱 How to Save Your Video</p>
             <p className="text-gray-400 text-xs">
-              <span className="text-white font-semibold">iPhone:</span> Tap and hold the video → select "Save to Photos" or tap the Share button → "Save to Files"
+              <span className="text-white font-semibold">iPhone:</span> Tap "Save Video" → tap "Download" in the popup → open your Files app → find the video → tap Share → "Save to Photos"
             </p>
             <p className="text-gray-400 text-xs">
-              <span className="text-white font-semibold">Android:</span> Tap and hold the video → select "Download" or "Save video" — or tap the ⬇️ Save Video button above.
+              <span className="text-white font-semibold">Android:</span> Tap "Save Video" → video saves directly to your Downloads folder → open Gallery app to find it.
+            </p>
+            <p className="text-gray-400 text-xs">
+              <span className="text-white font-semibold">Desktop:</span> Click "Save Video" → video downloads automatically to your Downloads folder.
             </p>
           </div>
 

@@ -10,17 +10,41 @@ export default function Dashboard() {
   useEffect(() => {
     const getUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) setUser(session.user);
+      if (!session) return;
+      setUser(session.user);
+
+      // Fetch real token balance
+      const tokenRes = await fetch('/api/tokens', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
+      const tokenData = await tokenRes.json();
+      if (tokenData.balance !== undefined) setTokens(tokenData.balance);
+
+      // Fetch real generations count
+      const genRes = await fetch('/api/generations', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
+      const genData = await genRes.json();
+      const generations = genData.generations || [];
+      const videos = generations.filter((g: any) => g.type?.includes('video')).length;
+      const images = generations.filter((g: any) => g.type?.includes('image')).length;
+
+      setStats([
+        { icon: "🎬", label: "Videos Generated", value: videos, sub: `${videos} completed`, color: "text-purple-400" },
+        { icon: "🖼️", label: "Images Generated", value: images, sub: `${images} completed`, color: "text-pink-400" },
+        { icon: "📡", label: "Posts Published", value: 0, sub: "0 this week", color: "text-blue-400" },
+        { icon: "🕵️", label: "Ads Spied", value: 0, sub: "0 saved", color: "text-green-400" },
+      ]);
     };
     getUser();
   }, []);
 
-  const stats = [
+  const [stats, setStats] = useState([
     { icon: "🎬", label: "Videos Generated", value: 0, sub: "0 completed", color: "text-purple-400" },
     { icon: "🖼️", label: "Images Generated", value: 0, sub: "0 completed", color: "text-pink-400" },
     { icon: "📡", label: "Posts Published", value: 0, sub: "0 this week", color: "text-blue-400" },
     { icon: "🕵️", label: "Ads Spied", value: 0, sub: "0 saved", color: "text-green-400" },
-  ];
+  ]);
 
   const quickActions = [
     { icon: "🎬", title: "Generate Video", desc: "Text to video, image to video, avatar videos", href: "/dashboard/studio", color: "from-purple-600 to-purple-800" },
