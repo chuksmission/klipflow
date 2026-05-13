@@ -61,7 +61,6 @@ export default function Studio() {
         try {
           const statusRes = await fetch(`/api/video-status?task_id=${data.task_id}`);
           const statusData = await statusRes.json();
-
           if (statusData.completed && statusData.video_url) {
             setVideoUrl(statusData.video_url);
             setStatus("Video ready!");
@@ -112,7 +111,7 @@ export default function Studio() {
           <p className="text-gray-500 text-xs">Each video costs 10 tokens. Top up anytime from $5.</p>
         </div>
         <a href="/dashboard/billing" className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold py-2 px-4 rounded-full transition">
-          Top Up →
+          Top Up
         </a>
       </div>
 
@@ -125,14 +124,16 @@ export default function Studio() {
               className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:border-purple-500/50 transition cursor-pointer group"
             >
               {mod.badge && (
-                <div className="inline-block bg-purple-900/40 text-purple-300 text-xs font-bold px-2 py-0.5 rounded-full mb-3">{mod.badge}</div>
+                <div className="inline-block bg-purple-900/40 text-purple-300 text-xs font-bold px-2 py-0.5 rounded-full mb-3">
+                  {mod.badge}
+                </div>
               )}
               <div className="text-3xl mb-3">{mod.icon}</div>
               <h3 className="font-bold mb-1 group-hover:text-purple-400 transition">{mod.title}</h3>
               <p className="text-gray-500 text-xs mb-3 leading-relaxed">{mod.desc}</p>
               <div className="flex items-center justify-between">
                 <span className="text-purple-400 text-xs font-bold">{mod.tokens}</span>
-                <span className="text-gray-600 text-xs">Click to use →</span>
+                <span className="text-gray-600 text-xs">Click to use</span>
               </div>
             </div>
           ))}
@@ -142,8 +143,11 @@ export default function Studio() {
       {activeModule && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <button onClick={resetForm} className="text-gray-400 hover:text-white text-sm transition">
-              ← Back
+            <button
+              onClick={resetForm}
+              className="text-gray-400 hover:text-white text-sm transition"
+            >
+              Back
             </button>
             <h2 className="font-bold">
               {modules.find(m => m.id === activeModule)?.icon}{" "}
@@ -152,6 +156,7 @@ export default function Studio() {
           </div>
 
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-4">
+
             {activeModule === 'image_to_video' && (
               <div>
                 <label className="text-gray-400 text-sm mb-1 block">Image URL</label>
@@ -173,9 +178,11 @@ export default function Studio() {
               </label>
               <textarea
                 placeholder={
-                  activeModule === 'text_to_video' ? 'A luxury watch rotating slowly on a marble surface, golden hour lighting, cinematic...' :
-                  activeModule === 'image_to_video' ? 'Describe how you want the image to move...' :
-                  'Describe what you want to create...'
+                  activeModule === 'text_to_video'
+                    ? 'A luxury watch rotating slowly on a marble surface, golden hour lighting, cinematic...'
+                    : activeModule === 'image_to_video'
+                    ? 'Describe how you want the image to move...'
+                    : 'Describe what you want to create...'
                 }
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
@@ -204,20 +211,22 @@ export default function Studio() {
                     onChange={(e) => setAspectRatio(e.target.value)}
                     className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition text-sm"
                   >
-                    <option value="16:9">16:9 (YouTube)</option>
-                    <option value="9:16">9:16 (TikTok/Reels)</option>
-                    <option value="1:1">1:1 (Feed)</option>
+                    <option value="16:9">16:9 YouTube</option>
+                    <option value="9:16">9:16 TikTok</option>
+                    <option value="1:1">1:1 Feed</option>
                   </select>
                 </div>
               </div>
             )}
 
-            {error && <p className="text-red-400 text-sm">{error}</p>}
+            {error && (
+              <p className="text-red-400 text-sm">{error}</p>
+            )}
 
             {status && !error && (
               <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3">
                 <p className="text-purple-300 text-sm">
-                  {loading && <span className="animate-pulse">⏳ </span>}
+                  {loading && "⏳ "}
                   {status}
                 </p>
               </div>
@@ -234,16 +243,19 @@ export default function Studio() {
 
           {videoUrl && (
             <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <h3 className="font-bold mb-4">✅ Your Video is Ready!</h3>
-              <video src={videoUrl} controls className="w-full rounded-xl mb-4" />
+              <h3 className="font-bold mb-4">Your Video is Ready!</h3>
+              <video
+                src={videoUrl}
+                controls
+                className="w-full rounded-xl mb-4"
+              />
               <div className="flex gap-3">
-                
-                  href={videoUrl}
-                  download
-                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition text-center text-sm"
+                <button
+                  onClick={() => window.open(videoUrl, '_blank')}
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition text-sm"
                 >
-                  ⬇️ Download Video
-                </a>
+                  Download Video
+                </button>
                 <button
                   onClick={resetForm}
                   className="flex-1 bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition text-sm"
