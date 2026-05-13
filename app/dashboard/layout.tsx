@@ -48,14 +48,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   );
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex">
+    <div className="min-h-screen bg-gray-950 text-white flex overflow-x-hidden w-full">
 
       {/* SIDEBAR */}
       <aside className="hidden md:flex flex-col w-64 border-r border-white/10 fixed h-full bg-gray-950">
 
         {/* LOGO */}
         <div className="p-6 border-b border-white/10">
-          <Link href="/" className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
+          <Link href="/dashboard" className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
             KlipflowAI
           </Link>
         </div>
@@ -105,12 +105,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* MAIN */}
-      <div className="flex-1 md:ml-64 flex flex-col">
+      <div className="flex-1 md:ml-64 flex flex-col min-w-0 overflow-x-hidden">
 
         {/* TOP HEADER */}
         <header className="sticky top-0 z-40 bg-gray-950 border-b border-white/10 px-4 py-3 flex items-center justify-between">
           {/* MOBILE LOGO */}
-          <Link href="/" className="md:hidden text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
+          <Link href="/dashboard" className="md:hidden text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
             KlipflowAI
           </Link>
 
@@ -193,7 +193,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         )}
 
         {/* PAGE CONTENT */}
-        <main className="flex-1 p-4 md:p-8 overflow-x-hidden">
+        <main className="flex-1 p-4 md:p-8 overflow-x-hidden w-full min-w-0">
           {children}
         </main>
       </div>

@@ -1,6 +1,7 @@
 'use client';
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabase";
 import { getDeviceFingerprint } from "../lib/fingerprint";
 
@@ -11,6 +12,15 @@ export default function SignUp() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) router.push('/dashboard');
+    };
+    checkSession();
+  }, []);
 
   const handleSignUp = async () => {
     if (!email || !password || !confirmPassword) {

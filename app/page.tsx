@@ -1,7 +1,9 @@
 'use client';
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { getDeviceFingerprint } from "./lib/fingerprint";
+import { supabase } from "./lib/supabase";
 
 export default function Home() {
   const [email, setEmail] = useState("");
@@ -16,6 +18,30 @@ export default function Home() {
   const [expandedPrompt, setExpandedPrompt] = useState("");
   const [promptLoading, setPromptLoading] = useState(false);
   const [activeNiche, setActiveNiche] = useState(0);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setIsLoggedIn(true);
+      }
+    };
+    checkSession();
+  }, []);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setIsLoggedIn(true);
+      }
+    };
+    checkSession();
+  }, []);
 
   const handleSubmit = async () => {
     if (!email) return;
@@ -151,12 +177,20 @@ export default function Home() {
           <a href="#faq" className="hover:text-white transition">FAQ</a>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/login" className="text-gray-400 hover:text-white text-sm font-semibold py-2 px-5 rounded-full border border-white/20 hover:border-white/40 transition">
-            Sign In
-          </Link>
-          <Link href="/signup" className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold py-2 px-5 rounded-full transition">
-            Sign Up Free
-          </Link>
+          {isLoggedIn ? (
+            <Link href="/dashboard" className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold py-2 px-5 rounded-full transition">
+              Go to Dashboard →
+            </Link>
+          ) : (
+            <>
+              <Link href="/login" className="text-gray-400 hover:text-white text-sm font-semibold py-2 px-5 rounded-full border border-white/20 hover:border-white/40 transition">
+                Sign In
+              </Link>
+              <Link href="/signup" className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold py-2 px-5 rounded-full transition">
+                Sign Up Free
+              </Link>
+            </>
+          )}
         </div>
       </nav>
 
