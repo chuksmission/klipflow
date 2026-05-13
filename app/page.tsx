@@ -18,18 +18,7 @@ export default function Home() {
   const [expandedPrompt, setExpandedPrompt] = useState("");
   const [promptLoading, setPromptLoading] = useState(false);
   const [activeNiche, setActiveNiche] = useState(0);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const router = useRouter();
-
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setIsLoggedIn(true);
-      }
-    };
-    checkSession();
-  }, []);
+  
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const router = useRouter();
 
