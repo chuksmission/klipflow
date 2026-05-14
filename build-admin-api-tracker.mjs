@@ -1,4 +1,6 @@
-"use client";
+import { writeFileSync } from 'fs';
+
+writeFileSync('app/admin/ai-providers/page.tsx', `"use client";
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 
@@ -81,7 +83,7 @@ export default function AdminAIProviders() {
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-2xl p-4">
           <div className="text-yellow-400 text-xs font-bold uppercase mb-1">Total API Cost</div>
-          <div className="text-2xl font-extrabold text-white">${stats.totalCost.toFixed(3)}</div>
+          <div className="text-2xl font-extrabold text-white">\${stats.totalCost.toFixed(3)}</div>
           <div className="text-gray-500 text-xs">All time estimated</div>
         </div>
         <div className="bg-purple-900/20 border border-purple-500/30 rounded-2xl p-4">
@@ -91,7 +93,7 @@ export default function AdminAIProviders() {
         </div>
         <div className="bg-blue-900/20 border border-blue-500/30 rounded-2xl p-4">
           <div className="text-blue-400 text-xs font-bold uppercase mb-1">Avg Cost/Video</div>
-          <div className="text-2xl font-extrabold text-white">${stats.totalGenerations > 0 ? (stats.totalCost / stats.totalGenerations).toFixed(3) : "0.000"}</div>
+          <div className="text-2xl font-extrabold text-white">\${stats.totalGenerations > 0 ? (stats.totalCost / stats.totalGenerations).toFixed(3) : "0.000"}</div>
           <div className="text-gray-500 text-xs">Per generation</div>
         </div>
       </div>
@@ -107,7 +109,7 @@ export default function AdminAIProviders() {
                   <div className="text-gray-500 text-xs">{data.count} generations</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-yellow-400 font-bold text-sm">${data.cost.toFixed(3)}</div>
+                  <div className="text-yellow-400 font-bold text-sm">\${data.cost.toFixed(3)}</div>
                   <div className="text-gray-500 text-xs">estimated cost</div>
                 </div>
               </div>
@@ -145,3 +147,6 @@ export default function AdminAIProviders() {
     </div>
   );
 }
+`, 'utf8');
+
+console.log('Updated AI Providers page with cost tracker!');
