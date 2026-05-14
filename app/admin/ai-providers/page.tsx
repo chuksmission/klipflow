@@ -1,4 +1,4 @@
-"use client";
+ï»¿"use client";
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 
@@ -12,7 +12,7 @@ export default function AdminAIProviders() {
     {
       name: "Kling AI",
       icon: "??",
-      desc: "Video generation — Kling v1, v2, v3",
+      desc: "Video generation  Kling v1, v2, v3",
       fields: [
         { key: "kling_access_key", label: "Access Key", secret: true },
         { key: "kling_secret_key", label: "Secret Key", secret: true },

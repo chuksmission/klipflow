@@ -1,4 +1,4 @@
-"use client";
+ï»¿"use client";
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 
@@ -36,7 +36,7 @@ export default function AdminSocialAuth() {
       id: "apple",
       name: "Apple Sign In",
       icon: "??",
-      desc: "Sign in with Apple — required for iOS App Store",
+      desc: "Sign in with Apple  required for iOS App Store",
       redirect: "https://jcovsxvbrakofybchvbc.supabase.co/auth/v1/callback",
       fields: [
         { key: "apple_service_id", label: "Service ID", secret: false },
@@ -94,7 +94,7 @@ export default function AdminSocialAuth() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-extrabold mb-1">Social Auth</h1>
-          <p className="text-gray-400 text-sm">Configure all authentication providers — no coding needed</p>
+          <p className="text-gray-400 text-sm">Configure all authentication providers  no coding needed</p>
         </div>
         <button
           onClick={handleSave}
@@ -128,7 +128,7 @@ export default function AdminSocialAuth() {
               </div>
               {provider.redirect && (
                 <div className="bg-black/20 rounded-xl px-4 py-2 mb-3">
-                  <p className="text-gray-500 text-xs mb-0.5">Authorized Redirect URI — add this to your provider</p>
+                  <p className="text-gray-500 text-xs mb-0.5">Authorized Redirect URI  add this to your provider</p>
                   <p className="text-purple-400 text-xs font-mono break-all">{provider.redirect}</p>
                 </div>
               )}

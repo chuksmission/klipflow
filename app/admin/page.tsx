@@ -1,4 +1,4 @@
-"use client";
+ï»¿"use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { supabase } from "../lib/supabase";
@@ -62,7 +62,7 @@ export default function AdminOverview() {
       <div className="bg-gradient-to-r from-purple-900/30 to-pink-900/20 border border-purple-500/20 rounded-2xl p-6">
         <h1 className="text-2xl font-extrabold mb-1">Admin Dashboard ???</h1>
         <p className="text-gray-400 text-sm">
-          {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} · Platform-wide overview
+          {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}  Platform-wide overview
         </p>
       </div>
 

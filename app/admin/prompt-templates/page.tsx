@@ -1,4 +1,4 @@
-"use client";
+ï»¿"use client";
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 
@@ -64,7 +64,7 @@ export default function AdminPromptTemplates() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-extrabold mb-1">Prompt Templates</h1>
-          <p className="text-gray-400 text-sm">{templates.length} templates — shown to users in Video Studio</p>
+          <p className="text-gray-400 text-sm">{templates.length} templates  shown to users in Video Studio</p>
         </div>
         <button onClick={() => setShowForm(!showForm)} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-xl transition text-sm">
           + Add Template

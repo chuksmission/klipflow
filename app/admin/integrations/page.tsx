@@ -1,4 +1,4 @@
-"use client";
+ï»¿"use client";
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 
@@ -21,7 +21,7 @@ export default function AdminIntegrations() {
     {
       name: "Meta Ads Library",
       icon: "???",
-      desc: "Facebook Ad Spy — search winning ads via Meta Ads Library API",
+      desc: "Facebook Ad Spy  search winning ads via Meta Ads Library API",
       docs: "https://developers.facebook.com/docs/marketing-api/reference/ads-archive/",
       fields: [
         { key: "meta_ads_api_token", label: "Access Token", secret: true },
@@ -30,7 +30,7 @@ export default function AdminIntegrations() {
     {
       name: "Meta Ads Manager",
       icon: "??",
-      desc: "One-click ad launcher — launch campaigns directly to Facebook Ads",
+      desc: "One-click ad launcher  launch campaigns directly to Facebook Ads",
       docs: "https://developers.facebook.com/docs/marketing-apis/",
       fields: [
         { key: "meta_ads_manager_token", label: "Access Token", secret: true },

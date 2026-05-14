@@ -1,4 +1,4 @@
-"use client";
+ï»¿"use client";
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 
@@ -16,7 +16,7 @@ export default function AdminEmailSettings() {
     { key: "smtp_port", label: "SMTP Port", placeholder: "587", secret: false },
     { key: "smtp_security", label: "Security Protocol", placeholder: "TLS", secret: false },
     { key: "smtp_username", label: "Username", placeholder: "you@example.com", secret: false },
-    { key: "smtp_password", label: "Password / App Password", placeholder: "••••••••••••", secret: true },
+    { key: "smtp_password", label: "Password / App Password", placeholder: "", secret: true },
     { key: "smtp_sender_email", label: "Sender Email", placeholder: "noreply@klipflowai.com", secret: false },
     { key: "smtp_sender_name", label: "Sender Display Name", placeholder: "KlipflowAI", secret: false },
   ];
@@ -115,7 +115,7 @@ export default function AdminEmailSettings() {
                 type="password"
                 value={settings.smtp_password || ""}
                 onChange={(e) => setSettings({ ...settings, smtp_password: e.target.value })}
-                placeholder="••••••••••••"
+                placeholder=""
                 className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-sm"
               />
             </div>

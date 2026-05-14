@@ -1,4 +1,4 @@
-"use client";
+ï»¿"use client";
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 
@@ -38,7 +38,7 @@ export default function AdminLeads() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-extrabold mb-1">Leads</h1>
-        <p className="text-gray-400 text-sm">{leads.length} total leads · {leads.filter((l) => !l.is_read).length} unread</p>
+        <p className="text-gray-400 text-sm">{leads.length} total leads  {leads.filter((l) => !l.is_read).length} unread</p>
       </div>
 
       <input

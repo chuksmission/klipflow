@@ -1,4 +1,4 @@
-"use client";
+ï»¿"use client";
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 
@@ -144,7 +144,7 @@ export default function AdminUsers() {
                 className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm"
               >
                 {roles.filter((r) => r.value !== "super_admin").map((role) => (
-                  <option key={role.value} value={role.value}>{role.label} — {role.desc}</option>
+                  <option key={role.value} value={role.value}>{role.label}  {role.desc}</option>
                 ))}
               </select>
             </div>
@@ -227,14 +227,14 @@ export default function AdminUsers() {
               </div>
               <div>
                 <h3 className="font-bold">{selectedUser.email}</h3>
-                <p className="text-gray-500 text-xs">Joined {new Date(selectedUser.created_at).toLocaleDateString()} · {selectedUser.provider || "email"}</p>
+                <p className="text-gray-500 text-xs">Joined {new Date(selectedUser.created_at).toLocaleDateString()}  {selectedUser.provider || "email"}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-black/20 rounded-xl p-3">
                 <div className="text-gray-500 text-xs mb-1">Token Balance</div>
-                <div className="text-yellow-400 font-bold">?? {selectedUser.token_balance ?? "—"}</div>
+                <div className="text-yellow-400 font-bold">?? {selectedUser.token_balance ?? ""}</div>
               </div>
               <div className="bg-black/20 rounded-xl p-3">
                 <div className="text-gray-500 text-xs mb-1">Status</div>

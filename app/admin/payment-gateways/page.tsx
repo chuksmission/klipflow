@@ -1,4 +1,4 @@
-"use client";
+ï»¿"use client";
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 
@@ -34,7 +34,7 @@ export default function AdminPaymentGateways() {
       id: "paystack",
       name: "Paystack",
       icon: "??",
-      desc: "Africa payments — Nigeria, Ghana, Kenya, South Africa",
+      desc: "Africa payments  Nigeria, Ghana, Kenya, South Africa",
       fields: [
         { key: "paystack_public_key", label: "Public Key", secret: false },
         { key: "paystack_secret_key", label: "Secret Key", secret: true },

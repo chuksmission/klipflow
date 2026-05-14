@@ -1,4 +1,4 @@
-"use client";
+ï»¿"use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
@@ -167,7 +167,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="flex-1 md:ml-64 flex flex-col min-w-0 overflow-x-hidden">
         <header className="sticky top-0 z-40 bg-gray-950 border-b border-white/10 px-4 py-3 flex items-center justify-between">
           <div className="hidden md:block text-gray-400 text-xs">
-            Admin <span className="text-gray-600 mx-1">›</span>
+            Admin <span className="text-gray-600 mx-1"></span>
             <span className="text-white capitalize">{pathname.split("/").pop()?.replace(/-/g, " ") || "Overview"}</span>
           </div>
           <Link href="/admin" className="md:hidden text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">

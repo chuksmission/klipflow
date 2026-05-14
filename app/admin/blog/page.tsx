@@ -1,4 +1,4 @@
-"use client";
+ï»¿"use client";
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 
@@ -168,7 +168,7 @@ export default function AdminBlog() {
                   </span>
                 </div>
                 <p className="text-gray-500 text-xs truncate">{post.excerpt}</p>
-                <p className="text-gray-600 text-xs mt-1">/{post.slug} · {new Date(post.created_at).toLocaleDateString()}</p>
+                <p className="text-gray-600 text-xs mt-1">/{post.slug}  {new Date(post.created_at).toLocaleDateString()}</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button onClick={() => toggleStatus(post.id, post.status)} className="text-purple-400 hover:text-white text-xs transition">
