@@ -28,7 +28,7 @@ export default function AdminEmailSettings() {
       const res = await fetch("/api/admin/settings?category=email", { headers: { Authorization: "Bearer " + session.access_token } });
       const data = await res.json();
       const map = {};
-      data.settings?.forEach((s) => { map[s.key] = s.value || ""; });
+      data.settings?.forEach((s: any) => { map[s.key] = s.value || ""; });
       setSettings(map);
       setLoading(false);
     };

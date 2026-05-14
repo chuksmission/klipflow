@@ -23,7 +23,7 @@ export default function AdminSiteSettings() {
       const res = await fetch("/api/admin/settings?category=general", { headers: { Authorization: "Bearer " + session.access_token } });
       const data = await res.json();
       const map = {};
-      data.settings?.forEach((s) => { map[s.key] = s.value || ""; });
+      data.settings?.forEach((s: any) => { map[s.key] = s.value || ""; });
       setSettings(map);
       setLoading(false);
     };
