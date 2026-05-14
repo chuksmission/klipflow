@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 
@@ -11,7 +11,7 @@ export default function AdminIntegrations() {
   const integrations = [
     {
       name: "Ayrshare",
-      icon: "??",
+      icon: "Ayrshare",
       desc: "Auto-posting to TikTok, Instagram, YouTube, Facebook and X",
       docs: "https://www.ayrshare.com/",
       fields: [
@@ -20,8 +20,8 @@ export default function AdminIntegrations() {
     },
     {
       name: "Meta Ads Library",
-      icon: "???",
-      desc: "Facebook Ad Spy  search winning ads via Meta Ads Library API",
+      icon: "Meta Ads Library",
+      desc: "Facebook Ad Spy - search winning ads via Meta Ads Library API",
       docs: "https://developers.facebook.com/docs/marketing-api/reference/ads-archive/",
       fields: [
         { key: "meta_ads_api_token", label: "Access Token", secret: true },
@@ -29,8 +29,8 @@ export default function AdminIntegrations() {
     },
     {
       name: "Meta Ads Manager",
-      icon: "??",
-      desc: "One-click ad launcher  launch campaigns directly to Facebook Ads",
+      icon: "Meta Ads Manager",
+      desc: "One-click ad launcher - launch campaigns directly to Facebook Ads",
       docs: "https://developers.facebook.com/docs/marketing-apis/",
       fields: [
         { key: "meta_ads_manager_token", label: "Access Token", secret: true },
@@ -81,7 +81,7 @@ export default function AdminIntegrations() {
           disabled={saving}
           className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-2 px-6 rounded-xl transition text-sm"
         >
-          {saving ? "Saving..." : saved ? "? Saved!" : "Save Changes"}
+          {saving ? "Saving..." : saved ? "Saved!" : "Save Changes"}
         </button>
       </div>
 
@@ -93,7 +93,9 @@ export default function AdminIntegrations() {
             <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <span className="text-3xl">{integration.icon}</span>
+                  <div className="bg-purple-900/30 border border-purple-500/20 rounded-xl px-3 py-1.5">
+                    <span className="text-purple-400 text-xs font-bold">{integration.icon}</span>
+                  </div>
                   <div>
                     <h3 className="font-bold">{integration.name}</h3>
                     <p className="text-gray-500 text-xs">{integration.desc}</p>
@@ -103,9 +105,9 @@ export default function AdminIntegrations() {
                   href={integration.docs}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-purple-400 hover:text-white text-xs transition"
+                  className="text-purple-400 hover:text-white text-xs transition shrink-0"
                 >
-                  Docs →
+                  Docs
                 </a>
               </div>
               <div className="space-y-3">
