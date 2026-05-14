@@ -23,7 +23,7 @@ export default function AdminPaymentGateways() {
       if (!session) return;
       const res = await fetch("/api/admin/settings?category=payments", { headers: { Authorization: "Bearer " + session.access_token } });
       const data = await res.json();
-      const map = {};
+      const map: Record<string, string> = {};
       data.settings?.forEach((s: any) => { map[s.key] = s.value || ""; });
       setSettings(map);
       setLoading(false);
