@@ -11,7 +11,6 @@ export default function AdminIntegrations() {
   const integrations = [
     {
       name: "Ayrshare",
-      icon: "Ayrshare",
       desc: "Auto-posting to TikTok, Instagram, YouTube, Facebook and X",
       docs: "https://www.ayrshare.com/",
       fields: [
@@ -20,7 +19,6 @@ export default function AdminIntegrations() {
     },
     {
       name: "Meta Ads Library",
-      icon: "Meta Ads Library",
       desc: "Facebook Ad Spy - search winning ads via Meta Ads Library API",
       docs: "https://developers.facebook.com/docs/marketing-api/reference/ads-archive/",
       fields: [
@@ -29,7 +27,6 @@ export default function AdminIntegrations() {
     },
     {
       name: "Meta Ads Manager",
-      icon: "Meta Ads Manager",
       desc: "One-click ad launcher - launch campaigns directly to Facebook Ads",
       docs: "https://developers.facebook.com/docs/marketing-apis/",
       fields: [
@@ -92,23 +89,16 @@ export default function AdminIntegrations() {
           {integrations.map((integration, i) => (
             <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-6">
               <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="bg-purple-900/30 border border-purple-500/20 rounded-xl px-3 py-1.5">
-                    <span className="text-purple-400 text-xs font-bold">{integration.icon}</span>
-                  </div>
-                  <div>
-                    <h3 className="font-bold">{integration.name}</h3>
-                    <p className="text-gray-500 text-xs">{integration.desc}</p>
-                  </div>
+                <div>
+                  <h3 className="font-bold">{integration.name}</h3>
+                  <p className="text-gray-500 text-xs">{integration.desc}</p>
                 </div>
-                
-                  href={integration.docs}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-purple-400 hover:text-white text-xs transition shrink-0"
+                <button
+                  onClick={() => window.open(integration.docs, "_blank")}
+                  className="text-purple-400 hover:text-white text-xs transition shrink-0 ml-4"
                 >
-                  Docs
-                </a>
+                  View Docs
+                </button>
               </div>
               <div className="space-y-3">
                 {integration.fields.map((field) => (
