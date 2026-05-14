@@ -22,6 +22,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         return;
       }
       setUser(session.user);
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('is_banned')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      if (profile?.is_banned) {
+        await supabase.auth.signOut();
+        router.push('/login');
+        return;
+      }
     };
     getUser();
   }, []);
