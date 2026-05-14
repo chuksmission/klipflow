@@ -12,13 +12,13 @@ export default function AdminEmailSettings() {
   const [testResult, setTestResult] = useState("");
 
   const fields = [
-    { key: "smtp_host", label: "SMTP Host", placeholder: "smtp.resend.com" },
-    { key: "smtp_port", label: "SMTP Port", placeholder: "465" },
-    { key: "smtp_security", label: "Security Protocol", placeholder: "TLS" },
-    { key: "smtp_username", label: "Username", placeholder: "resend" },
-    { key: "smtp_password", label: "Password / API Key", placeholder: "••••••••••••", secret: true },
-    { key: "smtp_sender_email", label: "Sender Email", placeholder: "noreply@klipflowai.com" },
-    { key: "smtp_sender_name", label: "Sender Name", placeholder: "KlipflowAI" },
+    { key: "smtp_host", label: "SMTP Host", placeholder: "smtp.resend.com", secret: false },
+    { key: "smtp_port", label: "SMTP Port", placeholder: "465", secret: false },
+    { key: "smtp_security", label: "Security Protocol", placeholder: "TLS", secret: false },
+    { key: "smtp_username", label: "Username", placeholder: "resend", secret: false },
+    { key: "smtp_password", label: "Password or API Key", placeholder: "your-api-key", secret: true },
+    { key: "smtp_sender_email", label: "Sender Email", placeholder: "noreply@klipflowai.com", secret: false },
+    { key: "smtp_sender_name", label: "Sender Name", placeholder: "KlipflowAI", secret: false },
   ];
 
   useEffect(() => {

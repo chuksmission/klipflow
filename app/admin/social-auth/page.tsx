@@ -13,7 +13,7 @@ export default function AdminSocialAuth() {
     { id: "google", name: "Google OAuth", desc: "Sign in with Google", redirect: "https://jcovsxvbrakofybchvbc.supabase.co/auth/v1/callback", fields: [{ key: "google_client_id", label: "Client ID", secret: false }, { key: "google_client_secret", label: "Client Secret", secret: true }] },
     { id: "facebook", name: "Facebook OAuth", desc: "Sign in with Facebook", redirect: "https://jcovsxvbrakofybchvbc.supabase.co/auth/v1/callback", fields: [{ key: "facebook_app_id", label: "App ID", secret: false }, { key: "facebook_app_secret", label: "App Secret", secret: true }] },
     { id: "apple", name: "Apple Sign In", desc: "Sign in with Apple — required for iOS App Store", redirect: "https://jcovsxvbrakofybchvbc.supabase.co/auth/v1/callback", fields: [{ key: "apple_service_id", label: "Service ID", secret: false }, { key: "apple_team_id", label: "Team ID", secret: false }, { key: "apple_key_id", label: "Key ID", secret: false }, { key: "apple_private_key", label: "Private Key", secret: true }] },
-    { id: "phone", name: "Phone OTP via Twilio", desc: "Sign in with phone number via SMS OTP", redirect: null, fields: [{ key: "twilio_account_sid", label: "Account SID", secret: false }, { key: "twilio_auth_token", label: "Auth Token", secret: true }, { key: "twilio_phone_number", label: "Twilio Phone Number", secret: false }] },
+    { id: "phone", name: "Phone OTP via Twilio", desc: "Sign in with phone number via SMS OTP", redirect: null, fields: [{ key: "twilio_account_sid", label: "Account SID", secret: false }, { key: "twilio_auth_token", label: "Auth Token", secret: true }, { key: "twilio_phone_number", label: "Phone Number", secret: false }] },
   ];
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export default function AdminSocialAuth() {
               </div>
               {provider.redirect && (
                 <div className="bg-black/20 rounded-xl px-4 py-2 mb-3">
-                  <p className="text-gray-500 text-xs mb-0.5">Authorized Redirect URI</p>
+                  <p className="text-gray-500 text-xs mb-0.5">Redirect URI</p>
                   <p className="text-purple-400 text-xs font-mono break-all">{provider.redirect}</p>
                 </div>
               )}
