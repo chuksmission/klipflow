@@ -20,7 +20,7 @@ export default function ResetPassword() {
 
     try {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/update-password`
+        redirectTo: `https://klipflowai.com/update-password`
       });
 
       if (resetError) {
