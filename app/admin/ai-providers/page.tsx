@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 
 export default function AdminAIProviders() {
-  const [settings, setSettings] = useState({});
+  const [settings, setSettings] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);

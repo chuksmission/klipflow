@@ -3,8 +3,8 @@ import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 
 export default function AdminSocialAuth() {
-  const [settings, setSettings] = useState({});
-  const [enabled, setEnabled] = useState({ google: true });
+  const [settings, setSettings] = useState<Record<string, string>>({});
+  const [enabled, setEnabled] = useState<Record<string, boolean>>({ google: true });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);

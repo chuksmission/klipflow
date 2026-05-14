@@ -3,8 +3,8 @@ import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 
 export default function AdminPaymentGateways() {
-  const [settings, setSettings] = useState({});
-  const [enabled, setEnabled] = useState({});
+  const [settings, setSettings] = useState<Record<string, string>>({});
+  const [enabled, setEnabled] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
