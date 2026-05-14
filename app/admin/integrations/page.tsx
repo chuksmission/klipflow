@@ -105,7 +105,7 @@ export default function AdminIntegrations() {
                   rel="noopener noreferrer"
                   className="text-purple-400 hover:text-white text-xs transition"
                 >
-                  Docs ?
+                  Docs →
                 </a>
               </div>
               <div className="space-y-3">
