@@ -88,7 +88,11 @@ export async function POST(req: NextRequest) {
       }
 
       // Correct model: dop/standard for image-to-video, seedance for text-to-video
-      const modelId = image_url ? "higgsfield-ai/dop/standard" : "bytedance/seedance/v1/pro/image-to-video";
+      if (!image_url) {
+        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+        return NextResponse.json({ error: "Higgsfield requires an image. Please upload one.", refunded: true }, { status: 400 });
+      }
+      const modelId = "higgsfield-ai/dop/standard";
       const endpoint = `https://platform.higgsfield.ai/${modelId}`;
 
       const higgsfieldBody: Record<string, unknown> = { prompt };
