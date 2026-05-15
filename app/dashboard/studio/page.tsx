@@ -71,8 +71,7 @@ export default function Studio() {
   // Models shown per module — Higgsfield always shown in ugc_ad, hidden elsewhere
   // All Kling models always shown in text/image modules
   const getVisibleModels = (module: string | null): Model[] => {
-    if (module === "ugc_ad") return ALL_MODELS.filter((m) => m.available);
-    return ALL_MODELS.filter((m) => m.available && m.provider !== "higgsfield");
+    return ALL_MODELS.filter((m) => m.available);
   };
 
   useEffect(() => {
