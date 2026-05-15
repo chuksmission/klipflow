@@ -19,6 +19,14 @@ export default function AdminAIProviders() {
     "kling-v2-master": 0.025,
     "kling-v3-std":    0.040,
     "kling-v3-pro":    0.063,
+    "veo3-fast":       0.040,
+    "veo3-quality":    0.200,
+    "seedance-2":      0.050,
+    "seedance-2-fast": 0.025,
+    "hailuo-pro":      0.030,
+    "sora-2":          0.150,
+    "wan-2-6":         0.010,
+    "luma-ray-3":      0.080,
     "higgsfield-ugc":  0.060,
   };
 
@@ -26,27 +34,35 @@ export default function AdminAIProviders() {
     {
       id: "kie",
       name: "Kie.ai",
-      desc: "Unified API — Kling 1.6, 2.1, 3.0 (with audio), Veo 3, Seedance 2.0, and more",
+      desc: "Unified API — Kling, Veo 3, Seedance, Sora 2, Hailuo, Wan, Luma and more",
       docsUrl: "https://docs.kie.ai",
       enabledKey: "kie_enabled",
       fields: [
         { key: "kie_api_key", label: "API Key", secret: true },
       ],
       models: [
-        { key: "kling_v1_6_enabled", label: "Kling 1.6 (Standard + Pro)" },
-        { key: "kling_v2_master_enabled", label: "Kling 2.1 Master" },
-        { key: "kling_v3_enabled", label: "Kling 3.0 (Standard + Pro) — With Audio" },
+        { key: "kling_v1_6_enabled",    label: "Kling 1.6 Standard + Pro" },
+        { key: "kling_v2_master_enabled",label: "Kling 2.1 Master" },
+        { key: "kling_v3_enabled",       label: "Kling 3.0 Standard + Pro — With Audio" },
+        { key: "veo3_fast_enabled",      label: "Veo 3 Fast — Google, with audio ($0.40/8s)" },
+        { key: "veo3_quality_enabled",   label: "Veo 3 Quality — Google, with audio ($2.00/8s)" },
+        { key: "seedance2_enabled",      label: "Seedance 2.0 — ByteDance, best quality" },
+        { key: "seedance2_fast_enabled", label: "Seedance 2.0 Fast — ByteDance, cheaper" },
+        { key: "hailuo_enabled",         label: "Hailuo 2.3 Pro — MiniMax, fast" },
+        { key: "sora2_enabled",          label: "Sora 2 — OpenAI, premium realism" },
+        { key: "wan26_enabled",          label: "Wan 2.6 — Alibaba, cheapest option" },
+        { key: "luma_enabled",           label: "Luma Ray 3 — cinematic quality" },
       ],
     },
     {
       id: "higgsfield",
       name: "Higgsfield AI",
-      desc: "Realistic UGC and ad video generation — image to video with Seedance",
+      desc: "Realistic UGC and ad video generation — image to video",
       docsUrl: "https://docs.higgsfield.ai",
       enabledKey: "higgsfield_enabled",
       fields: [
-        { key: "higgsfield_key_id", label: "API Key ID", secret: false },
-        { key: "higgsfield_key_secret", label: "API Key Secret", secret: true },
+        { key: "higgsfield_key_id",     label: "API Key ID",     secret: false },
+        { key: "higgsfield_key_secret", label: "API Key Secret", secret: true  },
       ],
       models: [
         { key: "higgsfield_enabled", label: "Higgsfield UGC Mode" },
@@ -76,10 +92,7 @@ export default function AdminAIProviders() {
     },
   ];
 
-  useEffect(() => {
-    fetchSettings();
-    fetchStats();
-  }, []);
+  useEffect(() => { fetchSettings(); fetchStats(); }, []);
 
   const fetchSettings = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -194,9 +207,7 @@ export default function AdminAIProviders() {
                   <p className="text-gray-500 text-xs mt-0.5">{provider.desc}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => window.open(provider.docsUrl, "_blank")} className="text-purple-400 hover:text-white text-xs transition">
-                    Docs
-                  </button>
+                  <button onClick={() => window.open(provider.docsUrl, "_blank")} className="text-purple-400 hover:text-white text-xs transition">Docs</button>
                   <button
                     onClick={() => toggleEnabled(provider.enabledKey)}
                     className={"relative w-12 h-6 rounded-full transition-colors " + (settings[provider.enabledKey] === "true" ? "bg-purple-600" : "bg-white/20")}
@@ -230,9 +241,9 @@ export default function AdminAIProviders() {
                         <span className="text-sm">{model.label}</span>
                         <button
                           onClick={() => toggleEnabled(model.key)}
-                          className={"relative w-10 h-5 rounded-full transition-colors " + (settings[model.key] !== "false" ? "bg-purple-600" : "bg-white/20")}
+                          className={"relative w-10 h-5 rounded-full transition-colors " + (settings[model.key] === "true" ? "bg-purple-600" : "bg-white/20")}
                         >
-                          <div className={"absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all " + (settings[model.key] !== "false" ? "left-5" : "left-0.5")} />
+                          <div className={"absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all " + (settings[model.key] === "true" ? "left-5" : "left-0.5")} />
                         </button>
                       </div>
                     ))}

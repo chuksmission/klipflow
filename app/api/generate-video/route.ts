@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
 
     if (!prompt) return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
 
-    // ---- HIGGSFIELD (keep using until credits run out) ----
+    // ---- HIGGSFIELD (keep until credits used up) ----
     if (model === "higgsfield-ugc") {
       const keyId = await getSetting("higgsfield_key_id");
       const keySecret = await getSetting("higgsfield_key_secret");
@@ -68,7 +68,6 @@ export async function POST(req: NextRequest) {
         if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
         return NextResponse.json({ error: "Higgsfield not configured.", refunded: true }, { status: 503 });
       }
-
       if (!image_url) {
         if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
         return NextResponse.json({ error: "Higgsfield requires an image. Please upload one.", refunded: true }, { status: 400 });
@@ -76,7 +75,6 @@ export async function POST(req: NextRequest) {
 
       const endpoint = "https://platform.higgsfield.ai/bytedance/seedance/v1/pro/image-to-video";
       const higgsfieldBody = { prompt, image_url, duration: parseInt(duration) };
-
       console.log("Higgsfield POST:", endpoint, JSON.stringify(higgsfieldBody));
 
       const higgsfieldRes = await fetch(endpoint, {
@@ -114,40 +112,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Kie.ai API key not configured in admin settings.", refunded: true }, { status: 503 });
     }
 
-    // Map our model IDs to Kie.ai model strings
-    const kieModelMap: Record<string, { model: string; sound: boolean }> = {
-      "kling-v1-6-std":  { model: "kling-v1.6/video",    sound: false },
-      "kling-v1-6-pro":  { model: "kling-v1.6/video",    sound: false },
-      "kling-v2-master": { model: "kling-v2.1/video",    sound: false },
-      "kling-v3-std":    { model: "kling-3.0/video",     sound: true  },
-      "kling-v3-pro":    { model: "kling-3.0/video",     sound: true  },
+    // Map our model IDs to Kie.ai model strings + mode
+    type KieModelCfg = { model: string; mode?: string; sound: boolean };
+    const kieModelMap: Record<string, KieModelCfg> = {
+      "kling-v1-6-std":  { model: "kling-v1.6/video",           mode: "std", sound: false },
+      "kling-v1-6-pro":  { model: "kling-v1.6/video",           mode: "pro", sound: false },
+      "kling-v2-master": { model: "kling-v2.1/video",           mode: "pro", sound: false },
+      "kling-v3-std":    { model: "kling-3.0/video",            mode: "std", sound: true  },
+      "kling-v3-pro":    { model: "kling-3.0/video",            mode: "pro", sound: true  },
+      "veo3-fast":       { model: "veo3/video",                  mode: "fast",    sound: true  },
+      "veo3-quality":    { model: "veo3/video",                  mode: "quality", sound: true  },
+      "seedance-2":      { model: "bytedance/seedance-2/video",  sound: true  },
+      "seedance-2-fast": { model: "bytedance/seedance-2-fast/video", sound: true },
+      "hailuo-pro":      { model: "hailuo-video/v2.3/video",    mode: "pro", sound: false },
+      "sora-2":          { model: "sora-2/video",               sound: false },
+      "wan-2-6":         { model: "wan/v2.6/video",             sound: false },
+      "luma-ray-3":      { model: "luma/ray-3/video",           sound: false },
     };
 
-    const kieMode: Record<string, string> = {
-      "kling-v1-6-std":  "std",
-      "kling-v1-6-pro":  "pro",
-      "kling-v2-master": "pro",
-      "kling-v3-std":    "std",
-      "kling-v3-pro":    "pro",
-    };
-
-    const kieCfg = kieModelMap[model] ?? { model: "kling-v1.6/video", sound: false };
+    const kieCfg = kieModelMap[model] ?? { model: "kling-v1.6/video", mode: "std", sound: false };
 
     const kieInput: Record<string, unknown> = {
       prompt,
       duration,
       aspect_ratio,
-      mode: kieMode[model] ?? "std",
       sound: kieCfg.sound,
     };
 
+    if (kieCfg.mode) kieInput.mode = kieCfg.mode;
     if (image_url) kieInput.image_urls = [image_url];
 
-    const kieBody = {
-      model: kieCfg.model,
-      input: kieInput,
-    };
-
+    const kieBody = { model: kieCfg.model, input: kieInput };
     console.log("Kie.ai POST:", JSON.stringify(kieBody));
 
     const kieRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
@@ -168,10 +163,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: errMsg, refunded: true }, { status: kieRes.status });
     }
 
-    const jobId = kieData.data?.jobId ?? kieData.jobId ?? kieData.data?.job_id;
+    const jobId = kieData.data?.jobId ?? kieData.jobId ?? kieData.data?.job_id ?? kieData.data?.taskId;
     if (!jobId) {
       if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-      return NextResponse.json({ error: "Kie.ai did not return a job ID.", refunded: true }, { status: 500 });
+      return NextResponse.json({ error: "Kie.ai did not return a job ID. Raw: " + JSON.stringify(kieData), refunded: true }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, task_id: jobId, status: "queued", provider: "kie" });

@@ -11,6 +11,7 @@ interface Model {
   available: boolean;
   provider: string;
   hasSound: boolean;
+  enabledKey: string;
 }
 
 interface Module {
@@ -22,65 +23,86 @@ interface Module {
 
 export default function Studio() {
   const [activeModule, setActiveModule] = useState<string | null>(null);
-  const [prompt, setPrompt] = useState<string>("");
-  const [duration, setDuration] = useState<string>("5");
-  const [aspectRatio, setAspectRatio] = useState<string>("16:9");
-  const [loading, setLoading] = useState<boolean>(false);
+  const [prompt, setPrompt] = useState("");
+  const [duration, setDuration] = useState("5");
+  const [aspectRatio, setAspectRatio] = useState("16:9");
+  const [loading, setLoading] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>("");
-  const [imageUrlInput, setImageUrlInput] = useState<string>("");
-  const [useUrl, setUseUrl] = useState<boolean>(false);
-  const [progress, setProgress] = useState<number>(0);
-  const [elapsedTime, setElapsedTime] = useState<number>(0);
-  const [tokenBalance, setTokenBalance] = useState<number>(25);
-  const [selectedModel, setSelectedModel] = useState<string>("kling-v1-6-pro");
+  const [imagePreview, setImagePreview] = useState("");
+  const [imageUrlInput, setImageUrlInput] = useState("");
+  const [useUrl, setUseUrl] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [tokenBalance, setTokenBalance] = useState(25);
+  const [selectedModel, setSelectedModel] = useState("kling-v1-6-pro");
+  const [enabledKeys, setEnabledKeys] = useState<Record<string, boolean>>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const tokenCostRef = useRef<number>(15);
-  const selectedModelRef = useRef<string>("kling-v1-6-pro");
+  const tokenCostRef = useRef(15);
+  const selectedModelRef = useRef("kling-v1-6-pro");
   const activeModuleRef = useRef<string | null>(null);
-  const providerRef = useRef<string>("kling");
+  const providerRef = useRef("kie");
 
   useEffect(() => { selectedModelRef.current = selectedModel; }, [selectedModel]);
   useEffect(() => { activeModuleRef.current = activeModule; }, [activeModule]);
 
-  // All models always visible — plans control tokens not access
   const ALL_MODELS: Model[] = [
-    { id: "kling-v1-6-std",  name: "Kling 1.6 Standard", desc: "Fast, great for drafts",             tokens: 10, badge: "",             available: true,  provider: "kling",      hasSound: false },
-    { id: "kling-v1-6-pro",  name: "Kling 1.6 Pro",      desc: "High quality, smooth motion",         tokens: 15, badge: "Recommended",  available: true,  provider: "kling",      hasSound: false },
-    { id: "kling-v2-master", name: "Kling 2 Master",      desc: "Best realism and motion",             tokens: 20, badge: "Best Quality", available: true,  provider: "kling",      hasSound: false },
-    { id: "kling-v3-std",    name: "Kling 3.0 Standard",  desc: "Cinematic, native audio, up to 15s", tokens: 25, badge: "With Audio",   available: true,  provider: "kling",      hasSound: true  },
-    { id: "kling-v3-pro",    name: "Kling 3.0 Pro",       desc: "1080p, native audio, multi-shot",    tokens: 35, badge: "Premium",      available: true,  provider: "kling",      hasSound: true  },
-    { id: "higgsfield-ugc",  name: "Higgsfield UGC",      desc: "Most realistic UGC and ad videos",   tokens: 20, badge: "Best for Ads", available: true,  provider: "higgsfield", hasSound: false },
-    { id: "runway-gen4",     name: "Runway Gen-4",         desc: "Professional cinematic quality",      tokens: 30, badge: "Coming Soon",  available: false, provider: "runway",     hasSound: false },
+    // Kling via Kie.ai
+    { id: "kling-v1-6-std",  name: "Kling 1.6 Standard", desc: "Fast, great for drafts",          tokens: 10,  badge: "",              available: true,  provider: "kie",        hasSound: false, enabledKey: "kling_v1_6_enabled" },
+    { id: "kling-v1-6-pro",  name: "Kling 1.6 Pro",      desc: "High quality, smooth motion",      tokens: 15,  badge: "Recommended",   available: true,  provider: "kie",        hasSound: false, enabledKey: "kling_v1_6_enabled" },
+    { id: "kling-v2-master", name: "Kling 2.1 Master",    desc: "Best realism and motion",          tokens: 20,  badge: "Best Quality",  available: true,  provider: "kie",        hasSound: false, enabledKey: "kling_v2_master_enabled" },
+    { id: "kling-v3-std",    name: "Kling 3.0 Standard",  desc: "Cinematic quality, up to 15s",    tokens: 25,  badge: "Best Quality",  available: true,  provider: "kie",        hasSound: true,  enabledKey: "kling_v3_enabled" },
+    { id: "kling-v3-pro",    name: "Kling 3.0 Pro",       desc: "1080p cinematic, multi-shot",     tokens: 35,  badge: "Ultra Quality", available: true,  provider: "kie",        hasSound: true,  enabledKey: "kling_v3_enabled" },
+    // Google Veo 3
+    { id: "veo3-fast",       name: "Veo 3 Fast",          desc: "Google AI, native audio, 8s",     tokens: 30,  badge: "With Audio",    available: true,  provider: "kie",        hasSound: true,  enabledKey: "veo3_fast_enabled" },
+    { id: "veo3-quality",    name: "Veo 3 Quality",       desc: "Google AI, cinematic, 8s",         tokens: 80,  badge: "Premium",       available: true,  provider: "kie",        hasSound: true,  enabledKey: "veo3_quality_enabled" },
+    // ByteDance Seedance
+    { id: "seedance-2",      name: "Seedance 2.0",        desc: "ByteDance, best quality + audio",  tokens: 30,  badge: "Best Quality",  available: true,  provider: "kie",        hasSound: true,  enabledKey: "seedance2_enabled" },
+    { id: "seedance-2-fast", name: "Seedance 2.0 Fast",   desc: "ByteDance, fast and affordable",   tokens: 20,  badge: "",              available: true,  provider: "kie",        hasSound: true,  enabledKey: "seedance2_fast_enabled" },
+    // Hailuo
+    { id: "hailuo-pro",      name: "Hailuo 2.3 Pro",      desc: "MiniMax, fast generation",         tokens: 20,  badge: "",              available: true,  provider: "kie",        hasSound: false, enabledKey: "hailuo_enabled" },
+    // Sora 2
+    { id: "sora-2",          name: "Sora 2",              desc: "OpenAI, premium realism",           tokens: 60,  badge: "Premium",       available: true,  provider: "kie",        hasSound: false, enabledKey: "sora2_enabled" },
+    // Wan
+    { id: "wan-2-6",         name: "Wan 2.6",             desc: "Alibaba, fast and cheap",           tokens: 8,   badge: "Cheapest",      available: true,  provider: "kie",        hasSound: false, enabledKey: "wan26_enabled" },
+    // Luma
+    { id: "luma-ray-3",      name: "Luma Ray 3",          desc: "Cinematic quality",                 tokens: 35,  badge: "",              available: true,  provider: "kie",        hasSound: false, enabledKey: "luma_enabled" },
+    // Higgsfield
+    { id: "higgsfield-ugc",  name: "Higgsfield UGC",      desc: "Most realistic UGC ad videos",     tokens: 20,  badge: "Best for Ads",  available: true,  provider: "higgsfield", hasSound: false, enabledKey: "higgsfield_enabled" },
+    // Coming soon
+    { id: "runway-gen4",     name: "Runway Gen-4",        desc: "Professional cinematic quality",    tokens: 40,  badge: "Coming Soon",   available: false, provider: "runway",     hasSound: false, enabledKey: "" },
   ];
 
   const modules: Module[] = [
-    { id: "text_to_video",  title: "Text to Video",   desc: "Generate cinematic videos from text descriptions", badge: "Most Popular" },
-    { id: "image_to_video", title: "Image to Video",  desc: "Animate any still image into a stunning video",    badge: "" },
-    { id: "ugc_ad",         title: "UGC Ad Creator",  desc: "AI avatar testimonial and product review videos",  badge: "Best for Ads" },
-    { id: "ai_actor",       title: "AI Actor",        desc: "Create photorealistic AI human avatars",           badge: "" },
-    { id: "voice",          title: "Voice Generation",desc: "Natural AI voiceovers for videos",                 badge: "" },
-    { id: "image_ad",       title: "Image Ad",        desc: "Scroll-stopping image advertisements",             badge: "Cheapest" },
-    { id: "prompt",         title: "Prompt Expander", desc: "Transform ideas into cinematic prompts",           badge: "" },
-    { id: "script",         title: "Script Writer",   desc: "Generate viral video scripts",                     badge: "" },
+    { id: "text_to_video",  title: "Text to Video",    desc: "Generate cinematic videos from text descriptions", badge: "Most Popular" },
+    { id: "image_to_video", title: "Image to Video",   desc: "Animate any still image into a stunning video",    badge: "" },
+    { id: "ugc_ad",         title: "UGC Ad Creator",   desc: "AI avatar testimonial and product review videos",  badge: "Best for Ads" },
+    { id: "ai_actor",       title: "AI Actor",         desc: "Create photorealistic AI human avatars",           badge: "" },
+    { id: "voice",          title: "Voice Generation", desc: "Natural AI voiceovers for videos",                 badge: "" },
+    { id: "image_ad",       title: "Image Ad",         desc: "Scroll-stopping image advertisements",             badge: "Cheapest" },
+    { id: "prompt",         title: "Prompt Expander",  desc: "Transform ideas into cinematic prompts",           badge: "" },
+    { id: "script",         title: "Script Writer",    desc: "Generate viral video scripts",                     badge: "" },
   ];
 
-  // Models shown per module — Higgsfield always shown in ugc_ad, hidden elsewhere
-  // All Kling models always shown in text/image modules
-  const getVisibleModels = (module: string | null): Model[] => {
-    return ALL_MODELS.filter((m) => m.available);
-  };
+  const visibleModels = ALL_MODELS.filter((m) => {
+    if (!m.available) return false;
+    if (!m.enabledKey) return false;
+    // If no setting found default to true for core models, false for new ones
+    const coreModels = ["kling_v1_6_enabled", "kling_v2_master_enabled", "kling_v3_enabled", "higgsfield_enabled"];
+    if (enabledKeys[m.enabledKey] === false) return false;
+    if (enabledKeys[m.enabledKey] === true) return true;
+    // Default: show core models, hide new ones until admin enables
+    return coreModels.includes(m.enabledKey);
+  });
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | undefined;
     if (loading) {
-      setElapsedTime(0);
-      setProgress(0);
+      setElapsedTime(0); setProgress(0);
       timer = setInterval(() => {
-        setElapsedTime((prev: number) => {
+        setElapsedTime((prev) => {
           const t = prev + 1;
           setProgress(Math.min(90, (t / 180) * 100));
           return t;
@@ -97,22 +119,32 @@ export default function Studio() {
       const res = await fetch("/api/tokens", { headers: { Authorization: "Bearer " + session.access_token } });
       const data = await res.json();
       if (data.balance !== undefined) setTokenBalance(data.balance);
+
+      // Fetch enabled models from admin settings
+      const sRes = await fetch("/api/admin/settings?category=ai_providers", {
+        headers: { Authorization: "Bearer " + session.access_token },
+      });
+      const sData = await sRes.json();
+      const map: Record<string, boolean> = {};
+      sData.settings?.forEach((s: any) => {
+        if (s.key.includes("_enabled")) map[s.key] = s.value === "true";
+      });
+      setEnabledKeys(map);
     };
     init();
   }, []);
 
   useEffect(() => {
-    if (activeModule === "ugc_ad") {
-      setSelectedModel("higgsfield-ugc");
-    }
+    if (activeModule === "ugc_ad") setSelectedModel("higgsfield-ugc");
+    else if (selectedModel === "higgsfield-ugc") setSelectedModel("kling-v1-6-pro");
   }, [activeModule]);
 
-  const formatTime = (s: number): string => {
+  const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
     return m > 0 ? m + "m " + (s % 60) + "s" : s + "s";
   };
 
-  const getStatusMsg = (e: number): string => {
+  const getStatusMsg = (e: number) => {
     if (e < 10) return "Initializing AI models...";
     if (e < 30) return "Analyzing your prompt...";
     if (e < 60) return "Generating video frames...";
@@ -126,9 +158,7 @@ export default function Studio() {
     const file = files[0];
     setImageFile(file);
     const reader = new FileReader();
-    reader.onload = (ev: ProgressEvent<FileReader>) => {
-      if (ev.target?.result) setImagePreview(ev.target.result as string);
-    };
+    reader.onload = (ev) => { if (ev.target?.result) setImagePreview(ev.target.result as string); };
     reader.readAsDataURL(file);
   };
 
@@ -152,7 +182,7 @@ export default function Studio() {
 
     const modelData = ALL_MODELS.find((m) => m.id === selectedModel);
     const tokenCost = modelData?.tokens ?? 15;
-    const provider = modelData?.provider ?? "kling";
+    const provider = modelData?.provider ?? "kie";
     tokenCostRef.current = tokenCost;
     providerRef.current = provider;
 
@@ -172,7 +202,20 @@ export default function Studio() {
       let imageUrl = imageUrlInput;
       if (needsImage && imageFile && !useUrl) {
         const uploaded = await uploadImage(imageFile);
-        if (!uploaded) { setError("Image upload failed. Try URL instead."); setLoading(false); return; }
+        if (!uploaded) {
+          setError("Image upload failed. Try URL instead.");
+          setLoading(false);
+          const { data: { session: rs } } = await supabase.auth.getSession();
+          if (rs) {
+            await fetch("/api/tokens/refund", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: "Bearer " + rs.access_token },
+              body: JSON.stringify({ amount: tokenCost }),
+            });
+            setTokenBalance((p) => p + tokenCost);
+          }
+          return;
+        }
         imageUrl = uploaded;
       }
 
@@ -222,7 +265,6 @@ export default function Studio() {
                 });
               }
             } catch (e) { console.error("Save error:", e); }
-
           } else if (sd.failed) {
             setError("Generation failed. Tokens refunded."); setLoading(false); clearInterval(poll);
             try {
@@ -246,7 +288,7 @@ export default function Studio() {
     } catch (e) { setError("Something went wrong."); setLoading(false); }
   };
 
-  const handleDownload = async (url: string): Promise<void> => {
+  const handleDownload = async (url: string) => {
     try {
       const r = await fetch(url);
       const b = await r.blob();
@@ -264,7 +306,6 @@ export default function Studio() {
     setProgress(0); setElapsedTime(0); setSelectedModel("kling-v1-6-pro");
   };
 
-  const visibleModels = getVisibleModels(activeModule);
   const currentModel = ALL_MODELS.find((m) => m.id === selectedModel);
   const tokenCost = currentModel?.tokens ?? 15;
   const needsImage = activeModule === "image_to_video" || activeModule === "ugc_ad";
@@ -305,7 +346,6 @@ export default function Studio() {
           </div>
 
           <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-4">
-
             {needsImage && (
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
@@ -334,7 +374,7 @@ export default function Studio() {
 
             {activeModule === "ugc_ad" && (
               <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3">
-                <p className="text-purple-300 text-xs font-semibold mb-1">Higgsfield UGC Mode</p>
+                <p className="text-purple-300 text-xs font-semibold mb-1">UGC Ad Mode</p>
                 <p className="text-gray-400 text-xs">Upload a photo of your avatar for the most realistic AI UGC ads.</p>
               </div>
             )}
@@ -344,7 +384,7 @@ export default function Studio() {
                 {activeModule === "ugc_ad" ? "Describe the UGC ad scenario" : activeModule === "script" ? "Describe your video topic" : activeModule === "prompt" ? "Simple idea to expand" : "Describe your video"}
               </label>
               <textarea
-                placeholder={activeModule === "ugc_ad" ? "Woman in kitchen holding product, smiling, authentic testimonial style, natural lighting..." : "A luxury watch rotating slowly on a marble surface, golden hour lighting, cinematic 4K..."}
+                placeholder={activeModule === "ugc_ad" ? "Woman in kitchen holding product, smiling, authentic testimonial style..." : "A luxury watch rotating slowly on a marble surface, golden hour lighting, cinematic 4K..."}
                 value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={4}
                 className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition text-sm resize-none"
               />
@@ -372,6 +412,7 @@ export default function Studio() {
                     <label className="text-gray-400 text-xs mb-1 block">Duration</label>
                     <select value={duration} onChange={(e) => setDuration(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm">
                       <option value="5">5 seconds</option>
+                      <option value="8">8 seconds</option>
                       <option value="10">10 seconds</option>
                       {(selectedModel === "kling-v3-std" || selectedModel === "kling-v3-pro") && <option value="15">15 seconds</option>}
                     </select>
@@ -428,7 +469,7 @@ export default function Studio() {
               { label: "Video finalized", done: !!videoUrl },
             ].map((step, i) => (
               <div key={i} className="flex items-center gap-2 text-xs">
-                <span className={step.done ? "text-green-400" : "text-gray-600"}>{step.done ? "v" : "o"}</span>
+                <span className={step.done ? "text-green-400" : "text-gray-600"}>{step.done ? "✓" : "○"}</span>
                 <span className={step.done ? "text-gray-300" : "text-gray-600"}>{step.label}</span>
               </div>
             ))}
