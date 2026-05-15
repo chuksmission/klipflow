@@ -1,4 +1,342 @@
-"use client";
+import { writeFileSync, mkdirSync } from 'fs';
+
+// ============================================
+// 1. GENERATE VIDEO API - Kling + Higgsfield
+// ============================================
+writeFileSync('app/api/generate-video/route.ts', `import { NextRequest, NextResponse } from "next/server";
+import * as jose from "jose";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+async function generateKlingToken(): Promise<string> {
+  const accessKey = process.env.KLING_ACCESS_KEY;
+  const secretKey = process.env.KLING_SECRET_KEY;
+  if (!accessKey || !secretKey) throw new Error("Kling API keys not configured");
+  const secret = new TextEncoder().encode(secretKey);
+  return new jose.SignJWT({
+    iss: accessKey,
+    exp: Math.floor(Date.now() / 1000) + 1800,
+    nbf: Math.floor(Date.now() / 1000) - 5,
+  })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .sign(secret);
+}
+
+async function refundTokens(userId: string, amount: number) {
+  try {
+    const { data } = await supabase.from("user_tokens").select("balance, total_used").eq("user_id", userId).single();
+    if (data) {
+      await supabase.from("user_tokens").update({
+        balance: data.balance + amount,
+        total_used: Math.max(0, data.total_used - amount),
+        updated_at: new Date().toISOString(),
+      }).eq("user_id", userId);
+    }
+  } catch (err) { console.error("Refund error:", err); }
+}
+
+async function generateKlingVideo(body: Record<string, unknown>, mode: string, token: string) {
+  const endpoint = mode === "image_to_video"
+    ? "https://api.klingai.com/v1/videos/image2video"
+    : "https://api.klingai.com/v1/videos/text2video";
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+    body: JSON.stringify(body),
+  });
+  return response;
+}
+
+async function generateHiggsfield(prompt: string, imageUrl: string | undefined, aspectRatio: string, duration: string) {
+  const keyId = process.env.HIGGSFIELD_KEY_ID;
+  const keySecret = process.env.HIGGSFIELD_KEY_SECRET;
+  if (!keyId || !keySecret) throw new Error("Higgsfield API keys not configured");
+
+  const credentials = keyId + ":" + keySecret;
+
+  // Soul mode for UGC — image to video with avatar
+  if (imageUrl) {
+    const response = await fetch("https://cloud.higgsfield.ai/v1/video/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Key " + credentials,
+      },
+      body: JSON.stringify({
+        model: "higgsfield/ugc",
+        input: {
+          prompt,
+          image_url: imageUrl,
+          aspect_ratio: aspectRatio,
+          duration: parseInt(duration),
+        },
+      }),
+    });
+    return response;
+  }
+
+  // Text to video UGC mode
+  const response = await fetch("https://cloud.higgsfield.ai/v1/video/generate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Key " + credentials,
+    },
+    body: JSON.stringify({
+      model: "higgsfield/ugc",
+      input: {
+        prompt,
+        aspect_ratio: aspectRatio,
+        duration: parseInt(duration),
+      },
+    }),
+  });
+  return response;
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json() as {
+      prompt: string;
+      mode?: string;
+      image_url?: string;
+      duration?: string;
+      aspect_ratio?: string;
+      model?: string;
+      with_audio?: boolean;
+      user_id?: string;
+      tokens_used?: number;
+    };
+
+    const {
+      prompt,
+      mode = "text_to_video",
+      image_url,
+      duration = "5",
+      aspect_ratio = "16:9",
+      model = "kling-v1-6-std",
+      with_audio = false,
+      user_id,
+      tokens_used = 10,
+    } = body;
+
+    if (!prompt) return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
+
+    // Route to Higgsfield for UGC
+    if (model === "higgsfield-ugc") {
+      const response = await generateHiggsfield(prompt, image_url, aspect_ratio, duration);
+      const data = await response.json() as { id?: string; status?: string; error?: string };
+      if (!response.ok) {
+        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+        return NextResponse.json({ error: data.error ?? "Higgsfield API error", refunded: true }, { status: response.status });
+      }
+      return NextResponse.json({ success: true, task_id: data.id, status: data.status, provider: "higgsfield" });
+    }
+
+    // Route to Kling
+    const klingToken = await generateKlingToken();
+
+    // Correct Kling API model_name values from official docs
+    const modelMap: Record<string, { model_name: string; mode: string; sound: boolean }> = {
+      "kling-v1-6-std": { model_name: "kling-v1-6", mode: "std", sound: false },
+      "kling-v1-6-pro": { model_name: "kling-v1-6", mode: "pro", sound: false },
+      "kling-v2-master": { model_name: "kling-v2-master", mode: "pro", sound: false },
+      "kling-v2-6": { model_name: "kling-v2-6", mode: "pro", sound: true },
+    };
+
+    const modelConfig = modelMap[model] ?? { model_name: "kling-v1-6", mode: "std", sound: false };
+    const useAudio = with_audio || modelConfig.sound;
+
+    const requestBody: Record<string, unknown> = {
+      model_name: modelConfig.model_name,
+      prompt,
+      duration,
+      aspect_ratio,
+      cfg_scale: 0.5,
+      mode: modelConfig.mode,
+    };
+
+    if (useAudio) requestBody.with_audio = true;
+    if (mode === "image_to_video" && image_url) requestBody.image_url = image_url;
+
+    const response = await generateKlingVideo(requestBody, mode, klingToken);
+    const data = await response.json() as { data?: { task_id?: string; task_status?: string }; message?: string };
+
+    if (!response.ok) {
+      if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+      return NextResponse.json({ error: data.message ?? "Kling API error", refunded: true }, { status: response.status });
+    }
+
+    return NextResponse.json({
+      success: true,
+      task_id: data.data?.task_id,
+      status: data.data?.task_status,
+      provider: "kling",
+    });
+
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Something went wrong";
+    console.error("Video generation error:", error);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+`, 'utf8');
+console.log('Fixed generate-video API');
+
+// ============================================
+// 2. VIDEO STATUS API - handles both providers
+// ============================================
+writeFileSync('app/api/video-status/route.ts', `import { NextRequest, NextResponse } from "next/server";
+import * as jose from "jose";
+
+async function generateKlingToken(): Promise<string> {
+  const accessKey = process.env.KLING_ACCESS_KEY;
+  const secretKey = process.env.KLING_SECRET_KEY;
+  if (!accessKey || !secretKey) throw new Error("Kling API keys not configured");
+  const secret = new TextEncoder().encode(secretKey);
+  return new jose.SignJWT({
+    iss: accessKey,
+    exp: Math.floor(Date.now() / 1000) + 1800,
+    nbf: Math.floor(Date.now() / 1000) - 5,
+  })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .sign(secret);
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const task_id = searchParams.get("task_id");
+    const mode = searchParams.get("mode") ?? "text_to_video";
+    const provider = searchParams.get("provider") ?? "kling";
+
+    if (!task_id) return NextResponse.json({ error: "task_id is required" }, { status: 400 });
+
+    // Higgsfield status check
+    if (provider === "higgsfield") {
+      const keyId = process.env.HIGGSFIELD_KEY_ID;
+      const keySecret = process.env.HIGGSFIELD_KEY_SECRET;
+      if (!keyId || !keySecret) return NextResponse.json({ error: "Higgsfield not configured" }, { status: 503 });
+
+      const credentials = keyId + ":" + keySecret;
+      const response = await fetch("https://cloud.higgsfield.ai/v1/video/" + task_id, {
+        headers: { "Authorization": "Key " + credentials },
+      });
+
+      const data = await response.json() as {
+        status?: string;
+        output?: { url?: string } | Array<{ url?: string }>;
+        error?: string;
+      };
+
+      const videoUrl = Array.isArray(data.output)
+        ? data.output[0]?.url
+        : data.output?.url;
+
+      return NextResponse.json({
+        success: true,
+        status: data.status,
+        video_url: videoUrl ?? null,
+        completed: data.status === "succeeded" || data.status === "completed",
+        failed: data.status === "failed" || data.status === "error",
+        progress: data.status ?? "",
+      });
+    }
+
+    // Kling status check
+    const token = await generateKlingToken();
+    const endpoint = mode === "image_to_video"
+      ? \`https://api.klingai.com/v1/videos/image2video/\${task_id}\`
+      : \`https://api.klingai.com/v1/videos/text2video/\${task_id}\`;
+
+    const response = await fetch(endpoint, {
+      headers: { Authorization: "Bearer " + token },
+    });
+
+    const data = await response.json() as {
+      data?: {
+        task_status?: string;
+        task_status_msg?: string;
+        task_result?: { videos?: Array<{ url: string }> };
+      };
+      message?: string;
+    };
+
+    if (!response.ok) {
+      return NextResponse.json({ error: data.message ?? "Status check failed" }, { status: response.status });
+    }
+
+    const taskData = data.data;
+    const status = taskData?.task_status;
+    const videoUrl = taskData?.task_result?.videos?.[0]?.url;
+
+    return NextResponse.json({
+      success: true,
+      status,
+      video_url: videoUrl ?? null,
+      completed: status === "succeed",
+      failed: status === "failed",
+      progress: taskData?.task_status_msg ?? "",
+    });
+
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Something went wrong";
+    console.error("Status check error:", error);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+`, 'utf8');
+console.log('Fixed video-status API');
+
+// ============================================
+// 3. TOKEN REFUND API
+// ============================================
+mkdirSync('app/api/tokens/refund', { recursive: true });
+writeFileSync('app/api/tokens/refund/route.ts', `import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export async function POST(req: NextRequest) {
+  try {
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { amount } = await req.json() as { amount: number };
+    if (!amount || amount <= 0) return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+
+    const { data: tokenData } = await supabase.from("user_tokens").select("balance, total_used").eq("user_id", user.id).single();
+    if (!tokenData) return NextResponse.json({ error: "Token record not found" }, { status: 404 });
+
+    const { data: updated } = await supabase.from("user_tokens").update({
+      balance: tokenData.balance + amount,
+      total_used: Math.max(0, tokenData.total_used - amount),
+      updated_at: new Date().toISOString(),
+    }).eq("user_id", user.id).select().single();
+
+    return NextResponse.json({ balance: updated?.balance, refunded: amount });
+  } catch (error) {
+    console.error("Refund error:", error);
+    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+  }
+}
+`, 'utf8');
+console.log('Created token refund API');
+
+// ============================================
+// 4. STUDIO PAGE - updated models + provider tracking
+// ============================================
+writeFileSync('app/dashboard/studio/page.tsx', `"use client";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "../../lib/supabase";
 
@@ -533,3 +871,7 @@ export default function Studio() {
     </div>
   );
 }
+`, 'utf8');
+console.log('Updated studio page');
+
+console.log('\nAll done! Push now.');
