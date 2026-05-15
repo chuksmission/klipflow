@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
 
     if (!prompt) return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
 
-    // ---- HIGGSFIELD (keep until credits used up) ----
+    // ---- HIGGSFIELD (keep until credits run out) ----
     if (model === "higgsfield-ugc") {
       const keyId = await getSetting("higgsfield_key_id");
       const keySecret = await getSetting("higgsfield_key_secret");
@@ -112,35 +112,51 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Kie.ai API key not configured in admin settings.", refunded: true }, { status: 503 });
     }
 
-    // Map our model IDs to Kie.ai model strings + mode
-    type KieModelCfg = { model: string; mode?: string; sound: boolean };
-    const kieModelMap: Record<string, KieModelCfg> = {
-      "kling-v1-6-std":  { model: "kling-v1.6/video",           mode: "std", sound: false },
-      "kling-v1-6-pro":  { model: "kling-v1.6/video",           mode: "pro", sound: false },
-      "kling-v2-master": { model: "kling-v2.1/video",           mode: "pro", sound: false },
-      "kling-v3-std":    { model: "kling-3.0/video",            mode: "std", sound: true  },
-      "kling-v3-pro":    { model: "kling-3.0/video",            mode: "pro", sound: true  },
-      "veo3-fast":       { model: "veo3/video",                  mode: "fast",    sound: true  },
-      "veo3-quality":    { model: "veo3/video",                  mode: "quality", sound: true  },
-      "seedance-2":      { model: "bytedance/seedance-2/video",  sound: true  },
-      "seedance-2-fast": { model: "bytedance/seedance-2-fast/video", sound: true },
-      "hailuo-pro":      { model: "hailuo-video/v2.3/video",    mode: "pro", sound: false },
-      "sora-2":          { model: "sora-2/video",               sound: false },
-      "wan-2-6":         { model: "wan/v2.6/video",             sound: false },
-      "luma-ray-3":      { model: "luma/ray-3/video",           sound: false },
+    const isImageMode = mode === "image_to_video" && !!image_url;
+
+    // Confirmed exact model strings from docs.kie.ai
+    type KieCfg = { model: string; extraInput?: Record<string, unknown> };
+
+    const textModelMap: Record<string, KieCfg> = {
+      "kling-v1-6-std":  { model: "kling/v2-1-standard" },
+      "kling-v1-6-pro":  { model: "kling/v2-1-pro" },
+      "kling-v2-master": { model: "kling/v2-1-master-text-to-video" },
+      "kling-v3-std":    { model: "kling-3.0/video", extraInput: { mode: "std", sound: true } },
+      "kling-v3-pro":    { model: "kling-3.0/video", extraInput: { mode: "pro", sound: true } },
+      "veo3-fast":       { model: "veo3/fast/text-to-video" },
+      "veo3-quality":    { model: "veo3/quality/text-to-video" },
+      "seedance-2":      { model: "bytedance/seedance-2", extraInput: { generate_audio: true } },
+      "seedance-2-fast": { model: "bytedance/seedance-2-fast" },
+      "hailuo-pro":      { model: "hailuo/v2/pro/text-to-video" },
+      "sora-2":          { model: "sora2/text-to-video" },
+      "wan-2-6":         { model: "wan/v2.6/text-to-video" },
+      "luma-ray-3":      { model: "luma/ray-3/text-to-video" },
     };
 
-    const kieCfg = kieModelMap[model] ?? { model: "kling-v1.6/video", mode: "std", sound: false };
+    const imageModelMap: Record<string, KieCfg> = {
+      "kling-v1-6-std":  { model: "kling-2.6/image-to-video", extraInput: { mode: "std" } },
+      "kling-v1-6-pro":  { model: "kling-2.6/image-to-video", extraInput: { mode: "pro" } },
+      "kling-v2-master": { model: "kling/v2-1-master-image-to-video" },
+      "kling-v3-std":    { model: "kling-3.0/video", extraInput: { mode: "std", sound: true } },
+      "kling-v3-pro":    { model: "kling-3.0/video", extraInput: { mode: "pro", sound: true } },
+      "seedance-2":      { model: "bytedance/seedance-2", extraInput: { generate_audio: true } },
+      "seedance-2-fast": { model: "bytedance/seedance-2-fast" },
+      "hailuo-pro":      { model: "hailuo/v2/pro/image-to-video" },
+      "wan-2-6":         { model: "wan/v2.6/image-to-video" },
+      "luma-ray-3":      { model: "luma/ray-3/image-to-video" },
+    };
+
+    const modelMap = isImageMode ? imageModelMap : textModelMap;
+    const kieCfg = modelMap[model] ?? textModelMap[model] ?? { model: "kling/v2-1-pro" };
 
     const kieInput: Record<string, unknown> = {
       prompt,
       duration,
       aspect_ratio,
-      sound: kieCfg.sound,
+      ...kieCfg.extraInput,
     };
 
-    if (kieCfg.mode) kieInput.mode = kieCfg.mode;
-    if (image_url) kieInput.image_urls = [image_url];
+    if (isImageMode && image_url) kieInput.image_url = image_url;
 
     const kieBody = { model: kieCfg.model, input: kieInput };
     console.log("Kie.ai POST:", JSON.stringify(kieBody));
@@ -157,19 +173,19 @@ export async function POST(req: NextRequest) {
     const kieData = await safeJson(kieRes) as any;
     console.log("Kie.ai response:", kieRes.status, JSON.stringify(kieData));
 
-    if (!kieRes.ok) {
+    if (kieData.code !== 200) {
       if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-      const errMsg = kieData.message ?? kieData.error ?? `Kie.ai error (${kieRes.status})`;
-      return NextResponse.json({ error: errMsg, refunded: true }, { status: kieRes.status });
+      const errMsg = kieData.msg ?? kieData.message ?? kieData.error ?? `Kie.ai error (${kieRes.status})`;
+      return NextResponse.json({ error: errMsg, refunded: true }, { status: kieRes.status || 500 });
     }
 
-    const jobId = kieData.data?.jobId ?? kieData.jobId ?? kieData.data?.job_id ?? kieData.data?.taskId;
-    if (!jobId) {
+    const taskId = kieData.data?.taskId;
+    if (!taskId) {
       if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-      return NextResponse.json({ error: "Kie.ai did not return a job ID. Raw: " + JSON.stringify(kieData), refunded: true }, { status: 500 });
+      return NextResponse.json({ error: "Kie.ai did not return a taskId. Raw: " + JSON.stringify(kieData), refunded: true }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, task_id: jobId, status: "queued", provider: "kie" });
+    return NextResponse.json({ success: true, task_id: taskId, status: "queued", provider: "kie" });
 
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Something went wrong";
