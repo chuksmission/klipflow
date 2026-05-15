@@ -104,8 +104,8 @@ export async function POST(req: NextRequest) {
       }
 
       const higgsfieldEndpoint = image_url
-        ? "https://platform.higgsfield.ai/v1/higgsfield/ugc/image-to-video"
-        : "https://platform.higgsfield.ai/v1/higgsfield/ugc/text-to-video";
+        ? "https://platform.higgsfield.ai/v1/bytedance/seedance/v2/image-to-video"
+        : "https://platform.higgsfield.ai/v1/bytedance/seedance/v2/text-to-video";
 
       console.log("Higgsfield request to:", higgsfieldEndpoint);
       console.log("Higgsfield body:", JSON.stringify(higgsfieldBody));
