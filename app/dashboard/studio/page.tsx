@@ -36,7 +36,6 @@ export default function Studio() {
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   const [tokenBalance, setTokenBalance] = useState<number>(25);
   const [selectedModel, setSelectedModel] = useState<string>("kling-v1-6-pro");
-  const [enabledModels, setEnabledModels] = useState<Record<string, boolean>>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tokenCostRef = useRef<number>(15);
@@ -47,36 +46,34 @@ export default function Studio() {
   useEffect(() => { selectedModelRef.current = selectedModel; }, [selectedModel]);
   useEffect(() => { activeModuleRef.current = activeModule; }, [activeModule]);
 
+  // All models always visible — plans control tokens not access
   const ALL_MODELS: Model[] = [
-    { id: "kling-v1-6-std",  name: "Kling 1.6 Standard", desc: "Fast, great for drafts",                tokens: 10, badge: "",              available: true, provider: "kling",       hasSound: false },
-    { id: "kling-v1-6-pro",  name: "Kling 1.6 Pro",      desc: "High quality, smooth motion",            tokens: 15, badge: "Recommended",   available: true, provider: "kling",       hasSound: false },
-    { id: "kling-v2-master", name: "Kling 2 Master",      desc: "Best realism and motion",                tokens: 20, badge: "Best Quality",  available: true, provider: "kling",       hasSound: false },
-    { id: "kling-v3-std",    name: "Kling 3.0 Standard",  desc: "Cinematic, native audio, up to 15s",    tokens: 25, badge: "With Audio",     available: true, provider: "kling",       hasSound: true  },
-    { id: "kling-v3-pro",    name: "Kling 3.0 Pro",       desc: "1080p, native audio, multi-shot",       tokens: 35, badge: "Premium",        available: true, provider: "kling",       hasSound: true  },
-    { id: "higgsfield-ugc",  name: "Higgsfield UGC",      desc: "Most realistic UGC and ad videos",      tokens: 20, badge: "Best for Ads",   available: true, provider: "higgsfield",  hasSound: false },
-    { id: "runway-gen4",     name: "Runway Gen-4",         desc: "Professional cinematic quality",         tokens: 30, badge: "Coming Soon",   available: false, provider: "runway",     hasSound: false },
+    { id: "kling-v1-6-std",  name: "Kling 1.6 Standard", desc: "Fast, great for drafts",             tokens: 10, badge: "",             available: true,  provider: "kling",      hasSound: false },
+    { id: "kling-v1-6-pro",  name: "Kling 1.6 Pro",      desc: "High quality, smooth motion",         tokens: 15, badge: "Recommended",  available: true,  provider: "kling",      hasSound: false },
+    { id: "kling-v2-master", name: "Kling 2 Master",      desc: "Best realism and motion",             tokens: 20, badge: "Best Quality", available: true,  provider: "kling",      hasSound: false },
+    { id: "kling-v3-std",    name: "Kling 3.0 Standard",  desc: "Cinematic, native audio, up to 15s", tokens: 25, badge: "With Audio",   available: true,  provider: "kling",      hasSound: true  },
+    { id: "kling-v3-pro",    name: "Kling 3.0 Pro",       desc: "1080p, native audio, multi-shot",    tokens: 35, badge: "Premium",      available: true,  provider: "kling",      hasSound: true  },
+    { id: "higgsfield-ugc",  name: "Higgsfield UGC",      desc: "Most realistic UGC and ad videos",   tokens: 20, badge: "Best for Ads", available: true,  provider: "higgsfield", hasSound: false },
+    { id: "runway-gen4",     name: "Runway Gen-4",         desc: "Professional cinematic quality",      tokens: 30, badge: "Coming Soon",  available: false, provider: "runway",     hasSound: false },
   ];
 
   const modules: Module[] = [
-    { id: "text_to_video", title: "Text to Video",   desc: "Generate cinematic videos from text descriptions", badge: "Most Popular" },
-    { id: "image_to_video", title: "Image to Video", desc: "Animate any still image into a stunning video",    badge: "" },
-    { id: "ugc_ad",   title: "UGC Ad Creator",        desc: "AI avatar testimonial and product review videos",  badge: "Best for Ads" },
-    { id: "ai_actor", title: "AI Actor",              desc: "Create photorealistic AI human avatars",           badge: "" },
-    { id: "voice",    title: "Voice Generation",      desc: "Natural AI voiceovers for videos",                 badge: "" },
-    { id: "image_ad", title: "Image Ad",              desc: "Scroll-stopping image advertisements",             badge: "Cheapest" },
-    { id: "prompt",   title: "Prompt Expander",       desc: "Transform ideas into cinematic prompts",           badge: "" },
-    { id: "script",   title: "Script Writer",         desc: "Generate viral video scripts",                     badge: "" },
+    { id: "text_to_video",  title: "Text to Video",   desc: "Generate cinematic videos from text descriptions", badge: "Most Popular" },
+    { id: "image_to_video", title: "Image to Video",  desc: "Animate any still image into a stunning video",    badge: "" },
+    { id: "ugc_ad",         title: "UGC Ad Creator",  desc: "AI avatar testimonial and product review videos",  badge: "Best for Ads" },
+    { id: "ai_actor",       title: "AI Actor",        desc: "Create photorealistic AI human avatars",           badge: "" },
+    { id: "voice",          title: "Voice Generation",desc: "Natural AI voiceovers for videos",                 badge: "" },
+    { id: "image_ad",       title: "Image Ad",        desc: "Scroll-stopping image advertisements",             badge: "Cheapest" },
+    { id: "prompt",         title: "Prompt Expander", desc: "Transform ideas into cinematic prompts",           badge: "" },
+    { id: "script",         title: "Script Writer",   desc: "Generate viral video scripts",                     badge: "" },
   ];
 
-  // Determine available models based on admin settings
-  const availableModels = ALL_MODELS.filter((m) => {
-    if (!m.available) return false;
-    if (m.provider === "higgsfield") return true;
-    if (m.id.startsWith("kling-v1-6")) return enabledModels["kling_v1_6_enabled"] !== false;
-    if (m.id.startsWith("kling-v2"))   return enabledModels["kling_v2_master_enabled"] !== false;
-    if (m.id.startsWith("kling-v3"))   return enabledModels["kling_v3_enabled"] !== false;
-    return true;
-  });
+  // Models shown per module — Higgsfield always shown in ugc_ad, hidden elsewhere
+  // All Kling models always shown in text/image modules
+  const getVisibleModels = (module: string | null): Model[] => {
+    if (module === "ugc_ad") return ALL_MODELS.filter((m) => m.available);
+    return ALL_MODELS.filter((m) => m.available && m.provider !== "higgsfield");
+  };
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | undefined;
@@ -98,27 +95,19 @@ export default function Studio() {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
-      // Fetch token balance
       const res = await fetch("/api/tokens", { headers: { Authorization: "Bearer " + session.access_token } });
       const data = await res.json();
       if (data.balance !== undefined) setTokenBalance(data.balance);
-      // Fetch enabled models from admin settings
-      const settingsRes = await fetch("/api/admin/settings?category=ai_providers", {
-        headers: { Authorization: "Bearer " + session.access_token },
-      });
-      const settingsData = await settingsRes.json();
-      const map: Record<string, boolean> = {};
-      settingsData.settings?.forEach((s: any) => {
-        if (s.key.includes("_enabled")) map[s.key] = s.value === "true";
-      });
-      setEnabledModels(map);
     };
     init();
   }, []);
 
   useEffect(() => {
-    if (activeModule === "ugc_ad") setSelectedModel("higgsfield-ugc");
-    else if (selectedModel === "higgsfield-ugc") setSelectedModel("kling-v1-6-pro");
+    if (activeModule === "ugc_ad") {
+      setSelectedModel("higgsfield-ugc");
+    } else if (selectedModel === "higgsfield-ugc") {
+      setSelectedModel("kling-v1-6-pro");
+    }
   }, [activeModule]);
 
   const formatTime = (s: number): string => {
@@ -164,7 +153,7 @@ export default function Studio() {
 
     setLoading(true); setError(""); setVideoUrl(null); setProgress(0);
 
-    const modelData = availableModels.find((m) => m.id === selectedModel);
+    const modelData = ALL_MODELS.find((m) => m.id === selectedModel);
     const tokenCost = modelData?.tokens ?? 15;
     const provider = modelData?.provider ?? "kling";
     tokenCostRef.current = tokenCost;
@@ -278,13 +267,11 @@ export default function Studio() {
     setProgress(0); setElapsedTime(0); setSelectedModel("kling-v1-6-pro");
   };
 
-  const currentModel = availableModels.find((m) => m.id === selectedModel);
+  const visibleModels = getVisibleModels(activeModule);
+  const currentModel = ALL_MODELS.find((m) => m.id === selectedModel);
   const tokenCost = currentModel?.tokens ?? 15;
   const needsImage = activeModule === "image_to_video" || activeModule === "ugc_ad";
   const showModels = activeModule === "text_to_video" || activeModule === "image_to_video" || activeModule === "ugc_ad";
-  const visibleModels = activeModule === "ugc_ad"
-    ? availableModels
-    : availableModels.filter((m) => m.id !== "higgsfield-ugc");
 
   return (
     <div className="space-y-4 max-w-2xl mx-auto">
