@@ -71,7 +71,7 @@ export default function Studio() {
   // Determine available models based on admin settings
   const availableModels = ALL_MODELS.filter((m) => {
     if (!m.available) return false;
-    if (m.provider === "higgsfield") return enabledModels["higgsfield_enabled"] !== false;
+    if (m.provider === "higgsfield") return true;
     if (m.id.startsWith("kling-v1-6")) return enabledModels["kling_v1_6_enabled"] !== false;
     if (m.id.startsWith("kling-v2"))   return enabledModels["kling_v2_master_enabled"] !== false;
     if (m.id.startsWith("kling-v3"))   return enabledModels["kling_v3_enabled"] !== false;
