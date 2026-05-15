@@ -98,11 +98,11 @@ export async function POST(req: NextRequest) {
         mode: "std",
       };
 
-      if (image_url) higgsfieldBody.start_image_url = image_url;
+      if (image_url) higgsfieldBody.image_url = image_url;
 
       const higgsfieldEndpoint = image_url
-        ? "https://platform.higgsfield.ai/v1/generate/seedance_2_0/image-to-video"
-        : "https://platform.higgsfield.ai/v1/generate/seedance_2_0/text-to-video";
+        ? "https://platform.higgsfield.ai/requests/higgsfield-ai/dop/preview"
+        : "https://platform.higgsfield.ai/requests/bytedance/seedance/v1/pro/text-to-video";
 
       console.log("Higgsfield request:", higgsfieldEndpoint, JSON.stringify(higgsfieldBody));
 
