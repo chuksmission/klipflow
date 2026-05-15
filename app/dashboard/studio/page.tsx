@@ -53,7 +53,7 @@ export default function Studio() {
   ];
 
   useEffect(() => {
-    let timer;
+    let timer: ReturnType<typeof setInterval> | undefined;
     if (loading) {
       setElapsedTime(0);
       setProgress(0);
