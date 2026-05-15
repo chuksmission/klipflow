@@ -84,40 +84,32 @@ export async function POST(req: NextRequest) {
 
       if (!keyId || !keySecret) {
         if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-        return NextResponse.json({ error: "Higgsfield not configured in admin settings.", refunded: true }, { status: 503 });
+        return NextResponse.json({ error: "Higgsfield not configured.", refunded: true }, { status: 503 });
       }
 
-      const credentials = `${keyId}:${keySecret}`;
-      const higgsfieldAspect = aspect_ratio === "9:16" ? "portrait" : aspect_ratio === "1:1" ? "square" : "landscape";
+      // Correct model: dop/standard for image-to-video, seedance for text-to-video
+      const modelId = image_url ? "higgsfield-ai/dop/standard" : "bytedance/seedance/v1/pro/image-to-video";
+      const endpoint = `https://platform.higgsfield.ai/${modelId}`;
 
-      const higgsfieldBody: Record<string, unknown> = {
-        prompt,
-        aspect_ratio: higgsfieldAspect,
-        duration: parseInt(duration),
-        resolution: "720p",
-        mode: "std",
-      };
-
+      const higgsfieldBody: Record<string, unknown> = { prompt };
       if (image_url) higgsfieldBody.image_url = image_url;
+      if (duration) higgsfieldBody.duration = parseInt(duration);
 
-      const higgsfieldEndpoint = image_url
-        ? "https://platform.higgsfield.ai/requests/higgsfield-ai/dop/preview"
-        : "https://platform.higgsfield.ai/requests/bytedance/seedance/v1/pro/text-to-video";
+      console.log("Higgsfield POST:", endpoint, JSON.stringify(higgsfieldBody));
 
-      console.log("Higgsfield request:", higgsfieldEndpoint, JSON.stringify(higgsfieldBody));
-
-      const higgsfieldResponse = await fetch(higgsfieldEndpoint, {
+      const higgsfieldResponse = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Key ${credentials}`,
+          "Accept": "application/json",
+          "Authorization": `Key ${keyId}:${keySecret}`,
         },
         body: JSON.stringify(higgsfieldBody),
       });
 
       const higgsfieldData = await safeJson(higgsfieldResponse) as {
-        id?: string; job_id?: string; generation_id?: string; request_id?: string;
-        status?: string; error?: string; message?: string; detail?: string;
+        request_id?: string; status?: string;
+        error?: string; message?: string; detail?: string;
       };
 
       console.log("Higgsfield response:", higgsfieldResponse.status, JSON.stringify(higgsfieldData));
@@ -128,13 +120,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: errMsg, refunded: true }, { status: higgsfieldResponse.status });
       }
 
-      const taskId = higgsfieldData.id ?? higgsfieldData.job_id ?? higgsfieldData.generation_id ?? higgsfieldData.request_id;
-      if (!taskId) {
+      if (!higgsfieldData.request_id) {
         if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-        return NextResponse.json({ error: "Higgsfield did not return a task ID.", refunded: true }, { status: 500 });
+        return NextResponse.json({ error: "Higgsfield did not return a request_id.", refunded: true }, { status: 500 });
       }
 
-      return NextResponse.json({ success: true, task_id: taskId, status: higgsfieldData.status ?? "processing", provider: "higgsfield" });
+      return NextResponse.json({ success: true, task_id: higgsfieldData.request_id, status: higgsfieldData.status ?? "queued", provider: "higgsfield" });
     }
 
     // ---- KLING ----

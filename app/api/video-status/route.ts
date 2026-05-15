@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
       if (!keyId || !keySecret) return NextResponse.json({ error: "Higgsfield not configured" }, { status: 503 });
 
       const credentials = keyId + ":" + keySecret;
-      const response = await fetch("https://cloud.higgsfield.ai/v1/video/" + task_id, {
+      const response = await fetch("https://platform.higgsfield.ai/requests/" + task_id + "/status", {
         headers: { "Authorization": "Key " + credentials },
       });
 
@@ -52,12 +52,9 @@ export async function GET(req: NextRequest) {
         error?: string;
       };
 
-      const videoUrl = Array.isArray(data.output)
-        ? data.output[0]?.url
-        : (data.output as { url?: string } | undefined)?.url;
-
-      const isDone = data.status === "succeeded" || data.status === "completed";
-      const isFailed = data.status === "failed" || data.status === "error";
+      const videoUrl = (data as any).video?.url ?? null;
+      const isDone = data.status === "completed";
+      const isFailed = data.status === "failed" || data.status === "nsfw";
 
       return NextResponse.json({
         success: true,
