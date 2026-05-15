@@ -277,7 +277,21 @@ export default function Studio() {
         } catch (e) { console.error("Poll error:", e); }
       }, 5000);
 
-      setTimeout(() => { clearInterval(poll); setLoading(false); }, 300000);
+      setTimeout(async () => {
+  clearInterval(poll);
+  setLoading(false);
+  setError("Generation timed out after 5 minutes. Tokens refunded.");
+  const { data: { session: ts } } = await supabase.auth.getSession();
+  if (ts) {
+    const rr = await fetch("/api/tokens/refund", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + ts.access_token },
+      body: JSON.stringify({ amount: capturedCost }),
+    });
+    const rd = await rr.json();
+    if (rd.balance !== undefined) setTokenBalance(rd.balance);
+  }
+}, 300000);
 
     } catch (e) { setError("Something went wrong."); setLoading(false); }
   };
