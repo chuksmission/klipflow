@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as jose from "jose";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -7,23 +6,9 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-async function getAdminSetting(key: string): Promise<string> {
+async function getSetting(key: string): Promise<string> {
   const { data } = await supabase.from("admin_settings").select("value").eq("key", key).single();
   return data?.value ?? "";
-}
-
-async function generateKlingToken(): Promise<string> {
-  const accessKey = process.env.KLING_ACCESS_KEY ?? await getAdminSetting("kling_access_key");
-  const secretKey = process.env.KLING_SECRET_KEY ?? await getAdminSetting("kling_secret_key");
-  if (!accessKey || !secretKey) throw new Error("Kling API keys not configured");
-  const secret = new TextEncoder().encode(secretKey);
-  return new jose.SignJWT({
-    iss: accessKey,
-    exp: Math.floor(Date.now() / 1000) + 1800,
-    nbf: Math.floor(Date.now() / 1000) - 5,
-  })
-    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
-    .sign(secret);
 }
 
 async function refundTokens(userId: string, amount: number) {
@@ -44,9 +29,7 @@ async function safeJson(response: Response): Promise<Record<string, unknown>> {
     const text = await response.text();
     if (!text || text.trim() === "") return {};
     return JSON.parse(text);
-  } catch {
-    return {};
-  }
+  } catch { return {}; }
 }
 
 export async function POST(req: NextRequest) {
@@ -70,38 +53,33 @@ export async function POST(req: NextRequest) {
       duration = "5",
       aspect_ratio = "16:9",
       model = "kling-v1-6-pro",
-      with_audio = false,
       user_id,
       tokens_used = 15,
     } = body;
 
     if (!prompt) return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
 
-    // ---- HIGGSFIELD ----
+    // ---- HIGGSFIELD (keep using until credits run out) ----
     if (model === "higgsfield-ugc") {
-      const keyId = await getAdminSetting("higgsfield_key_id");
-      const keySecret = await getAdminSetting("higgsfield_key_secret");
+      const keyId = await getSetting("higgsfield_key_id");
+      const keySecret = await getSetting("higgsfield_key_secret");
 
       if (!keyId || !keySecret) {
         if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
         return NextResponse.json({ error: "Higgsfield not configured.", refunded: true }, { status: 503 });
       }
 
-      // Correct model: dop/standard for image-to-video, seedance for text-to-video
       if (!image_url) {
         if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
         return NextResponse.json({ error: "Higgsfield requires an image. Please upload one.", refunded: true }, { status: 400 });
       }
-      const modelId = "bytedance/seedance/v1/pro/image-to-video";
-      const endpoint = `https://platform.higgsfield.ai/${modelId}`;
 
-      const higgsfieldBody: Record<string, unknown> = { prompt };
-      if (image_url) higgsfieldBody.image_url = image_url;
-      if (duration) higgsfieldBody.duration = parseInt(duration);
+      const endpoint = "https://platform.higgsfield.ai/bytedance/seedance/v1/pro/image-to-video";
+      const higgsfieldBody = { prompt, image_url, duration: parseInt(duration) };
 
       console.log("Higgsfield POST:", endpoint, JSON.stringify(higgsfieldBody));
 
-      const higgsfieldResponse = await fetch(endpoint, {
+      const higgsfieldRes = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -111,79 +89,92 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify(higgsfieldBody),
       });
 
-      const higgsfieldData = await safeJson(higgsfieldResponse) as {
-        request_id?: string; status?: string;
-        error?: string; message?: string; detail?: string;
-      };
+      const higgsfieldData = await safeJson(higgsfieldRes) as any;
+      console.log("Higgsfield response:", higgsfieldRes.status, JSON.stringify(higgsfieldData));
 
-      console.log("Higgsfield response:", higgsfieldResponse.status, JSON.stringify(higgsfieldData));
-
-      if (!higgsfieldResponse.ok) {
+      if (!higgsfieldRes.ok) {
         if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-        const errMsg = higgsfieldData.error ?? higgsfieldData.message ?? higgsfieldData.detail ?? `Higgsfield error (${higgsfieldResponse.status})`;
-        return NextResponse.json({ error: errMsg, refunded: true }, { status: higgsfieldResponse.status });
+        const errMsg = higgsfieldData.error ?? higgsfieldData.message ?? higgsfieldData.detail ?? `Higgsfield error (${higgsfieldRes.status})`;
+        return NextResponse.json({ error: errMsg, refunded: true }, { status: higgsfieldRes.status });
       }
 
-      if (!higgsfieldData.request_id) {
+      const taskId = higgsfieldData.request_id ?? higgsfieldData.id ?? higgsfieldData.job_id;
+      if (!taskId) {
         if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-        return NextResponse.json({ error: "Higgsfield did not return a request_id.", refunded: true }, { status: 500 });
+        return NextResponse.json({ error: "Higgsfield did not return a task ID.", refunded: true }, { status: 500 });
       }
 
-      return NextResponse.json({ success: true, task_id: higgsfieldData.request_id, status: higgsfieldData.status ?? "queued", provider: "higgsfield" });
+      return NextResponse.json({ success: true, task_id: taskId, status: "queued", provider: "higgsfield" });
     }
 
-    // ---- KLING ----
-    const klingToken = await generateKlingToken();
+    // ---- ALL OTHER MODELS via KIE.AI ----
+    const kieApiKey = await getSetting("kie_api_key");
+    if (!kieApiKey) {
+      if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+      return NextResponse.json({ error: "Kie.ai API key not configured in admin settings.", refunded: true }, { status: 503 });
+    }
 
-    const modelMap: Record<string, { model_name: string; mode: string; sound: boolean }> = {
-      "kling-v1-6-std":  { model_name: "kling-v1-6",     mode: "std", sound: false },
-      "kling-v1-6-pro":  { model_name: "kling-v1-6",     mode: "pro", sound: false },
-      "kling-v2-master": { model_name: "kling-v2-master", mode: "pro", sound: false },
-      "kling-v3-std":    { model_name: "kling-v3",        mode: "std", sound: true  },
-      "kling-v3-pro":    { model_name: "kling-v3",        mode: "pro", sound: true  },
+    // Map our model IDs to Kie.ai model strings
+    const kieModelMap: Record<string, { model: string; sound: boolean }> = {
+      "kling-v1-6-std":  { model: "kling-v1.6/video",    sound: false },
+      "kling-v1-6-pro":  { model: "kling-v1.6/video",    sound: false },
+      "kling-v2-master": { model: "kling-v2.1/video",    sound: false },
+      "kling-v3-std":    { model: "kling-3.0/video",     sound: true  },
+      "kling-v3-pro":    { model: "kling-3.0/video",     sound: true  },
     };
 
-    const cfg = modelMap[model] ?? { model_name: "kling-v1-6", mode: "std", sound: false };
-    const useAudio = with_audio || cfg.sound;
+    const kieMode: Record<string, string> = {
+      "kling-v1-6-std":  "std",
+      "kling-v1-6-pro":  "pro",
+      "kling-v2-master": "pro",
+      "kling-v3-std":    "std",
+      "kling-v3-pro":    "pro",
+    };
 
-    const requestBody: Record<string, unknown> = {
-      model_name: cfg.model_name,
+    const kieCfg = kieModelMap[model] ?? { model: "kling-v1.6/video", sound: false };
+
+    const kieInput: Record<string, unknown> = {
       prompt,
       duration,
       aspect_ratio,
-      cfg_scale: 0.5,
-      mode: cfg.mode,
+      mode: kieMode[model] ?? "std",
+      sound: kieCfg.sound,
     };
 
-    if (useAudio) requestBody.with_audio = true;
-    if (mode === "image_to_video" && image_url) requestBody.image_url = image_url;
+    if (image_url) kieInput.image_urls = [image_url];
 
-    const klingEndpoint = mode === "image_to_video"
-      ? "https://api.klingai.com/v1/videos/image2video"
-      : "https://api.klingai.com/v1/videos/text2video";
+    const kieBody = {
+      model: kieCfg.model,
+      input: kieInput,
+    };
 
-    const klingResponse = await fetch(klingEndpoint, {
+    console.log("Kie.ai POST:", JSON.stringify(kieBody));
+
+    const kieRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + klingToken },
-      body: JSON.stringify(requestBody),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${kieApiKey}`,
+      },
+      body: JSON.stringify(kieBody),
     });
 
-    const klingData = await safeJson(klingResponse) as {
-      data?: { task_id?: string; task_status?: string };
-      message?: string;
-    };
+    const kieData = await safeJson(kieRes) as any;
+    console.log("Kie.ai response:", kieRes.status, JSON.stringify(kieData));
 
-    if (!klingResponse.ok) {
+    if (!kieRes.ok) {
       if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-      return NextResponse.json({ error: klingData.message ?? "Kling API error", refunded: true }, { status: klingResponse.status });
+      const errMsg = kieData.message ?? kieData.error ?? `Kie.ai error (${kieRes.status})`;
+      return NextResponse.json({ error: errMsg, refunded: true }, { status: kieRes.status });
     }
 
-    return NextResponse.json({
-      success: true,
-      task_id: klingData.data?.task_id,
-      status: klingData.data?.task_status,
-      provider: "kling",
-    });
+    const jobId = kieData.data?.jobId ?? kieData.jobId ?? kieData.data?.job_id;
+    if (!jobId) {
+      if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+      return NextResponse.json({ error: "Kie.ai did not return a job ID.", refunded: true }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, task_id: jobId, status: "queued", provider: "kie" });
 
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Something went wrong";

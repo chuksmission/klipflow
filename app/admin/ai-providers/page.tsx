@@ -7,39 +7,42 @@ export default function AdminAIProviders() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [stats, setStats] = useState({ totalGenerations: 0, totalCost: 0, byModel: {} as Record<string, { count: number; cost: number }> });
+  const [stats, setStats] = useState({
+    totalGenerations: 0,
+    totalCost: 0,
+    byModel: {} as Record<string, { count: number; cost: number }>,
+  });
 
   const MODEL_COSTS: Record<string, number> = {
-    "kling-v1-6-std": 0.014,
-    "kling-v1-6-pro": 0.028,
-    "kling-v2-master": 0.05,
-    "kling-v3-std": 0.084,
-    "kling-v3-pro": 0.14,
-    "higgsfield-ugc": 0.06,
+    "kling-v1-6-std":  0.007,
+    "kling-v1-6-pro":  0.014,
+    "kling-v2-master": 0.025,
+    "kling-v3-std":    0.040,
+    "kling-v3-pro":    0.063,
+    "higgsfield-ugc":  0.060,
   };
 
   const providers = [
     {
-      id: "kling",
-      name: "Kling AI",
-      desc: "Video generation — Kling 1.6, 2 Master, 3.0",
-      docsUrl: "https://app.klingai.com/global/dev",
-      enabledKey: "kling_v1_6_enabled",
+      id: "kie",
+      name: "Kie.ai",
+      desc: "Unified API — Kling 1.6, 2.1, 3.0 (with audio), Veo 3, Seedance 2.0, and more",
+      docsUrl: "https://docs.kie.ai",
+      enabledKey: "kie_enabled",
       fields: [
-        { key: "kling_access_key", label: "Access Key", secret: true },
-        { key: "kling_secret_key", label: "Secret Key", secret: true },
+        { key: "kie_api_key", label: "API Key", secret: true },
       ],
       models: [
         { key: "kling_v1_6_enabled", label: "Kling 1.6 (Standard + Pro)" },
-        { key: "kling_v2_master_enabled", label: "Kling 2 Master" },
-        { key: "kling_v3_enabled", label: "Kling 3.0 (Standard + Pro) — Native Audio" },
+        { key: "kling_v2_master_enabled", label: "Kling 2.1 Master" },
+        { key: "kling_v3_enabled", label: "Kling 3.0 (Standard + Pro) — With Audio" },
       ],
     },
     {
       id: "higgsfield",
       name: "Higgsfield AI",
-      desc: "Realistic UGC and ad video generation — Soul Mode, DoP",
-      docsUrl: "https://cloud.higgsfield.ai",
+      desc: "Realistic UGC and ad video generation — image to video with Seedance",
+      docsUrl: "https://docs.higgsfield.ai",
       enabledKey: "higgsfield_enabled",
       fields: [
         { key: "higgsfield_key_id", label: "API Key ID", secret: false },
@@ -52,7 +55,7 @@ export default function AdminAIProviders() {
     {
       id: "openai",
       name: "OpenAI",
-      desc: "GPT-4 for scripts and prompt expansion. Sora coming soon.",
+      desc: "GPT-4 for scripts and prompt expansion",
       docsUrl: "https://platform.openai.com",
       enabledKey: "openai_enabled",
       fields: [
@@ -119,7 +122,9 @@ export default function AdminAIProviders() {
     await fetch("/api/admin/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
-      body: JSON.stringify({ settings: Object.entries(settings).map(([key, value]) => ({ key, value })) }),
+      body: JSON.stringify({
+        settings: Object.entries(settings).map(([key, value]) => ({ key, value })),
+      }),
     });
     setSaving(false);
     setSaved(true);
@@ -155,7 +160,9 @@ export default function AdminAIProviders() {
         </div>
         <div className="bg-blue-900/20 border border-blue-500/30 rounded-2xl p-4">
           <div className="text-blue-400 text-xs font-bold uppercase mb-1">Avg Cost Per Video</div>
-          <div className="text-2xl font-extrabold">${stats.totalGenerations > 0 ? (stats.totalCost / stats.totalGenerations).toFixed(3) : "0.000"}</div>
+          <div className="text-2xl font-extrabold">
+            ${stats.totalGenerations > 0 ? (stats.totalCost / stats.totalGenerations).toFixed(3) : "0.000"}
+          </div>
           <div className="text-gray-500 text-xs">Per generation</div>
         </div>
       </div>
@@ -184,10 +191,12 @@ export default function AdminAIProviders() {
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h3 className="font-bold">{provider.name}</h3>
-                  <p className="text-gray-500 text-xs">{provider.desc}</p>
+                  <p className="text-gray-500 text-xs mt-0.5">{provider.desc}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => window.open(provider.docsUrl, "_blank")} className="text-purple-400 hover:text-white text-xs transition">View Docs</button>
+                  <button onClick={() => window.open(provider.docsUrl, "_blank")} className="text-purple-400 hover:text-white text-xs transition">
+                    Docs
+                  </button>
                   <button
                     onClick={() => toggleEnabled(provider.enabledKey)}
                     className={"relative w-12 h-6 rounded-full transition-colors " + (settings[provider.enabledKey] === "true" ? "bg-purple-600" : "bg-white/20")}
@@ -221,9 +230,9 @@ export default function AdminAIProviders() {
                         <span className="text-sm">{model.label}</span>
                         <button
                           onClick={() => toggleEnabled(model.key)}
-                          className={"relative w-10 h-5 rounded-full transition-colors " + (settings[model.key] === "true" || settings[model.key] === undefined ? "bg-purple-600" : "bg-white/20")}
+                          className={"relative w-10 h-5 rounded-full transition-colors " + (settings[model.key] !== "false" ? "bg-purple-600" : "bg-white/20")}
                         >
-                          <div className={"absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all " + (settings[model.key] === "true" || settings[model.key] === undefined ? "left-5" : "left-0.5")} />
+                          <div className={"absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all " + (settings[model.key] !== "false" ? "left-5" : "left-0.5")} />
                         </button>
                       </div>
                     ))}
