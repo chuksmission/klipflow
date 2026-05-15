@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
     const kieApiKey = await getSetting("kie_api_key");
     if (!kieApiKey) return NextResponse.json({ error: "Kie.ai not configured" }, { status: 503 });
 
-    const res = await fetch(`https://api.kie.ai/api/v1/jobs/${task_id}`, {
+    const res = await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${task_id}`, {
       headers: { "Authorization": `Bearer ${kieApiKey}` },
     });
 
@@ -61,22 +61,21 @@ export async function GET(req: NextRequest) {
     try { data = JSON.parse(rawText); } catch { data = {}; }
 
     // Kie.ai status values: pending, processing, completed, failed
-    const jobData = data.data ?? data;
-    const status = jobData.status ?? jobData.jobStatus ?? "";
-    const isDone = status === "completed" || status === "succeed" || status === "success";
-    const isFailed = status === "failed" || status === "error";
-
-    // Extract video URL from Kie.ai response
-    const videoUrl = jobData.works?.[0]?.video?.resource
-      ?? jobData.works?.[0]?.url
-      ?? jobData.output?.url
-      ?? jobData.video_url
-      ?? jobData.result?.url
-      ?? null;
+    const jobData = data.data ?? {};
+    const state = jobData.state ?? "";
+    const isDone = state === "success";
+    const isFailed = state === "fail";
+    let videoUrl: string | null = null;
+    if (isDone && jobData.resultJson) {
+      try {
+        const result = JSON.parse(jobData.resultJson);
+        videoUrl = result.resultUrls?.[0] ?? null;
+      } catch { videoUrl = null; }
+    }
 
     return NextResponse.json({
       success: true,
-      status,
+      status: state,
       video_url: videoUrl,
       completed: isDone,
       failed: isFailed,
