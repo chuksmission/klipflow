@@ -46,20 +46,27 @@ export async function GET(req: NextRequest) {
         headers: { "Authorization": "Key " + credentials },
       });
 
-      const data = await response.json() as {
-        status?: string;
-        output?: { url?: string } | Array<{ url?: string }>;
-        error?: string;
-      };
+      const rawText = await response.text();
+      console.log("Higgsfield status raw:", rawText);
 
-      const videoUrl = (data as any).video?.url ?? null;
+      let data: any = {};
+      try { data = JSON.parse(rawText); } catch { data = {}; }
+
+      // Try all possible video URL locations
+      const videoUrl = data?.video?.url
+        ?? data?.videos?.[0]?.url
+        ?? data?.output?.url
+        ?? data?.output?.video_url
+        ?? data?.result?.url
+        ?? null;
+
       const isDone = data.status === "completed";
       const isFailed = data.status === "failed" || data.status === "nsfw";
 
       return NextResponse.json({
         success: true,
         status: data.status,
-        video_url: videoUrl ?? null,
+        video_url: videoUrl,
         completed: isDone,
         failed: isFailed,
         progress: data.status ?? "",
