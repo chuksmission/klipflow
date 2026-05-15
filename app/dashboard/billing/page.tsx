@@ -69,7 +69,9 @@ const TOKEN_PACKS = [
   { tokens: 1200, price: 69 },
 ];
 
-export default function Billing() {
+import { Suspense } from "react";
+
+function BillingContent() {
   const [tokenBalance, setTokenBalance] = useState(0);
   const [billing, setBilling] = useState("monthly");
   const [loading, setLoading] = useState(false);
@@ -255,5 +257,13 @@ export default function Billing() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function Billing() {
+  return (
+    <Suspense fallback={<div className="text-gray-400 p-6">Loading billing...</div>}>
+      <BillingContent />
+    </Suspense>
   );
 }
