@@ -104,8 +104,6 @@ export default function Studio() {
   useEffect(() => {
     if (activeModule === "ugc_ad") {
       setSelectedModel("higgsfield-ugc");
-    } else if (selectedModel === "higgsfield-ugc") {
-      setSelectedModel("kling-v1-6-pro");
     }
   }, [activeModule]);
 
@@ -270,7 +268,7 @@ export default function Studio() {
   const currentModel = ALL_MODELS.find((m) => m.id === selectedModel);
   const tokenCost = currentModel?.tokens ?? 15;
   const needsImage = activeModule === "image_to_video" || activeModule === "ugc_ad";
-  const showModels = activeModule === "text_to_video" || activeModule === "image_to_video" || activeModule === "ugc_ad";
+  const showModels = activeModule === "text_to_video" || activeModule === "image_to_video" || activeModule === "ugc_ad" || activeModule === "ai_actor";
 
   return (
     <div className="space-y-4 max-w-2xl mx-auto">
