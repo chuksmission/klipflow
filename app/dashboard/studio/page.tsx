@@ -242,6 +242,13 @@ export default function Studio() {
 
       const genProvider = data.provider ?? capturedProvider;
 
+      if (!data.task_id) {
+        setError("Failed to start generation. Please try again.");
+        setLoading(false);
+        if (data.refunded) setTokenBalance((p) => p + tokenCost);
+        return;
+      }
+
       const poll = setInterval(async () => {
         try {
           const sr = await fetch("/api/video-status?task_id=" + data.task_id + "&mode=" + capturedMode + "&provider=" + genProvider);
