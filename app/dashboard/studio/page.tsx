@@ -121,15 +121,9 @@ export default function Studio() {
       if (data.balance !== undefined) setTokenBalance(data.balance);
 
       // Fetch enabled models from admin settings
-      const sRes = await fetch("/api/admin/settings?category=ai_providers", {
-        headers: { Authorization: "Bearer " + session.access_token },
-      });
+      const sRes = await fetch("/api/settings/models");
       const sData = await sRes.json();
-      const map: Record<string, boolean> = {};
-      sData.settings?.forEach((s: any) => {
-        if (s.key.includes("_enabled")) map[s.key] = s.value === "true";
-      });
-      setEnabledKeys(map);
+      setEnabledKeys(sData.models ?? {});
     };
     init();
   }, []);
