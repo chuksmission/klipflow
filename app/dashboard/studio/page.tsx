@@ -81,13 +81,13 @@ export default function Studio() {
     fetchBalance();
   }, []);
 
-  const formatTime = (seconds) => {
+  const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return m > 0 ? m + "m " + s + "s" : s + "s";
   };
 
-  const getStatusMessage = (elapsed) => {
+  const getStatusMessage = (elapsed: number) => {
     if (elapsed < 10) return "Initializing AI models...";
     if (elapsed < 30) return "Analyzing your prompt...";
     if (elapsed < 60) return "Generating video frames...";
@@ -95,7 +95,7 @@ export default function Studio() {
     return "Almost ready, finalizing...";
   };
 
-  const handleImageFile = (e) => {
+  const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files[0];
     if (!file) return;
     setImageFile(file);
@@ -244,7 +244,7 @@ export default function Studio() {
     }
   };
 
-  const handleDownload = async (url) => {
+  const handleDownload = async (url: string) => {
     try {
       const response = await fetch(url);
       const blob = await response.blob();
