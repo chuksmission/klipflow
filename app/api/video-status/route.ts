@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as jose from "jose";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+async function getAdminSetting(key: string): Promise<string> {
+  const { data } = await supabase.from("admin_settings").select("value").eq("key", key).single();
+  return data?.value ?? "";
+}
 
 async function generateKlingToken(): Promise<string> {
-  const accessKey = process.env.KLING_ACCESS_KEY;
-  const secretKey = process.env.KLING_SECRET_KEY;
+  const accessKey = process.env.KLING_ACCESS_KEY ?? await getAdminSetting("kling_access_key");
+  const secretKey = process.env.KLING_SECRET_KEY ?? await getAdminSetting("kling_secret_key");
   if (!accessKey || !secretKey) throw new Error("Kling API keys not configured");
   const secret = new TextEncoder().encode(secretKey);
   return new jose.SignJWT({
@@ -24,10 +35,10 @@ export async function GET(req: NextRequest) {
 
     if (!task_id) return NextResponse.json({ error: "task_id is required" }, { status: 400 });
 
-    // Higgsfield status check
+    // Higgsfield status
     if (provider === "higgsfield") {
-      const keyId = process.env.HIGGSFIELD_KEY_ID;
-      const keySecret = process.env.HIGGSFIELD_KEY_SECRET;
+      const keyId = await getAdminSetting("higgsfield_key_id");
+      const keySecret = await getAdminSetting("higgsfield_key_secret");
       if (!keyId || !keySecret) return NextResponse.json({ error: "Higgsfield not configured" }, { status: 503 });
 
       const credentials = keyId + ":" + keySecret;
@@ -43,19 +54,22 @@ export async function GET(req: NextRequest) {
 
       const videoUrl = Array.isArray(data.output)
         ? data.output[0]?.url
-        : data.output?.url;
+        : (data.output as { url?: string } | undefined)?.url;
+
+      const isDone = data.status === "succeeded" || data.status === "completed";
+      const isFailed = data.status === "failed" || data.status === "error";
 
       return NextResponse.json({
         success: true,
         status: data.status,
         video_url: videoUrl ?? null,
-        completed: data.status === "succeeded" || data.status === "completed",
-        failed: data.status === "failed" || data.status === "error",
+        completed: isDone,
+        failed: isFailed,
         progress: data.status ?? "",
       });
     }
 
-    // Kling status check
+    // Kling status
     const token = await generateKlingToken();
     const endpoint = mode === "image_to_video"
       ? `https://api.klingai.com/v1/videos/image2video/${task_id}`

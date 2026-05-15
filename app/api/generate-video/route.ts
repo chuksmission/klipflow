@@ -7,9 +7,14 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+async function getAdminSetting(key: string): Promise<string> {
+  const { data } = await supabase.from("admin_settings").select("value").eq("key", key).single();
+  return data?.value ?? "";
+}
+
 async function generateKlingToken(): Promise<string> {
-  const accessKey = process.env.KLING_ACCESS_KEY;
-  const secretKey = process.env.KLING_SECRET_KEY;
+  const accessKey = process.env.KLING_ACCESS_KEY ?? await getAdminSetting("kling_access_key");
+  const secretKey = process.env.KLING_SECRET_KEY ?? await getAdminSetting("kling_secret_key");
   if (!accessKey || !secretKey) throw new Error("Kling API keys not configured");
   const secret = new TextEncoder().encode(secretKey);
   return new jose.SignJWT({
@@ -34,65 +39,6 @@ async function refundTokens(userId: string, amount: number) {
   } catch (err) { console.error("Refund error:", err); }
 }
 
-async function generateKlingVideo(body: Record<string, unknown>, mode: string, token: string) {
-  const endpoint = mode === "image_to_video"
-    ? "https://api.klingai.com/v1/videos/image2video"
-    : "https://api.klingai.com/v1/videos/text2video";
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-    body: JSON.stringify(body),
-  });
-  return response;
-}
-
-async function generateHiggsfield(prompt: string, imageUrl: string | undefined, aspectRatio: string, duration: string) {
-  const keyId = process.env.HIGGSFIELD_KEY_ID;
-  const keySecret = process.env.HIGGSFIELD_KEY_SECRET;
-  if (!keyId || !keySecret) throw new Error("Higgsfield API keys not configured");
-
-  const credentials = keyId + ":" + keySecret;
-
-  // Soul mode for UGC — image to video with avatar
-  if (imageUrl) {
-    const response = await fetch("https://cloud.higgsfield.ai/v1/video/generate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Key " + credentials,
-      },
-      body: JSON.stringify({
-        model: "higgsfield/ugc",
-        input: {
-          prompt,
-          image_url: imageUrl,
-          aspect_ratio: aspectRatio,
-          duration: parseInt(duration),
-        },
-      }),
-    });
-    return response;
-  }
-
-  // Text to video UGC mode
-  const response = await fetch("https://cloud.higgsfield.ai/v1/video/generate", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Key " + credentials,
-    },
-    body: JSON.stringify({
-      model: "higgsfield/ugc",
-      input: {
-        prompt,
-        aspect_ratio: aspectRatio,
-        duration: parseInt(duration),
-      },
-    }),
-  });
-  return response;
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json() as {
@@ -113,53 +59,93 @@ export async function POST(req: NextRequest) {
       image_url,
       duration = "5",
       aspect_ratio = "16:9",
-      model = "kling-v1-6-std",
+      model = "kling-v1-6-pro",
       with_audio = false,
       user_id,
-      tokens_used = 10,
+      tokens_used = 15,
     } = body;
 
     if (!prompt) return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
 
-    // Route to Higgsfield for UGC
+    // ---- HIGGSFIELD ----
     if (model === "higgsfield-ugc") {
-      const response = await generateHiggsfield(prompt, image_url, aspect_ratio, duration);
-      const data = await response.json() as { id?: string; status?: string; error?: string };
+      const keyId = await getAdminSetting("higgsfield_key_id");
+      const keySecret = await getAdminSetting("higgsfield_key_secret");
+      if (!keyId || !keySecret) {
+        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+        return NextResponse.json({ error: "Higgsfield not configured in admin settings.", refunded: true }, { status: 503 });
+      }
+
+      const credentials = keyId + ":" + keySecret;
+      const higgsBody: Record<string, unknown> = {
+        prompt,
+        aspect_ratio,
+        duration: parseInt(duration),
+      };
+      if (image_url) higgsBody.image_url = image_url;
+
+      const endpoint = image_url
+        ? "https://cloud.higgsfield.ai/v1/video/image-to-video"
+        : "https://cloud.higgsfield.ai/v1/video/text-to-video";
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Key " + credentials,
+        },
+        body: JSON.stringify(higgsBody),
+      });
+
+      const data = await response.json() as { id?: string; status?: string; error?: string; message?: string };
       if (!response.ok) {
         if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-        return NextResponse.json({ error: data.error ?? "Higgsfield API error", refunded: true }, { status: response.status });
+        return NextResponse.json({ error: data.error ?? data.message ?? "Higgsfield API error", refunded: true }, { status: response.status });
       }
       return NextResponse.json({ success: true, task_id: data.id, status: data.status, provider: "higgsfield" });
     }
 
-    // Route to Kling
+    // ---- KLING ----
     const klingToken = await generateKlingToken();
 
-    // Correct Kling API model_name values from official docs
+    // Official Kling API model names
     const modelMap: Record<string, { model_name: string; mode: string; sound: boolean }> = {
-      "kling-v1-6-std": { model_name: "kling-v1-6", mode: "std", sound: false },
-      "kling-v1-6-pro": { model_name: "kling-v1-6", mode: "pro", sound: false },
-      "kling-v2-master": { model_name: "kling-v2-master", mode: "pro", sound: false },
-      "kling-v2-6": { model_name: "kling-v2-6", mode: "pro", sound: true },
+      "kling-v1-6-std":  { model_name: "kling-v1-6",      mode: "std", sound: false },
+      "kling-v1-6-pro":  { model_name: "kling-v1-6",      mode: "pro", sound: false },
+      "kling-v2-master": { model_name: "kling-v2-master",  mode: "pro", sound: false },
+      "kling-v3-std":    { model_name: "kling-v3",         mode: "std", sound: true  },
+      "kling-v3-pro":    { model_name: "kling-v3",         mode: "pro", sound: true  },
     };
 
-    const modelConfig = modelMap[model] ?? { model_name: "kling-v1-6", mode: "std", sound: false };
-    const useAudio = with_audio || modelConfig.sound;
+    const cfg = modelMap[model] ?? { model_name: "kling-v1-6", mode: "std", sound: false };
+    const useAudio = with_audio || cfg.sound;
 
     const requestBody: Record<string, unknown> = {
-      model_name: modelConfig.model_name,
+      model_name: cfg.model_name,
       prompt,
       duration,
       aspect_ratio,
       cfg_scale: 0.5,
-      mode: modelConfig.mode,
+      mode: cfg.mode,
     };
 
     if (useAudio) requestBody.with_audio = true;
     if (mode === "image_to_video" && image_url) requestBody.image_url = image_url;
 
-    const response = await generateKlingVideo(requestBody, mode, klingToken);
-    const data = await response.json() as { data?: { task_id?: string; task_status?: string }; message?: string };
+    const endpoint = mode === "image_to_video"
+      ? "https://api.klingai.com/v1/videos/image2video"
+      : "https://api.klingai.com/v1/videos/text2video";
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + klingToken },
+      body: JSON.stringify(requestBody),
+    });
+
+    const data = await response.json() as {
+      data?: { task_id?: string; task_status?: string };
+      message?: string;
+    };
 
     if (!response.ok) {
       if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
