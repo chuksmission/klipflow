@@ -173,13 +173,14 @@ export async function POST(req: NextRequest) {
     const kieData = await safeJson(kieRes) as any;
     console.log("Kie.ai response:", kieRes.status, JSON.stringify(kieData));
 
-    if (kieData.code !== 200) {
+    if (kieData.code !== 200 || !kieData.data) {
       if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
       const errMsg = kieData.msg ?? kieData.message ?? kieData.error ?? `Kie.ai error (${kieRes.status})`;
-      return NextResponse.json({ error: errMsg, refunded: true }, { status: kieRes.status || 500 });
+      return NextResponse.json({ error: errMsg, refunded: true }, { status: 400 });
     }
 
-    const taskId = kieData.data?.taskId;
+    const taskId = kieData.data?.taskId ?? kieData.data?.task_id ?? kieData.taskId;
+    console.log("Kie.ai taskId:", taskId, "raw:", JSON.stringify(kieData));
     if (!taskId) {
       if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
       return NextResponse.json({ error: "Kie.ai did not return a taskId. Raw: " + JSON.stringify(kieData), refunded: true }, { status: 500 });
