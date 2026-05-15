@@ -59,7 +59,7 @@ export default function Studio() {
     { id: "veo3-fast",       name: "Veo 3 Fast",          desc: "Google AI, native audio, 8s",     tokens: 30,  badge: "With Audio",    available: true,  provider: "kie",        hasSound: true,  enabledKey: "veo3_fast_enabled" },
     { id: "veo3-quality",    name: "Veo 3 Quality",       desc: "Google AI, cinematic, 8s",         tokens: 80,  badge: "Premium",       available: true,  provider: "kie",        hasSound: true,  enabledKey: "veo3_quality_enabled" },
     // ByteDance Seedance
-    { id: "seedance-2",      name: "Seedance 2.0",        desc: "ByteDance, best quality + audio",  tokens: 30,  badge: "Best Quality",  available: true,  provider: "kie",        hasSound: true,  enabledKey: "seedance2_enabled" },
+    { id: "seedance-2",      name: "Seedance 2.0",        desc: "ByteDance, best quality + audio",  tokens: 50,  badge: "Best Quality",  available: true,  provider: "kie",        hasSound: true,  enabledKey: "seedance2_enabled" },
     { id: "seedance-2-fast", name: "Seedance 2.0 Fast",   desc: "ByteDance, fast and affordable",   tokens: 20,  badge: "",              available: true,  provider: "kie",        hasSound: true,  enabledKey: "seedance2_fast_enabled" },
     // Hailuo
     { id: "hailuo-pro",      name: "Hailuo 2.3 Pro",      desc: "MiniMax, fast generation",         tokens: 20,  badge: "",              available: true,  provider: "kie",        hasSound: false, enabledKey: "hailuo_enabled" },
@@ -322,7 +322,8 @@ export default function Studio() {
   };
 
   const currentModel = ALL_MODELS.find((m) => m.id === selectedModel);
-  const tokenCost = currentModel?.tokens ?? 15;
+  const durationMultiplier = duration === "5" ? 1 : duration === "8" ? 1.6 : duration === "10" ? 2 : duration === "15" ? 3 : 1;
+  const tokenCost = Math.ceil((currentModel?.tokens ?? 15) * durationMultiplier);
   const needsImage = activeModule === "image_to_video" || activeModule === "ugc_ad";
   const showModels = activeModule === "text_to_video" || activeModule === "image_to_video" || activeModule === "ugc_ad" || activeModule === "ai_actor";
 
