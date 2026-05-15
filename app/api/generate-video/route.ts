@@ -104,8 +104,8 @@ export async function POST(req: NextRequest) {
       }
 
       const higgsfieldEndpoint = image_url
-        ? "https://cloud.higgsfield.ai/v1/video/image-to-video"
-        : "https://cloud.higgsfield.ai/v1/video/text-to-video";
+        ? "https://platform.higgsfield.ai/v1/higgsfield/ugc/image-to-video"
+        : "https://platform.higgsfield.ai/v1/higgsfield/ugc/text-to-video";
 
       console.log("Higgsfield request to:", higgsfieldEndpoint);
       console.log("Higgsfield body:", JSON.stringify(higgsfieldBody));
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Key ${credentials}`,
+          "Authorization": `Bearer ${credentials}`,
         },
         body: JSON.stringify(higgsfieldBody),
       });
