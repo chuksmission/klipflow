@@ -84,8 +84,6 @@ export default function AdminGenerations() {
                   {gen.video_url ? (
                     
                       href={gen.video_url}
-                    
-                      href={gen.video_url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs px-3 py-1 rounded-lg bg-purple-900/40 hover:bg-purple-600 text-purple-300 hover:text-white transition font-semibold whitespace-nowrap inline-block"
