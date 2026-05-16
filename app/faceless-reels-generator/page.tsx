@@ -1,9 +1,17 @@
 import PSEOPage from "../components/PSEOPage";
+import { Metadata } from 'next'
 
-export const metadata = {
-  title: "Faceless Reels Generator — AI Reels Without Showing Your Face | KlipflowAI",
-  description: "Generate faceless reels for Instagram, TikTok and YouTube automatically. AI writes the script, creates the video, and posts it for you. No face required."
-};
+export const metadata: Metadata = {
+  title: 'Faceless Reels Generator — AI Instagram & TikTok Reels',
+  description: 'Create viral faceless reels for Instagram and TikTok using AI. Generate engaging short-form video content at scale without showing your face or hiring creators.',
+  keywords: ['faceless reels generator', 'AI reels generator', 'Instagram reels AI', 'TikTok video generator', 'faceless TikTok', 'AI short video generator', 'faceless content AI'],
+  alternates: { canonical: 'https://klipflowai.com/faceless-reels-generator' },
+  openGraph: {
+    title: 'Faceless Reels Generator — AI Instagram & TikTok | KlipflowAI',
+    description: 'Create viral faceless reels for Instagram and TikTok with AI. No face, no crew needed.',
+    url: 'https://klipflowai.com/faceless-reels-generator',
+  },
+}
 
 export default function FacelessReelsGenerator() {
   return (

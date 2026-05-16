@@ -1,9 +1,17 @@
 import PSEOPage from "../components/PSEOPage";
+import { Metadata } from 'next'
 
-export const metadata = {
-  title: "Social Media Autopilot — Auto-Post to 5 Platforms with AI | KlipflowAI",
-  description: "Automate your entire social media presence with AI. Generate and auto-post to TikTok, Instagram, YouTube, Facebook and X daily. Set it once and grow."
-};
+export const metadata: Metadata = {
+  title: 'Social Media Autopilot — AI Auto-Post to 5 Platforms',
+  description: 'Generate AI videos and auto-post to TikTok, Instagram, YouTube, Facebook, and Twitter on a schedule. Full social media automation powered by AI — set it and forget it.',
+  keywords: ['social media autopilot', 'social media automation AI', 'auto post social media', 'AI social media scheduler', 'social media posting automation', 'AI content scheduler'],
+  alternates: { canonical: 'https://klipflowai.com/social-media-autopilot' },
+  openGraph: {
+    title: 'Social Media Autopilot — Auto-Post to 5 Platforms | KlipflowAI',
+    description: 'AI-generated videos auto-posted to TikTok, Instagram, YouTube, Facebook, and Twitter on schedule.',
+    url: 'https://klipflowai.com/social-media-autopilot',
+  },
+}
 
 export default function SocialMediaAutopilot() {
   return (

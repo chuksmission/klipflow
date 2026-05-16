@@ -1,9 +1,17 @@
 import PSEOPage from "../components/PSEOPage";
+import { Metadata } from 'next'
 
-export const metadata = {
-  title: "AI Video Prompt Generator — Cinematic Prompts in Seconds | KlipflowAI",
-  description: "Generate professional cinematic AI video prompts instantly. Transform simple ideas into detailed film-grade prompts for Sora, Veo 3, Kling and more."
-};
+export const metadata: Metadata = {
+  title: 'AI Video Prompt Generator — Better Prompts, Better Videos',
+  description: 'Generate powerful AI video prompts instantly. Stop guessing what to type — our AI prompt expander turns simple ideas into detailed cinematic prompts that produce stunning results.',
+  keywords: ['AI video prompt generator', 'video prompt generator', 'AI prompt expander', 'Kling prompt generator', 'Sora prompt ideas', 'AI video prompts', 'text to video prompts'],
+  alternates: { canonical: 'https://klipflowai.com/ai-video-prompt-generator' },
+  openGraph: {
+    title: 'AI Video Prompt Generator — Better Prompts, Better Videos | KlipflowAI',
+    description: 'Turn simple ideas into detailed cinematic AI video prompts instantly.',
+    url: 'https://klipflowai.com/ai-video-prompt-generator',
+  },
+}
 
 export default function AIVideoPromptGenerator() {
   return (

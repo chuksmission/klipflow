@@ -1,9 +1,17 @@
 import PSEOPage from "../components/PSEOPage";
+import { Metadata } from 'next'
 
-export const metadata = {
-  title: "Facebook Ad Spy Tool — Find Winning Ads in Your Niche | KlipflowAI",
-  description: "Spy on winning Facebook ads legally. Find ads running for 7+ days in any niche. See what's scaling before you spend a dollar. Powered by Meta's official API."
-};
+export const metadata: Metadata = {
+  title: 'Facebook Ad Spy Tool — See Winning Ads & Copy Them',
+  description: 'Spy on your competitors\' best Facebook and Instagram ads. Find winning ad creatives, copy the strategy, and generate your own version with AI — all in one platform.',
+  keywords: ['Facebook ad spy tool', 'Facebook ad spy', 'ad spy tool', 'competitor ad research', 'Facebook ads library tool', 'spy on Facebook ads', 'winning Facebook ads'],
+  alternates: { canonical: 'https://klipflowai.com/facebook-ad-spy-tool' },
+  openGraph: {
+    title: 'Facebook Ad Spy Tool — Find Winning Ads | KlipflowAI',
+    description: 'Spy on competitor Facebook ads, find winning creatives, and generate your own version with AI.',
+    url: 'https://klipflowai.com/facebook-ad-spy-tool',
+  },
+}
 
 export default function FacebookAdSpyTool() {
   return (

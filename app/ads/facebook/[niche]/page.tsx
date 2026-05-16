@@ -1,4 +1,5 @@
 import PSEOPage from "../../../components/PSEOPage";
+import { Metadata } from 'next'
 
 interface Props {
   params: Promise<{ niche: string }>;
@@ -8,13 +9,20 @@ function formatNiche(niche: string) {
   return niche.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-export async function generateMetadata({ params }: Props) {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { niche } = await params;
   const formatted = formatNiche(niche);
   return {
-    title: `Facebook Ad Spy — ${formatted} Ads | KlipflowAI`,
-    description: `Spy on winning Facebook ads in the ${formatted} niche. Find ads running 7+ days, see what's scaling, and generate better versions instantly with AI.`
-  };
+    title: `${formatted} Facebook Ads — Spy & Generate AI Video Ads`,
+    description: `Browse the best ${formatted.toLowerCase()} Facebook ads and generate your own AI video version in seconds. Spy on what's working in the ${formatted.toLowerCase()} niche and outcompete your rivals.`,
+    keywords: [`${formatted.toLowerCase()} Facebook ads`, `${formatted.toLowerCase()} ad examples`, 'Facebook ad spy', `${formatted.toLowerCase()} video ads`, 'AI ad generator', `${formatted.toLowerCase()} marketing`],
+    alternates: { canonical: `https://klipflowai.com/ads/facebook/${niche}` },
+    openGraph: {
+      title: `${formatted} Facebook Ads — Spy & Generate | KlipflowAI`,
+      description: `Find winning ${formatted.toLowerCase()} Facebook ads and generate your own AI version instantly.`,
+      url: `https://klipflowai.com/ads/facebook/${niche}`,
+    },
+  }
 }
 
 export function generateStaticParams() {

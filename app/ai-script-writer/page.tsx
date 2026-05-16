@@ -1,9 +1,17 @@
 import PSEOPage from "../components/PSEOPage";
+import { Metadata } from 'next'
 
-export const metadata = {
-  title: "AI Script Writer — Generate Video Scripts Instantly | KlipflowAI",
-  description: "Generate viral video scripts with AI. Trending hooks, full scripts, and CTAs written automatically for your niche. Perfect for faceless channels and video ads."
-};
+export const metadata: Metadata = {
+  title: 'AI Script Writer — Video Scripts Generated Instantly',
+  description: 'Generate high-converting video scripts for ads, YouTube, TikTok, and more using AI. Get proven script structures that hook viewers and drive sales in seconds.',
+  keywords: ['AI script writer', 'video script generator', 'AI script generator', 'ad script writer AI', 'YouTube script AI', 'TikTok script generator', 'AI copywriting tool'],
+  alternates: { canonical: 'https://klipflowai.com/ai-script-writer' },
+  openGraph: {
+    title: 'AI Script Writer — Video Scripts in Seconds | KlipflowAI',
+    description: 'Generate high-converting video scripts for ads, YouTube, TikTok instantly with AI.',
+    url: 'https://klipflowai.com/ai-script-writer',
+  },
+}
 
 export default function AIScriptWriter() {
   return (

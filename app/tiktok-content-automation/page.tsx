@@ -1,9 +1,17 @@
 import PSEOPage from "../components/PSEOPage";
+import { Metadata } from 'next'
 
-export const metadata = {
-  title: "TikTok Content Automation — AI Runs Your TikTok 24/7 | KlipflowAI",
-  description: "Automate your entire TikTok channel with AI. Generate viral TikTok videos daily and post automatically. Grow your TikTok without creating a single video yourself."
-};
+export const metadata: Metadata = {
+  title: 'TikTok Content Automation — AI TikTok Video Generator',
+  description: 'Automate your TikTok content with AI. Generate, schedule, and post viral TikTok videos on autopilot. Grow your TikTok account without spending hours creating content.',
+  keywords: ['TikTok content automation', 'TikTok AI generator', 'automate TikTok', 'TikTok video automation', 'AI TikTok creator', 'TikTok autopilot', 'TikTok growth AI'],
+  alternates: { canonical: 'https://klipflowai.com/tiktok-content-automation' },
+  openGraph: {
+    title: 'TikTok Content Automation — AI TikTok Autopilot | KlipflowAI',
+    description: 'Automate your TikTok with AI. Generate and post viral videos on autopilot.',
+    url: 'https://klipflowai.com/tiktok-content-automation',
+  },
+}
 
 export default function TikTokContentAutomation() {
   return (

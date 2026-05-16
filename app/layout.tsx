@@ -14,26 +14,68 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "KlipflowAI — Spy. Generate. Dominate.",
-  description: "The only AI platform that combines Facebook Ad Spy, AI video generation, script writing, voice synthesis, avatar creation, and automated posting to 5 platforms in one closed loop.",
-  keywords: "ai video generator, facebook ad spy, ugc video creator, faceless channel automation, ai ad generator, social media autopilot, text to video ai, ai actor generator",
+  metadataBase: new URL('https://klipflowai.com'),
+  title: {
+    default: 'KlipflowAI — AI Video Generator | Text to Video, UGC & More',
+    template: '%s | KlipflowAI',
+  },
+  description: 'Generate stunning AI videos in seconds. Text to video, image to video, UGC videos, AI actors, voice generation and more. Powered by Kling, Sora, Veo 3 and top AI models.',
+  keywords: [
+    'AI video generator',
+    'text to video AI',
+    'image to video AI',
+    'UGC video generator',
+    'AI actor generator',
+    'Kling AI',
+    'Sora video generator',
+    'Veo 3',
+    'faceless video creator',
+    'AI content creator',
+    'facebook ad spy',
+    'ai ad generator',
+    'social media autopilot',
+    'faceless channel automation',
+    'ai voice generator',
+  ],
+  authors: [{ name: 'KlipflowAI' }],
+  creator: 'KlipflowAI',
+  publisher: 'KlipflowAI',
   openGraph: {
-    title: "KlipflowAI — Spy. Generate. Dominate.",
-    description: "Spy on winning Facebook ads, generate cinematic AI videos, and auto-post to 5 platforms on autopilot.",
-    url: "https://klipflowai.com",
-    siteName: "KlipflowAI",
-    type: "website",
+    type: 'website',
+    locale: 'en_US',
+    url: 'https://klipflowai.com',
+    siteName: 'KlipflowAI',
+    title: 'KlipflowAI — AI Video Generator | Text to Video, UGC & More',
+    description: 'Generate stunning AI videos in seconds using the world\'s best AI models. Kling, Sora, Veo 3, and more.',
+    images: [
+      {
+        url: '/og-image.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'KlipflowAI — AI Video Generator',
+      },
+    ],
   },
   twitter: {
-    card: "summary_large_image",
-    title: "KlipflowAI — Spy. Generate. Dominate.",
-    description: "The only AI platform that combines ad spy, video generation, and automated posting in one closed loop.",
+    card: 'summary_large_image',
+    site: '@klipflowai',
+    creator: '@klipflowai',
+    title: 'KlipflowAI — AI Video Generator | Text to Video, UGC & More',
+    description: 'Generate stunning AI videos in seconds. Text to video, UGC, AI actors, voice synthesis and more.',
+    images: ['/og-image.jpg'],
   },
   robots: {
     index: true,
     follow: true,
-  }
-};
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+}
 
 export default function RootLayout({
   children,

@@ -1,9 +1,18 @@
 import PSEOPage from "../components/PSEOPage";
+import { Metadata } from 'next'
 
-export const metadata = {
-  title: "AI Video Generator — Create Professional Videos in Minutes | KlipflowAI",
-  description: "Generate professional AI videos from text or images. Powered by Kling, Veo 3, and Sora. Text to video, image to video, avatar videos and more. Start free."
-};
+export const metadata: Metadata = {
+  title: 'AI Video Generator — Create Videos in Seconds',
+  description: 'The most powerful AI video generator online. Turn text or images into stunning videos using Kling, Sora, Veo 3, and more top AI models. No editing skills needed.',
+  keywords: ['AI video generator', 'AI video maker', 'text to video', 'best AI video generator 2024', 'free AI video generator', 'generate video with AI'],
+  alternates: { canonical: 'https://klipflowai.com/ai-video-generator' },
+  openGraph: {
+    title: 'AI Video Generator — Create Videos in Seconds | KlipflowAI',
+    description: 'Turn text or images into stunning AI videos using Kling, Sora, Veo 3 and more. No editing skills needed.',
+    url: 'https://klipflowai.com/ai-video-generator',
+  },
+}
+
 
 export default function AIVideoGenerator() {
   return (

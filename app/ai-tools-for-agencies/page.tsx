@@ -1,9 +1,17 @@
 import PSEOPage from "../components/PSEOPage";
+import { Metadata } from 'next'
 
-export const metadata = {
-  title: "AI Tools for Agencies — Scale Client Content with AI | KlipflowAI",
-  description: "The complete AI platform for marketing agencies. Manage unlimited client accounts, generate video and image ads at scale, and white-label for your brand."
-};
+export const metadata: Metadata = {
+  title: 'AI Tools for Agencies — White Label AI Video Platform',
+  description: 'The complete AI video platform for marketing agencies. Generate unlimited client videos, manage multiple brands, and deliver results at scale — all under your brand.',
+  keywords: ['AI tools for agencies', 'white label AI video', 'AI video platform agencies', 'marketing agency AI tools', 'agency video generator', 'AI content for agencies'],
+  alternates: { canonical: 'https://klipflowai.com/ai-tools-for-agencies' },
+  openGraph: {
+    title: 'AI Tools for Agencies — White Label Video Platform | KlipflowAI',
+    description: 'The complete AI video platform for agencies. Generate unlimited client videos at scale.',
+    url: 'https://klipflowai.com/ai-tools-for-agencies',
+  },
+}
 
 export default function AIToolsForAgencies() {
   return (

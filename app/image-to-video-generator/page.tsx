@@ -1,9 +1,17 @@
 import PSEOPage from "../components/PSEOPage";
+import { Metadata } from 'next'
 
-export const metadata = {
-  title: "Image to Video Generator — Animate Any Photo with AI | KlipflowAI",
-  description: "Transform any image into a stunning AI video. Animate product photos, portraits, and landscapes with controlled motion. Free to try — no credit card needed."
-};
+export const metadata: Metadata = {
+  title: 'Image to Video Generator — Animate Any Photo with AI',
+  description: 'Turn any image into a stunning AI video with one click. Upload your photo and watch it come to life using Kling, Seedance, Luma Ray 3 and more.',
+  keywords: ['image to video', 'image to video AI', 'image to video generator', 'animate photo AI', 'photo to video AI', 'AI image animation'],
+  alternates: { canonical: 'https://klipflowai.com/image-to-video-generator' },
+  openGraph: {
+    title: 'Image to Video Generator — Animate Any Photo with AI | KlipflowAI',
+    description: 'Turn any image into a stunning AI video with one click. Powered by Kling, Seedance, Luma Ray 3.',
+    url: 'https://klipflowai.com/image-to-video-generator',
+  },
+}
 
 export default function ImageToVideoGenerator() {
   return (

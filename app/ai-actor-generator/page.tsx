@@ -1,9 +1,17 @@
 import PSEOPage from "../components/PSEOPage";
+import { Metadata } from 'next'
 
-export const metadata = {
-  title: "AI Actor Generator — Create Realistic AI Spokespeople | KlipflowAI",
-  description: "Generate photorealistic AI actors and spokespeople for your videos. Describe your ideal actor and create them instantly. No casting, no studios, no costs."
-};
+export const metadata: Metadata = {
+  title: 'AI Actor Generator — Create AI Human Videos',
+  description: 'Generate realistic AI actor videos for ads, content, and marketing. Choose from hundreds of AI avatars and create talking head videos without a camera or studio.',
+  keywords: ['AI actor generator', 'AI avatar video', 'AI human video generator', 'talking head AI', 'AI spokesperson video', 'virtual actor AI', 'AI presenter'],
+  alternates: { canonical: 'https://klipflowai.com/ai-actor-generator' },
+  openGraph: {
+    title: 'AI Actor Generator — Realistic AI Human Videos | KlipflowAI',
+    description: 'Generate realistic AI actor videos for ads and marketing. No camera or studio needed.',
+    url: 'https://klipflowai.com/ai-actor-generator',
+  },
+}
 
 export default function AIActorGenerator() {
   return (

@@ -1,9 +1,17 @@
 import PSEOPage from "../components/PSEOPage";
+import { Metadata } from 'next'
 
-export const metadata = {
-  title: "Faceless Channel Automation — AI Runs Your Channel 24/7 | KlipflowAI",
-  description: "Automate your entire faceless YouTube, TikTok or Instagram channel with AI. Script, video, voiceover, and posting — all on autopilot. Start free today."
-};
+export const metadata: Metadata = {
+  title: 'Faceless Channel Automation — AI YouTube Autopilot',
+  description: 'Build and automate a faceless YouTube channel with AI. Generate videos, voiceovers, and auto-post on a schedule. Make money on YouTube without showing your face.',
+  keywords: ['faceless YouTube channel', 'faceless channel automation', 'AI YouTube automation', 'faceless channel AI', 'automated YouTube channel', 'faceless content creator', 'YouTube autopilot'],
+  alternates: { canonical: 'https://klipflowai.com/faceless-channel-automation' },
+  openGraph: {
+    title: 'Faceless Channel Automation — AI YouTube Autopilot | KlipflowAI',
+    description: 'Build and automate a faceless YouTube channel with AI. Generate, schedule, and post automatically.',
+    url: 'https://klipflowai.com/faceless-channel-automation',
+  },
+}
 
 export default function FacelessChannelAutomation() {
   return (

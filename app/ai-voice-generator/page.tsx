@@ -1,9 +1,17 @@
 import PSEOPage from "../components/PSEOPage";
+import { Metadata } from 'next'
 
-export const metadata = {
-  title: "AI Voice Generator — Natural AI Voiceovers for Videos | KlipflowAI",
-  description: "Generate natural AI voiceovers for your videos. Multiple voices, accents, and styles. Synced to your avatar or video automatically. Start free today."
-};
+export const metadata: Metadata = {
+  title: 'AI Voice Generator — Text to Speech for Videos',
+  description: 'Generate natural-sounding AI voiceovers for your videos in seconds. 100+ voices, 30+ languages. Powered by ElevenLabs. Perfect for ads, content, and faceless channels.',
+  keywords: ['AI voice generator', 'text to speech AI', 'AI voiceover generator', 'ElevenLabs alternative', 'AI voice for videos', 'free AI voice generator', 'realistic AI voice'],
+  alternates: { canonical: 'https://klipflowai.com/ai-voice-generator' },
+  openGraph: {
+    title: 'AI Voice Generator — Natural Text to Speech | KlipflowAI',
+    description: 'Generate natural AI voiceovers for videos. 100+ voices, 30+ languages. Powered by ElevenLabs.',
+    url: 'https://klipflowai.com/ai-voice-generator',
+  },
+}
 
 export default function AIVoiceGenerator() {
   return (

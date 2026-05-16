@@ -1,9 +1,17 @@
 import PSEOPage from "../components/PSEOPage";
+import { Metadata } from 'next'
 
-export const metadata = {
-  title: "E-Commerce Video Ad Generator — AI Ads for Online Stores | KlipflowAI",
-  description: "Generate high-converting video ads for your e-commerce store with AI. Spy on winning ads, create better versions, and launch campaigns in minutes."
-};
+export const metadata: Metadata = {
+  title: 'E-Commerce Video Ad Generator — AI Product Video Ads',
+  description: 'Generate high-converting product video ads for your e-commerce store with AI. Perfect for Shopify, WooCommerce, Amazon sellers. Turn product images into viral video ads instantly.',
+  keywords: ['ecommerce video ad generator', 'product video ad AI', 'Shopify video ad maker', 'AI product video', 'ecommerce video marketing', 'product ad generator', 'AI ecommerce ads'],
+  alternates: { canonical: 'https://klipflowai.com/e-commerce-video-ad-generator' },
+  openGraph: {
+    title: 'E-Commerce Video Ad Generator — AI Product Ads | KlipflowAI',
+    description: 'Turn product images into viral video ads with AI. Perfect for Shopify and Amazon sellers.',
+    url: 'https://klipflowai.com/e-commerce-video-ad-generator',
+  },
+}
 
 export default function EcommerceVideoAdGenerator() {
   return (

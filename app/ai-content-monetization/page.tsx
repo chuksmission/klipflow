@@ -1,9 +1,17 @@
 import PSEOPage from "../components/PSEOPage";
+import { Metadata } from 'next'
 
-export const metadata = {
-  title: "AI Content Monetization — Make Money with AI Generated Content | KlipflowAI",
-  description: "Monetize AI-generated content across TikTok, YouTube, Instagram and more. Build faceless channels that generate passive income with AI automation."
-};
+export const metadata: Metadata = {
+  title: 'AI Content Monetization — Make Money with AI Videos',
+  description: 'Learn how to monetize AI-generated videos on YouTube, TikTok, and Instagram. Build passive income streams with faceless channels, affiliate marketing, and digital products.',
+  keywords: ['AI content monetization', 'make money AI videos', 'monetize AI content', 'AI YouTube monetization', 'passive income AI', 'faceless channel income', 'AI video business'],
+  alternates: { canonical: 'https://klipflowai.com/ai-content-monetization' },
+  openGraph: {
+    title: 'AI Content Monetization — Make Money with AI Videos | KlipflowAI',
+    description: 'Build passive income with AI-generated videos. Faceless channels, affiliate marketing, and more.',
+    url: 'https://klipflowai.com/ai-content-monetization',
+  },
+}
 
 export default function AIContentMonetization() {
   return (

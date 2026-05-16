@@ -1,4 +1,5 @@
 import PSEOPage from "../../components/PSEOPage";
+import { Metadata } from 'next'
 
 interface Props {
   params: Promise<{ category: string }>;
@@ -8,13 +9,20 @@ function formatCategory(category: string) {
   return category.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-export async function generateMetadata({ params }: Props) {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { category } = await params;
   const formatted = formatCategory(category);
   return {
-    title: `Winning ${formatted} Products — Ad Spy & Research | KlipflowAI`,
-    description: `Find winning ${formatted} products through Facebook ad intelligence. See what's selling, generate product video ads, and launch campaigns in minutes.`
-  };
+    title: `Winning ${formatted} Products — AI Video Ads Ready`,
+    description: `Discover winning ${formatted} dropshipping products with proven demand. Generate AI video ads for each product instantly and start selling today.`,
+    keywords: [`winning ${formatted.toLowerCase()} products`, 'winning dropshipping products', 'hot products to sell', `${formatted.toLowerCase()} dropshipping`, 'product research AI'],
+    alternates: { canonical: `https://klipflowai.com/winning-products/${category}` },
+    openGraph: {
+      title: `Winning ${formatted} Products — AI Video Ads | KlipflowAI`,
+      description: `Find winning ${formatted.toLowerCase()} products and generate AI video ads instantly.`,
+      url: `https://klipflowai.com/winning-products/${category}`,
+    },
+  }
 }
 
 export function generateStaticParams() {

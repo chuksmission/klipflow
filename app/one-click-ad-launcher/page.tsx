@@ -1,9 +1,17 @@
 import PSEOPage from "../components/PSEOPage";
+import { Metadata } from 'next'
 
-export const metadata = {
-  title: "One-Click Ad Launcher — Launch Facebook Ads Automatically | KlipflowAI",
-  description: "Launch Facebook ad campaigns in one click with AI. Answer 5 questions about your audience and budget. AI picks the best creative and launches automatically."
-};
+export const metadata: Metadata = {
+  title: 'One Click Ad Launcher — Launch Facebook Ads with AI',
+  description: 'Generate a winning video ad and launch it directly to Facebook Ads Manager in one click. The fastest way to go from product idea to live ad campaign.',
+  keywords: ['one click ad launcher', 'launch Facebook ads AI', 'AI ad campaign launcher', 'automated ad launch', 'Facebook ads automation', 'AI ad publisher'],
+  alternates: { canonical: 'https://klipflowai.com/one-click-ad-launcher' },
+  openGraph: {
+    title: 'One Click Ad Launcher — Launch Ads Instantly | KlipflowAI',
+    description: 'Generate a winning video ad and launch to Facebook Ads Manager in one click.',
+    url: 'https://klipflowai.com/one-click-ad-launcher',
+  },
+}
 
 export default function OneClickAdLauncher() {
   return (

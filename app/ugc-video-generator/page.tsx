@@ -1,9 +1,17 @@
 import PSEOPage from "../components/PSEOPage";
+import { Metadata } from 'next'
 
-export const metadata = {
-  title: "UGC Video Generator — AI-Powered User Generated Content | KlipflowAI",
-  description: "Generate authentic UGC-style videos with AI avatars. Create scroll-stopping user generated content for ads and social media in minutes. No actors needed."
-};
+export const metadata: Metadata = {
+  title: 'UGC Video Generator — AI User Generated Content Videos',
+  description: 'Create authentic-looking UGC videos with AI in minutes. No influencers, no filming. Generate high-converting user generated content videos for your brand or dropshipping store.',
+  keywords: ['UGC video generator', 'AI UGC video', 'user generated content AI', 'UGC creator AI', 'fake UGC video', 'UGC ads generator', 'AI ugc content'],
+  alternates: { canonical: 'https://klipflowai.com/ugc-video-generator' },
+  openGraph: {
+    title: 'UGC Video Generator — AI User Generated Content | KlipflowAI',
+    description: 'Create authentic-looking UGC videos with AI. No influencers needed. High-converting content in minutes.',
+    url: 'https://klipflowai.com/ugc-video-generator',
+  },
+}
 
 export default function UGCVideoGenerator() {
   return (

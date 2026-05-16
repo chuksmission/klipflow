@@ -1,9 +1,17 @@
 import PSEOPage from "../components/PSEOPage";
+import { Metadata } from 'next'
 
-export const metadata = {
-  title: "AI Ad Generator — Create Video & Image Ads with AI | KlipflowAI",
-  description: "Generate high-converting video and image ads with AI. Inspired by winning ad formulas, unique to your brand. For Facebook, Instagram, TikTok and more."
-};
+export const metadata: Metadata = {
+  title: 'AI Ad Generator — Create High-Converting Video Ads',
+  description: 'Generate scroll-stopping video ads with AI in minutes. Perfect for Facebook, TikTok, and Instagram. Turn any product into a winning video ad without a production team.',
+  keywords: ['AI ad generator', 'AI video ad maker', 'Facebook video ad generator', 'TikTok ad generator', 'AI advertisement creator', 'video ad AI', 'product video ad generator'],
+  alternates: { canonical: 'https://klipflowai.com/ai-ad-generator' },
+  openGraph: {
+    title: 'AI Ad Generator — High-Converting Video Ads | KlipflowAI',
+    description: 'Generate scroll-stopping video ads with AI. For Facebook, TikTok, Instagram. No production team needed.',
+    url: 'https://klipflowai.com/ai-ad-generator',
+  },
+}
 
 export default function AIAdGenerator() {
   return (

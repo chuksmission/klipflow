@@ -1,9 +1,17 @@
 import PSEOPage from "../components/PSEOPage";
+import { Metadata } from 'next'
 
-export const metadata = {
-  title: "AI Video for Dropshipping — Generate Product Ads Instantly | KlipflowAI",
-  description: "Generate high-converting video ads for your dropshipping store with AI. Spy on winning product ads, create better versions, and launch campaigns in minutes."
-};
+export const metadata: Metadata = {
+  title: 'AI Video for Dropshipping — Product Video Ads Generator',
+  description: 'Create winning product video ads for your dropshipping store with AI. Generate UGC-style videos, product demos, and ad creatives without filming anything.',
+  keywords: ['AI video for dropshipping', 'dropshipping video ads', 'dropshipping ad creator', 'product video dropshipping', 'AI dropshipping marketing', 'dropshipping content AI'],
+  alternates: { canonical: 'https://klipflowai.com/ai-video-for-dropshipping' },
+  openGraph: {
+    title: 'AI Video for Dropshipping — Winning Product Ads | KlipflowAI',
+    description: 'Create winning video ads for your dropshipping store with AI. No filming needed.',
+    url: 'https://klipflowai.com/ai-video-for-dropshipping',
+  },
+}
 
 export default function AIVideoForDropshipping() {
   return (
