@@ -52,6 +52,13 @@ export default function AdminBlog() {
   const [editorMode, setEditorMode] = useState<EditorMode>("rich");
   const [richText, setRichText] = useState("");
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [editingPost, setEditingPost] = useState<any | null>(null);
+  const [editRichText, setEditRichText] = useState("");
+  const [editEditorMode, setEditEditorMode] = useState<EditorMode>("html");
+  const [editImagePreview, setEditImagePreview] = useState("");
+  const [updating, setUpdating] = useState(false);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
+  const editBodyImageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bodyImageInputRef = useRef<HTMLInputElement>(null);
 
@@ -213,6 +220,93 @@ export default function AdminBlog() {
     setPosts(posts.filter((p) => p.id !== id));
   };
 
+  const openEdit = (post: any) => {
+    setEditingPost({ ...post });
+    setEditImagePreview(post.featured_image || "");
+    setEditEditorMode("html");
+    setEditRichText(htmlToRich(post.html_body || ""));
+  };
+
+  const handleEditImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { alert("Please upload an image file."); return; }
+    if (file.size > 5 * 1024 * 1024) { alert("Image must be under 5MB."); return; }
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `blog-${Date.now()}.${fileExt}`;
+      const { error } = await supabase.storage.from("blog-images").upload(fileName, file, { cacheControl: "3600", upsert: false });
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage.from("blog-images").getPublicUrl(fileName);
+      setEditingPost({ ...editingPost, featured_image: publicUrl });
+      setEditImagePreview(publicUrl);
+    } catch (err: any) {
+      alert("Upload failed: " + err.message);
+    } finally {
+      if (editFileInputRef.current) editFileInputRef.current.value = "";
+    }
+  };
+
+  const handleEditBodyImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { alert("Please upload an image file."); return; }
+    if (file.size > 5 * 1024 * 1024) { alert("Image must be under 5MB."); return; }
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `blog-body-${Date.now()}.${fileExt}`;
+      const { error } = await supabase.storage.from("blog-images").upload(fileName, file, { cacheControl: "3600", upsert: false });
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage.from("blog-images").getPublicUrl(fileName);
+      if (editEditorMode === "rich") {
+        setEditRichText(prev => prev + `\n\n<img src="${publicUrl}" alt="Image" style="width:100%;border-radius:12px;margin:16px 0;" />\n\n`);
+      } else {
+        setEditingPost({ ...editingPost, html_body: (editingPost.html_body || "") + `\n<img src="${publicUrl}" alt="Image" style="width:100%;border-radius:12px;margin:16px 0;" />\n` });
+      }
+    } catch (err: any) {
+      alert("Image upload failed: " + err.message);
+    } finally {
+      if (editBodyImageInputRef.current) editBodyImageInputRef.current.value = "";
+    }
+  };
+
+  const handleUpdate = async () => {
+    if (!editingPost?.title) return;
+    setUpdating(true);
+    try {
+      const finalHtml = editEditorMode === "rich" ? richToHtml(editRichText) : editingPost.html_body;
+      const { data, error } = await supabase
+        .from("blog_posts")
+        .update({
+          title: editingPost.title,
+          slug: editingPost.slug,
+          excerpt: editingPost.excerpt || null,
+          html_body: finalHtml || null,
+          featured_image: editingPost.featured_image || null,
+          status: editingPost.status,
+          meta_title: editingPost.meta_title || editingPost.title,
+          meta_description: editingPost.meta_description || null,
+          meta_keywords: editingPost.meta_keywords || null,
+          published_at: editingPost.status === "published" ? (editingPost.published_at || new Date().toISOString()) : null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", editingPost.id)
+        .select()
+        .single();
+
+      if (error) { alert("Error updating post: " + error.message); setUpdating(false); return; }
+      if (data) {
+        setPosts(posts.map((p) => p.id === data.id ? data : p));
+        setEditingPost(null);
+        setEditImagePreview("");
+      }
+    } catch (err: any) {
+      alert("Unexpected error: " + err.message);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const copyUrl = (slug: string, id: number) => {
     navigator.clipboard.writeText(`${SITE_URL}/blog/${slug}`);
     setCopiedId(id);
@@ -233,6 +327,132 @@ export default function AdminBlog() {
           + New Post
         </button>
       </div>
+
+      {/* EDIT MODAL */}
+      {editingPost && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 overflow-y-auto">
+          <div className="max-w-4xl mx-auto px-4 py-8">
+            <div className="bg-gray-900 border border-purple-500/30 rounded-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-lg">Edit Post</h3>
+                <button onClick={() => setEditingPost(null)} className="text-gray-400 hover:text-white text-sm transition">✕ Close</button>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                {/* Featured Image */}
+                <div className="md:col-span-2">
+                  <label className="text-gray-400 text-xs mb-2 block">Featured Image</label>
+                  {editImagePreview ? (
+                    <div className="relative w-full h-48 rounded-xl overflow-hidden border border-white/20 mb-2">
+                      <img src={editImagePreview} alt="Preview" className="w-full h-full object-cover" />
+                      <button onClick={() => { setEditingPost({ ...editingPost, featured_image: "" }); setEditImagePreview(""); }} className="absolute top-2 right-2 bg-black/70 hover:bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full transition">✕ Remove</button>
+                    </div>
+                  ) : (
+                    <div onClick={() => editFileInputRef.current?.click()} className="w-full h-24 border-2 border-dashed border-white/20 hover:border-purple-500/60 rounded-xl flex flex-col items-center justify-center cursor-pointer transition mb-2">
+                      <div className="text-2xl mb-1">🖼️</div>
+                      <div className="text-white text-xs font-semibold">Click to upload image</div>
+                    </div>
+                  )}
+                  <input ref={editFileInputRef} type="file" accept="image/*" onChange={handleEditImageUpload} className="hidden" />
+                  <input
+                    type="text"
+                    value={editingPost.featured_image || ""}
+                    onChange={(e) => { setEditingPost({ ...editingPost, featured_image: e.target.value }); setEditImagePreview(e.target.value); }}
+                    placeholder="or paste image URL"
+                    className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-gray-400 text-xs mb-1 block">Title</label>
+                  <input type="text" value={editingPost.title} onChange={(e) => setEditingPost({ ...editingPost, title: e.target.value })} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm" />
+                </div>
+                <div>
+                  <label className="text-gray-400 text-xs mb-1 block">Slug</label>
+                  <input type="text" value={editingPost.slug} onChange={(e) => setEditingPost({ ...editingPost, slug: e.target.value })} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm" />
+                </div>
+                <div>
+                  <label className="text-gray-400 text-xs mb-1 block">Status</label>
+                  <select value={editingPost.status} onChange={(e) => setEditingPost({ ...editingPost, status: e.target.value })} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm">
+                    <option value="draft">Draft</option>
+                    <option value="published">Published</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-gray-400 text-xs mb-1 block">Excerpt</label>
+                  <input type="text" value={editingPost.excerpt || ""} onChange={(e) => setEditingPost({ ...editingPost, excerpt: e.target.value })} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm" />
+                </div>
+
+                {/* Editor */}
+                <div className="md:col-span-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-gray-400 text-xs">Content</label>
+                    <div className="bg-white/10 rounded-lg p-0.5 flex">
+                      <button onClick={() => { setEditEditorMode("rich"); setEditRichText(htmlToRich(editingPost.html_body || "")); }} className={`px-3 py-1 rounded-md text-xs font-semibold transition ${editEditorMode === "rich" ? "bg-purple-600 text-white" : "text-gray-400 hover:text-white"}`}>✏️ Rich Text</button>
+                      <button onClick={() => { setEditEditorMode("html"); setEditingPost({ ...editingPost, html_body: richToHtml(editRichText) }); }} className={`px-3 py-1 rounded-md text-xs font-semibold transition ${editEditorMode === "html" ? "bg-purple-600 text-white" : "text-gray-400 hover:text-white"}`}>{"</>"} HTML</button>
+                    </div>
+                  </div>
+
+                  {editEditorMode === "rich" ? (
+                    <div>
+                      <div className="bg-white/5 border border-white/10 rounded-t-xl px-3 py-2 flex gap-2 flex-wrap">
+                        {[
+                          { label: "H2", action: () => setEditRichText(editRichText + "\n\n## ") },
+                          { label: "H3", action: () => setEditRichText(editRichText + "\n\n### ") },
+                          { label: "B", action: () => setEditRichText(editRichText + "**bold**") },
+                          { label: "• List", action: () => setEditRichText(editRichText + "\n\n- Item 1\n- Item 2\n- Item 3") },
+                          { label: "1. List", action: () => setEditRichText(editRichText + "\n\n1. Item 1\n2. Item 2\n3. Item 3") },
+                          { label: "¶ Para", action: () => setEditRichText(editRichText + "\n\n") },
+                          { label: "🖼 Image", action: () => editBodyImageInputRef.current?.click() },
+                        ].map((btn, i) => (
+                          <button key={i} onClick={btn.action} className="bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-2 py-1 rounded transition">{btn.label}</button>
+                        ))}
+                      </div>
+                      <textarea value={editRichText} onChange={(e) => setEditRichText(e.target.value)} rows={12} className="w-full bg-black/40 border border-white/10 border-t-0 rounded-b-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition text-sm resize-none" />
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="bg-white/5 border border-white/10 rounded-t-xl px-3 py-2 flex gap-2">
+                        <button onClick={() => editBodyImageInputRef.current?.click()} className="bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-2 py-1 rounded transition">🖼 Image</button>
+                      </div>
+                      <textarea value={editingPost.html_body || ""} onChange={(e) => setEditingPost({ ...editingPost, html_body: e.target.value })} rows={12} className="w-full bg-black/40 border border-white/10 border-t-0 rounded-b-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition text-xs font-mono resize-none" />
+                    </div>
+                  )}
+                  <input ref={editBodyImageInputRef} type="file" accept="image/*" onChange={handleEditBodyImageUpload} className="hidden" />
+                </div>
+              </div>
+
+              {/* SEO */}
+              <div className="border-t border-white/10 pt-4">
+                <h4 className="font-bold text-sm mb-3">SEO & Meta Tags</h4>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-gray-400 text-xs mb-1 block">Meta Title</label>
+                    <input type="text" value={editingPost.meta_title || ""} onChange={(e) => setEditingPost({ ...editingPost, meta_title: e.target.value })} maxLength={60} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-gray-400 text-xs mb-1 block">Meta Keywords</label>
+                    <input type="text" value={editingPost.meta_keywords || ""} onChange={(e) => setEditingPost({ ...editingPost, meta_keywords: e.target.value })} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-gray-400 text-xs mb-1 block">Meta Description</label>
+                    <textarea value={editingPost.meta_description || ""} onChange={(e) => setEditingPost({ ...editingPost, meta_description: e.target.value })} maxLength={160} rows={2} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm resize-none" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={handleUpdate} disabled={updating} className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-2 px-6 rounded-xl transition text-sm">
+                  {updating ? "Saving..." : "Save Changes"}
+                </button>
+                <button onClick={() => setEditingPost(null)} className="bg-white/10 hover:bg-white/20 text-white font-bold py-2 px-6 rounded-xl transition text-sm">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <div className="bg-white/5 border border-purple-500/30 rounded-2xl p-6 space-y-4">
@@ -419,6 +639,9 @@ export default function AdminBlog() {
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
+                <button onClick={() => openEdit(post)} className="text-blue-400 hover:text-white text-xs transition">
+                  Edit
+                </button>
                 {post.status === "published" && (
                   <button
                     onClick={() => copyUrl(post.slug, post.id)}
