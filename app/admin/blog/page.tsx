@@ -140,20 +140,6 @@ export default function AdminBlog() {
       setSaving(false);
     }
   };
-        meta_title: form.meta_title || form.title,
-        meta_description: form.meta_description,
-        meta_keywords: form.meta_keywords,
-        author_id: session?.user.id,
-        published_at: form.status === "published" ? new Date().toISOString() : null,
-      })
-      .select()
-      .single();
-    if (data) setPosts([data, ...posts]);
-    setForm({ title: "", slug: "", excerpt: "", html_body: "", featured_image: "", status: "draft", meta_title: "", meta_description: "", meta_keywords: "" });
-    setImagePreview("");
-    setShowForm(false);
-    setSaving(false);
-  };
 
   const toggleStatus = async (id: number, currentStatus: string) => {
     const newStatus = currentStatus === "published" ? "draft" : "published";
