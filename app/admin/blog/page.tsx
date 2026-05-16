@@ -140,11 +140,6 @@ export default function AdminBlog() {
       setSaving(false);
     }
   };
-        slug: form.slug || generateSlug(form.title),
-        excerpt: form.excerpt,
-        html_body: form.html_body,
-        featured_image: form.featured_image,
-        status: form.status,
         meta_title: form.meta_title || form.title,
         meta_description: form.meta_description,
         meta_keywords: form.meta_keywords,
