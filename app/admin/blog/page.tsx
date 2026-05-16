@@ -21,6 +21,7 @@ function richToHtml(text: string): string {
         const items = para.split("\n").map((l) => `<li>${l.replace(/^\d+\. /, "")}</li>`).join("");
         return `<ol>${items}</ol>`;
       }
+      if (para.startsWith("<img")) return para;
       return `<p>${para.replace(/\n/g, " ")}</p>`;
     })
     .join("\n");
@@ -307,6 +308,10 @@ export default function AdminBlog() {
                       { label: "• List", action: () => setRichText(richText + "\n\n- Item 1\n- Item 2\n- Item 3") },
                       { label: "1. List", action: () => setRichText(richText + "\n\n1. Item 1\n2. Item 2\n3. Item 3") },
                       { label: "¶ Para", action: () => setRichText(richText + "\n\n") },
+                    { label: "🖼 Image", action: () => {
+                      const url = prompt("Paste image URL:");
+                      if (url) setRichText(richText + `\n\n<img src="${url}" alt="Image" style="width:100%;border-radius:12px;margin:16px 0;" />\n\n`);
+                    }},
                     ].map((btn, i) => (
                       <button key={i} onClick={btn.action} className="bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-2 py-1 rounded transition">
                         {btn.label}
