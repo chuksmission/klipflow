@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 
@@ -77,7 +77,7 @@ export default function AdminGenerations() {
                     onClick={() => copyPrompt(gen.prompt, i)}
                     className="text-xs px-3 py-1 rounded-lg bg-white/10 hover:bg-purple-600 text-gray-300 hover:text-white transition font-semibold whitespace-nowrap"
                   >
-                    {copiedId === i ? "✓ Copied!" : "📋 Copy"}
+                    {copiedId === i ? "? Copied!" : "?? Copy"}
                   </button>
                 </div>
                 <div>
@@ -88,11 +88,11 @@ export default function AdminGenerations() {
                       rel="noopener noreferrer"
                       className="text-xs px-3 py-1 rounded-lg bg-purple-900/40 hover:bg-purple-600 text-purple-300 hover:text-white transition font-semibold whitespace-nowrap inline-block"
                     >
-                      ▶ View
+                      ? View
                     </a>
                   ) : (
                     <span className="text-gray-600 text-xs">
-                      {gen.status === "processing" ? "⏳ Processing" : "—"}
+                      {gen.status === "processing" ? "? Processing" : "�"}
                     </span>
                   )}
                 </div>
