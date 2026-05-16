@@ -853,26 +853,24 @@ export default function HomeClient() {
             <ul className="space-y-2 text-gray-500 text-sm">
               <li><a href="#features" className="hover:text-white transition">Features</a></li>
               <li><a href="#pricing" className="hover:text-white transition">Pricing</a></li>
-              <li><a href="#" className="hover:text-white transition">Changelog</a></li>
-              <li><a href="#" className="hover:text-white transition">Roadmap</a></li>
             </ul>
           </div>
           <div>
             <h4 className="font-semibold text-sm mb-4">Resources</h4>
             <ul className="space-y-2 text-gray-500 text-sm">
-              <li><a href="#" className="hover:text-white transition">Blog</a></li>
-              <li><a href="#" className="hover:text-white transition">Academy</a></li>
-              <li><a href="#" className="hover:text-white transition">API Docs</a></li>
+              <li><Link href="/blog" className="hover:text-white transition">Blog</Link></li>
+              <li><Link href="/academy" className="hover:text-white transition">Academy</Link></li>
+              <li><Link href="/api-docs" className="hover:text-white transition">API Docs</Link></li>
               <li><a href="#faq" className="hover:text-white transition">FAQ</a></li>
             </ul>
           </div>
           <div>
             <h4 className="font-semibold text-sm mb-4">Company</h4>
             <ul className="space-y-2 text-gray-500 text-sm">
-              <li><a href="#" className="hover:text-white transition">About</a></li>
-              <li><a href="#" className="hover:text-white transition">Contact</a></li>
-              <li><a href="#" className="hover:text-white transition">Privacy Policy</a></li>
-              <li><a href="#" className="hover:text-white transition">Terms of Service</a></li>
+              <li><Link href="/about" className="hover:text-white transition">About</Link></li>
+              <li><Link href="/contact" className="hover:text-white transition">Contact</Link></li>
+              <li><Link href="/privacy-policy" className="hover:text-white transition">Privacy Policy</Link></li>
+              <li><Link href="/terms-of-service" className="hover:text-white transition">Terms of Service</Link></li>
             </ul>
           </div>
         </div>
