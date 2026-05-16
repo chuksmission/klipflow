@@ -53,6 +53,7 @@ export default function AdminBlog() {
   const [richText, setRichText] = useState("");
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bodyImageInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     title: "",
@@ -112,6 +113,27 @@ export default function AdminBlog() {
       alert("Upload failed: " + err.message);
     } finally {
       setImageUploading(false);
+    }
+  };
+
+  const handleBodyImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { alert("Please upload an image file."); return; }
+    if (file.size > 5 * 1024 * 1024) { alert("Image must be under 5MB."); return; }
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `blog-body-${Date.now()}.${fileExt}`;
+      const { error } = await supabase.storage
+        .from("blog-images")
+        .upload(fileName, file, { cacheControl: "3600", upsert: false });
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage.from("blog-images").getPublicUrl(fileName);
+      setRichText(prev => prev + `\n\n<img src="${publicUrl}" alt="Image" style="width:100%;border-radius:12px;margin:16px 0;" />\n\n`);
+    } catch (err: any) {
+      alert("Image upload failed: " + err.message);
+    } finally {
+      if (bodyImageInputRef.current) bodyImageInputRef.current.value = "";
     }
   };
 
@@ -244,6 +266,7 @@ export default function AdminBlog() {
                 </div>
               )}
               <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+              <input ref={bodyImageInputRef} type="file" accept="image/*" onChange={handleBodyImageUpload} className="hidden" />
               <div className="flex items-center gap-3 mt-2">
                 <div className="flex-1 h-px bg-white/10" />
                 <span className="text-gray-600 text-xs">or paste image URL</span>
@@ -308,10 +331,7 @@ export default function AdminBlog() {
                       { label: "• List", action: () => setRichText(richText + "\n\n- Item 1\n- Item 2\n- Item 3") },
                       { label: "1. List", action: () => setRichText(richText + "\n\n1. Item 1\n2. Item 2\n3. Item 3") },
                       { label: "¶ Para", action: () => setRichText(richText + "\n\n") },
-                    { label: "🖼 Image", action: () => {
-                      const url = prompt("Paste image URL:");
-                      if (url) setRichText(richText + `\n\n<img src="${url}" alt="Image" style="width:100%;border-radius:12px;margin:16px 0;" />\n\n`);
-                    }},
+                    { label: "🖼 Image", action: () => bodyImageInputRef.current?.click() },
                     ].map((btn, i) => (
                       <button key={i} onClick={btn.action} className="bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-2 py-1 rounded transition">
                         {btn.label}
