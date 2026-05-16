@@ -89,10 +89,57 @@ export default function AdminBlog() {
   const handleCreate = async () => {
     if (!form.title) return;
     setSaving(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    const { data, error } = await supabase
-      .from("blog_posts")
-      .insert({
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        alert("Not logged in. Please refresh and try again.");
+        setSaving(false);
+        return;
+      }
+
+      const insertData = {
+        title: form.title,
+        slug: form.slug || generateSlug(form.title),
+        excerpt: form.excerpt || null,
+        html_body: form.html_body || null,
+        featured_image: form.featured_image || null,
+        status: form.status,
+        meta_title: form.meta_title || form.title,
+        meta_description: form.meta_description || null,
+        meta_keywords: form.meta_keywords || null,
+        author_id: session.user.id,
+        published_at: form.status === "published" ? new Date().toISOString() : null,
+      };
+
+      console.log("Inserting:", insertData);
+
+      const { data, error } = await supabase
+        .from("blog_posts")
+        .insert(insertData)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Supabase error:", error);
+        alert("Error saving post: " + error.message + "\n\nCode: " + error.code);
+        setSaving(false);
+        return;
+      }
+
+      if (data) {
+        setPosts([data, ...posts]);
+        setForm({ title: "", slug: "", excerpt: "", html_body: "", featured_image: "", status: "draft", meta_title: "", meta_description: "", meta_keywords: "" });
+        setImagePreview("");
+        setShowForm(false);
+      }
+    } catch (err: any) {
+      console.error("Unexpected error:", err);
+      alert("Unexpected error: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
         title: form.title,
         slug: form.slug || generateSlug(form.title),
         excerpt: form.excerpt,
