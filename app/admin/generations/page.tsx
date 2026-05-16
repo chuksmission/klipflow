@@ -49,12 +49,13 @@ export default function AdminGenerations() {
           className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition text-sm mb-4"
         />
 
-        <div className="grid grid-cols-6 text-gray-500 text-xs font-bold uppercase px-3 mb-2">
+        <div className="grid grid-cols-7 text-gray-500 text-xs font-bold uppercase px-3 mb-2">
           <span className="col-span-2">Prompt</span>
           <span>Type</span>
           <span>Tokens</span>
           <span>Date</span>
           <span>Copy</span>
+          <span>Video</span>
         </div>
 
         {loading ? (
@@ -64,7 +65,7 @@ export default function AdminGenerations() {
         ) : (
           <div className="space-y-2">
             {filtered.map((gen, i) => (
-              <div key={i} className="grid grid-cols-6 items-center p-3 bg-white/5 rounded-xl text-sm gap-2">
+              <div key={i} className="grid grid-cols-7 items-center p-3 bg-white/5 rounded-xl text-sm gap-2">
                 <div className="col-span-2 text-gray-300 pr-2">
                   <p className="truncate text-xs">{gen.prompt}</p>
                 </div>
@@ -78,6 +79,22 @@ export default function AdminGenerations() {
                   >
                     {copiedId === i ? "✓ Copied!" : "📋 Copy"}
                   </button>
+                </div>
+                <div>
+                  {gen.video_url ? (
+                    
+                      href={gen.video_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs px-3 py-1 rounded-lg bg-purple-900/40 hover:bg-purple-600 text-purple-300 hover:text-white transition font-semibold whitespace-nowrap inline-block"
+                    >
+                      ▶ View
+                    </a>
+                  ) : (
+                    <span className="text-gray-600 text-xs">
+                      {gen.status === "processing" ? "⏳ Processing" : "—"}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
