@@ -93,14 +93,19 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Higgsfield UGC requires an image. Please upload one.", refunded: true }, { status: 400 });
       }
 
-      const higgsfieldRes = await fetch("https://platform.higgsfield.ai/higgsfield-ai/dop/standard", {
+      const higgsfieldRes = await fetch("https://platform.higgsfield.ai/bytedance/seedance/v1/pro/image-to-video", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
           "Authorization": `Key ${keyId}:${keySecret}`,
         },
-        body: JSON.stringify({ prompt, image_url, duration: parseInt(duration) }),
+        body: JSON.stringify({ 
+          prompt, 
+          image_url, 
+          duration: parseInt(duration),
+          generate_audio: true,
+        }),
       });
 
       const higgsfieldData = await safeJson(higgsfieldRes);
