@@ -69,9 +69,18 @@ export async function GET(req: NextRequest) {
     if (isDone && jobData.resultJson) {
       try {
         const result = JSON.parse(jobData.resultJson);
-        videoUrl = result.resultUrls?.[0] ?? null;
+        console.log("Kie.ai resultJson parsed:", JSON.stringify(result));
+        videoUrl = result.resultUrls?.[0] 
+          ?? result.url 
+          ?? result.video_url 
+          ?? result.urls?.[0]
+          ?? result.works?.[0]?.resource?.resource
+          ?? result.works?.[0]?.url
+          ?? null;
       } catch { videoUrl = null; }
     }
+
+    console.log("Kie.ai status check — state:", state, "videoUrl:", videoUrl, "jobData keys:", Object.keys(jobData));
 
     return NextResponse.json({
       success: true,
