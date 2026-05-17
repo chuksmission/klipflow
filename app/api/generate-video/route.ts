@@ -33,18 +33,20 @@ async function safeJson(response: Response): Promise<Record<string, unknown>> {
 }
 
 export async function POST(req: NextRequest) {
+  let body: {
+    prompt: string;
+    mode?: string;
+    image_url?: string;
+    duration?: string;
+    aspect_ratio?: string;
+    model?: string;
+    with_audio?: boolean;
+    user_id?: string;
+    tokens_used?: number;
+  } = { prompt: "" };
+
   try {
-    const body = await req.json() as {
-      prompt: string;
-      mode?: string;
-      image_url?: string;
-      duration?: string;
-      aspect_ratio?: string;
-      model?: string;
-      with_audio?: boolean;
-      user_id?: string;
-      tokens_used?: number;
-    };
+    body = await req.json() as typeof body;
 
     const {
       prompt,
@@ -59,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     if (!prompt) return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
 
-    // ---- HIGGSFIELD (keep until credits run out) ----
+    // ---- HIGGSFIELD ----
     if (model === "higgsfield-ugc") {
       const keyId = await getSetting("higgsfield_key_id");
       const keySecret = await getSetting("higgsfield_key_secret");
@@ -114,7 +116,6 @@ export async function POST(req: NextRequest) {
 
     const isImageMode = mode === "image_to_video" && !!image_url;
 
-    // Confirmed exact model strings from docs.kie.ai
     type KieCfg = { model: string; extraInput?: Record<string, unknown> };
 
     const textModelMap: Record<string, KieCfg> = {
@@ -191,7 +192,7 @@ export async function POST(req: NextRequest) {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Something went wrong";
     console.error("Video generation error:", error);
-    if (body?.user_id && body?.tokens_used > 0) {
+    if (body?.user_id && body?.tokens_used && body.tokens_used > 0) {
       await refundTokens(body.user_id, body.tokens_used);
     }
     return NextResponse.json({ error: message, refunded: true }, { status: 500 });
