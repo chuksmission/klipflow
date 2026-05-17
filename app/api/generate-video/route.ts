@@ -191,6 +191,9 @@ export async function POST(req: NextRequest) {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Something went wrong";
     console.error("Video generation error:", error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    if (body?.user_id && body?.tokens_used > 0) {
+      await refundTokens(body.user_id, body.tokens_used);
+    }
+    return NextResponse.json({ error: message, refunded: true }, { status: 500 });
   }
 }

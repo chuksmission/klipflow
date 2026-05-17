@@ -56,15 +56,22 @@ function BillingContent() {
     if (data.balance !== undefined) setTokenBalance(data.balance);
   };
 
+  const [isSubscriber, setIsSubscriber] = useState(false);
+
   const fetchCurrentPlan = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
     const { data } = await supabase
       .from("user_profiles")
-      .select("is_admin")
+      .select("is_admin, subscription_status, plan")
       .eq("id", session.user.id)
       .single();
     if (data?.is_admin) setCurrentPlan("Admin");
+    if (data?.plan && data.plan !== "free") {
+      setCurrentPlan(data.plan);
+      setIsSubscriber(true);
+    }
+    if (data?.subscription_status === "active") setIsSubscriber(true);
   };
 
   const showMessage = (msg: string, type: "success" | "error" | "warning" = "error") => {
@@ -173,7 +180,13 @@ function BillingContent() {
             <span className="text-gray-400 text-sm">tokens</span>
           </div>
           <button
-            onClick={() => setTab("topup")}
+            onClick={() => {
+              if (!isSubscriber) {
+                showMessage("Token top-up is available for subscribers only. Please subscribe to a plan first.", "warning");
+                return;
+              }
+              setTab("topup");
+            }}
             className="text-purple-400 hover:text-white text-xs font-semibold transition"
           >
             Top Up →
@@ -183,15 +196,25 @@ function BillingContent() {
 
       {/* Tabs */}
       <div className="flex gap-2">
-        {["plans", "topup"].map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={"px-6 py-2 rounded-xl text-sm font-bold transition " + (tab === t ? "bg-purple-600 text-white" : "bg-white/10 text-gray-400 hover:bg-white/20")}
-          >
-            {t === "topup" ? "Top Up Tokens" : "Upgrade Plan"}
-          </button>
-        ))}
+        <button
+          onClick={() => setTab("plans")}
+          className={"px-6 py-2 rounded-xl text-sm font-bold transition " + (tab === "plans" ? "bg-purple-600 text-white" : "bg-white/10 text-gray-400 hover:bg-white/20")}
+        >
+          Upgrade Plan
+        </button>
+        <button
+          onClick={() => {
+            if (!isSubscriber) {
+              showMessage("Token top-up is available for subscribers only. Please subscribe to a plan first.", "warning");
+              setTab("plans");
+              return;
+            }
+            setTab("topup");
+          }}
+          className={"px-6 py-2 rounded-xl text-sm font-bold transition " + (tab === "topup" ? "bg-purple-600 text-white" : "bg-white/10 text-gray-400 hover:bg-white/20")}
+        >
+          Top Up Tokens {!isSubscriber && "🔒"}
+        </button>
       </div>
 
       {/* Plans Tab */}

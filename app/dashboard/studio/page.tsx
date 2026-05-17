@@ -249,12 +249,14 @@ export default function Studio() {
         return;
       }
 
+      let timedOut = false;
       const poll = setInterval(async () => {
         try {
           const sr = await fetch("/api/video-status?task_id=" + data.task_id + "&mode=" + capturedMode + "&provider=" + genProvider);
           const sd = await sr.json() as { completed?: boolean; failed?: boolean; video_url?: string };
 
           if (sd.completed && sd.video_url) {
+            if (timedOut) return;
             setVideoUrl(sd.video_url); setProgress(100); setLoading(false); clearInterval(poll);
             try {
               const { data: { session: fs } } = await supabase.auth.getSession();
@@ -285,6 +287,8 @@ export default function Studio() {
       }, 5000);
 
       setTimeout(async () => {
+  if (videoUrl) return;
+  timedOut = true;
   clearInterval(poll);
   setLoading(false);
   setError("Generation timed out after 5 minutes. Tokens refunded.");
