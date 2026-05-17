@@ -20,6 +20,8 @@ export default function HomeClient() {
   const [activeNiche, setActiveNiche] = useState(0);
   
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [creatorPlans, setCreatorPlans] = useState<any[]>([]);
+  const [ecomPlansDb, setEcomPlansDb] = useState<any[]>([]);
   const router = useRouter();
 
   useEffect(() => {
@@ -30,6 +32,13 @@ export default function HomeClient() {
       }
     };
     checkSession();
+    fetch("/api/plans")
+      .then((r) => r.json())
+      .then((data) => {
+        const all: any[] = data.plans || [];
+        setCreatorPlans(all.filter((p) => p.name.toLowerCase().includes("creator")));
+        setEcomPlansDb(all.filter((p) => !p.name.toLowerCase().includes("creator")));
+      });
   }, []);
 
   const handleSubmit = async () => {
@@ -713,9 +722,34 @@ export default function HomeClient() {
             </div>
 
             <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
-              {[
-                {
-                  name: "Starter", monthly: "$29", yearly: "$23",
+              {creatorPlans.length === 0 ? (
+                <div className="col-span-2 text-center text-gray-400 py-8">Loading plans...</div>
+              ) : creatorPlans.map((plan) => (
+                <div key={plan.id} className={`rounded-2xl p-8 border ${plan.is_popular ? "border-purple-500 bg-purple-900/20" : "border-white/10 bg-white/5"}`}>
+                  {plan.is_popular && <div className="text-xs font-bold text-purple-400 mb-3 uppercase tracking-widest">Most Popular</div>}
+                  <h3 className="text-2xl font-bold mb-1">{plan.name}</h3>
+                  <p className="text-gray-400 text-sm mb-4">{plan.description}</p>
+                  <div className="text-5xl font-extrabold mb-1">
+                    ${creatorBilling === 'monthly' ? plan.price_monthly : plan.price_yearly}
+                    <span className="text-lg text-gray-400">/mo</span>
+                  </div>
+                  {creatorBilling === 'yearly' && <p className="text-purple-400 text-xs mb-4">Billed annually</p>}
+                  <p className="text-purple-300 text-sm font-semibold mb-6">{plan.tokens_per_month} tokens/month</p>
+                  {Array.isArray(plan.features) && plan.features.length > 0 && (
+                    <ul className="space-y-3 mb-8">
+                      {plan.features.map((f: string, j: number) => (
+                        <li key={j} className="flex items-center gap-2 text-sm text-gray-300">
+                          <span className="text-purple-400">✓</span> {f}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <Link href="/signup" className={`block w-full py-3 rounded-full font-bold transition text-center ${plan.is_popular ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-white/10 hover:bg-white/20 text-white"}`}>
+                    Get Started
+                  </Link>
+                </div>
+              ))}
+            </div>
                   desc: "Perfect for solo creators",
                   tokens: "250 tokens/month (~25 videos)",
                   features: ["All 9 AI modules included", "AI Script Writer", "250 tokens per month", "Watermark-free videos", "Auto-post to 5 platforms", "3 social accounts connected", "Standard processing", "Email support"],
@@ -768,27 +802,32 @@ export default function HomeClient() {
               </div>
             </div>
             <div className="grid md:grid-cols-3 gap-8">
-              {ecomPlans.map((plan, i) => (
-                <div key={i} className={`rounded-2xl p-8 border ${plan.highlight ? "border-purple-500 bg-purple-900/20" : "border-white/10 bg-white/5"}`}>
-                  {plan.highlight && <div className="text-xs font-bold text-purple-400 mb-3 uppercase tracking-widest">Most Popular</div>}
+              {ecomPlansDb.length === 0 ? (
+                <div className="col-span-3 text-center text-gray-400 py-8">Loading plans...</div>
+              ) : ecomPlansDb.map((plan) => (
+                <div key={plan.id} className={`rounded-2xl p-8 border ${plan.is_popular ? "border-purple-500 bg-purple-900/20" : "border-white/10 bg-white/5"}`}>
+                  {plan.is_popular && <div className="text-xs font-bold text-purple-400 mb-3 uppercase tracking-widest">Most Popular</div>}
                   <h3 className="text-2xl font-bold mb-1">{plan.name}</h3>
-                  <p className="text-gray-400 text-sm mb-4">{plan.desc}</p>
+                  <p className="text-gray-400 text-sm mb-4">{plan.description}</p>
                   <div className="text-5xl font-extrabold mb-1">
-                    {getEcomPrice(plan)}<span className="text-lg text-gray-400">/mo</span>
+                    ${ecomBilling === 'monthly' ? plan.price_monthly : ecomBilling === 'sixmonths' ? Math.round(plan.price_monthly * 0.86) : plan.price_yearly}
+                    <span className="text-lg text-gray-400">/mo</span>
                   </div>
                   {ecomBilling !== 'monthly' && (
                     <p className="text-purple-400 text-xs mb-6">{ecomBilling === 'sixmonths' ? 'Billed every 6 months' : 'Billed annually'}</p>
                   )}
-                  <ul className="space-y-3 mb-8 mt-4">
-                    {plan.features.map((f, j) => (
-                      <li key={j} className="flex items-center gap-2 text-sm text-gray-300">
-                        <span className="text-purple-400">✓</span> {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <button className={`w-full py-3 rounded-full font-bold transition ${plan.highlight ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-white/10 hover:bg-white/20 text-white"}`}>
+                  {Array.isArray(plan.features) && plan.features.length > 0 && (
+                    <ul className="space-y-3 mb-8 mt-4">
+                      {plan.features.map((f: string, j: number) => (
+                        <li key={j} className="flex items-center gap-2 text-sm text-gray-300">
+                          <span className="text-purple-400">✓</span> {f}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <Link href="/signup" className={`block w-full py-3 rounded-full font-bold transition text-center ${plan.is_popular ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-white/10 hover:bg-white/20 text-white"}`}>
                     Get Started
-                  </button>
+                  </Link>
                 </div>
               ))}
             </div>
