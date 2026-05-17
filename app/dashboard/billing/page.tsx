@@ -34,17 +34,16 @@ function BillingContent() {
   }, []);
 
   const fetchPlans = async () => {
-    const { createClient } = await import("@supabase/supabase-js");
-    const anonSupabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-    const { data } = await anonSupabase
+    const { data } = await supabase
       .from("plans")
       .select("*")
       .eq("is_active", true)
-      .order("sort_order");
-    setPlans(data || []);
+      .order("sort_order")
+      .limit(50);
+    
+    // Filter client-side as extra safety
+    const activePlans = (data || []).filter((p: any) => p.is_active === true);
+    setPlans(activePlans);
     setPlansLoading(false);
   };
 
