@@ -115,6 +115,7 @@ export async function POST(req: NextRequest) {
       }
 
       const taskId = higgsfieldData.request_id ?? higgsfieldData.id ?? higgsfieldData.job_id;
+      console.log("Higgsfield taskId:", taskId, "raw:", JSON.stringify(higgsfieldData));
       if (!taskId) {
         if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
         return NextResponse.json({ error: "Higgsfield did not return a task ID.", refunded: true }, { status: 500 });

@@ -35,7 +35,8 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Higgsfield not configured" }, { status: 503 });
       }
 
-      const res = await fetch(`https://platform.higgsfield.ai/request/${task_id}`, {
+      // Correct status endpoint from docs
+      const res = await fetch(`https://platform.higgsfield.ai/requests/${task_id}/status`, {
         headers: { 
           "Authorization": `Key ${keyId}:${keySecret}`,
           "Accept": "application/json",
@@ -47,13 +48,12 @@ export async function GET(req: NextRequest) {
       let data: any = {};
       try { data = JSON.parse(rawText); } catch { data = {}; }
 
+      // Status values: queued, in_progress, completed, failed, nsfw
       const isDone = data.status === "completed";
       const isFailed = data.status === "failed" || data.status === "nsfw";
-      const videoUrl = data?.video?.url
-        ?? data?.videos?.[0]?.url
-        ?? data?.output?.url
-        ?? data?.url
-        ?? null;
+
+      // Completed response has video.url directly
+      const videoUrl = data?.video?.url ?? null;
 
       console.log("Higgsfield status:", data.status, "videoUrl:", videoUrl);
       return NextResponse.json({
