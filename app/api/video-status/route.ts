@@ -35,8 +35,11 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Higgsfield not configured" }, { status: 503 });
       }
 
-      const res = await fetch(`https://platform.higgsfield.ai/requests/${task_id}/status`, {
-        headers: { "Authorization": `Key ${keyId}:${keySecret}` },
+      const res = await fetch(`https://platform.higgsfield.ai/request/${task_id}`, {
+        headers: { 
+          "Authorization": `Key ${keyId}:${keySecret}`,
+          "Accept": "application/json",
+        },
       });
 
       const rawText = await res.text();

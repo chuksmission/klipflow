@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Higgsfield UGC requires an image. Please upload one.", refunded: true }, { status: 400 });
       }
 
-      const higgsfieldRes = await fetch("https://platform.higgsfield.ai/bytedance/seedance/v1/pro/image-to-video", {
+      const higgsfieldRes = await fetch("https://platform.higgsfield.ai/higgsfield-ai/dop/standard", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
