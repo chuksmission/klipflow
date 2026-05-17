@@ -78,19 +78,12 @@ export async function POST(req: NextRequest) {
     const isImageMode = mode === "image_to_video" && !!image_url;
 
     // ================================================================
-    // HIGGSFIELD — direct API
-    // Keys: higgsfield_key_id, higgsfield_key_secret
-    // Toggle: higgsfield_enabled
+    // HIGGSFIELD - direct API
     // ================================================================
     if (model === "higgsfield-ugc") {
-      const enabled = await getSetting("higgsfield_enabled");
-      if (enabled === "false") {
-        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-        return NextResponse.json({ error: "Higgsfield is currently disabled.", refunded: true }, { status: 503 });
-      }
-
       const keyId = await getSetting("higgsfield_key_id");
       const keySecret = await getSetting("higgsfield_key_secret");
+
       if (!keyId || !keySecret) {
         if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
         return NextResponse.json({ error: "Higgsfield is not configured.", refunded: true }, { status: 503 });
@@ -131,8 +124,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ================================================================
-    // ALL KIE.AI MODELS — single API key
-    // Key: kie_api_key
+    // ALL KIE.AI MODELS
     // ================================================================
     const kieApiKey = await getSetting("kie_api_key");
     if (!kieApiKey) {
@@ -141,7 +133,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ----------------------------------------------------------------
-    // VEO3 — dedicated endpoint /api/v1/veo/generate
+    // VEO3 - dedicated endpoint
     // ----------------------------------------------------------------
     if (model === "veo3-fast" || model === "veo3-quality") {
       const veoModel = model === "veo3-fast" ? "veo3_fast" : "veo3_quality";
@@ -185,31 +177,31 @@ export async function POST(req: NextRequest) {
     }
 
     // ----------------------------------------------------------------
-    // ALL OTHER KIE.AI MODELS — /api/v1/jobs/createTask
-    // Each model group has its own exact input structure from docs
+    // KIE.AI MARKET MODELS - /api/v1/jobs/createTask
     // ----------------------------------------------------------------
-
     let kieModelString = "";
     let kieInput: Record<string, unknown> = {};
 
-    // --- Kling V2.1 Standard ---
-    // Docs: { prompt, duration, cfg_scale } — NO aspect_ratio
     if (model === "kling-v1-6-std") {
-      kieModelString = "kling/v2-1-standard";
-      kieInput = { prompt, duration: String(duration), cfg_scale: 0.5 };
-      if (isImageMode && image_url) kieInput.image_url = image_url; // singular, not array
+      kieModelString = isImageMode ? "kling-2.6/image-to-video" : "kling-2.6/text-to-video";
+      if (isImageMode) {
+        kieInput = { prompt, duration: String(duration), sound: false };
+        if (image_url) kieInput.image_urls = [image_url];
+      } else {
+        kieInput = { prompt, duration: String(duration), aspect_ratio, sound: false };
+      }
     }
 
-    // --- Kling V2.1 Pro ---
-    // Docs: { prompt, duration, cfg_scale } — NO aspect_ratio
     else if (model === "kling-v1-6-pro") {
-      kieModelString = "kling/v2-1-pro";
-      kieInput = { prompt, duration: String(duration), cfg_scale: 0.5 };
-      if (isImageMode && image_url) kieInput.image_url = image_url;
+      kieModelString = isImageMode ? "kling-2.6/image-to-video" : "kling-2.6/text-to-video";
+      if (isImageMode) {
+        kieInput = { prompt, duration: String(duration), sound: false };
+        if (image_url) kieInput.image_urls = [image_url];
+      } else {
+        kieInput = { prompt, duration: String(duration), aspect_ratio, sound: false };
+      }
     }
 
-    // --- Kling V2.1 Master ---
-    // Docs: { prompt, duration } — NO aspect_ratio
     else if (model === "kling-v2-master") {
       if (isImageMode) {
         kieModelString = "kling/v2-1-master-image-to-video";
@@ -221,51 +213,44 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // --- Kling 2.6 ---
-    // Docs: { prompt, sound, aspect_ratio, duration }
-    else if (model === "kling-v3-std" || model === "kling-v3-pro") {
-      // Note: kling-v3-std/pro maps to Kling 3.0, not 2.6
-      // Kling 3.0: { prompt, sound, aspect_ratio, mode, multi_shots, duration }
+    else if (model === "kling-v3-std") {
       kieModelString = "kling-3.0/video";
       kieInput = {
         prompt,
-        sound: true,
-        aspect_ratio,
         duration: String(duration),
-        mode: model === "kling-v3-std" ? "std" : "pro",
+        aspect_ratio,
+        sound: true,
+        mode: "std",
         multi_shots: false,
       };
       if (isImageMode && image_url) kieInput.image_urls = [image_url];
     }
 
-    // --- Kling 2.6 (if we add it separately) ---
-    else if (model === "kling-2-6-std" || model === "kling-2-6-pro") {
-      if (isImageMode) {
-        kieModelString = "kling-2.6/image-to-video";
-        kieInput = { prompt, sound: false, duration: String(duration) };
-        if (image_url) kieInput.image_urls = [image_url];
-      } else {
-        kieModelString = "kling-2.6/text-to-video";
-        kieInput = { prompt, sound: false, aspect_ratio, duration: String(duration) };
-      }
+    else if (model === "kling-v3-pro") {
+      kieModelString = "kling-3.0/video";
+      kieInput = {
+        prompt,
+        duration: String(duration),
+        aspect_ratio,
+        sound: true,
+        mode: "pro",
+        multi_shots: false,
+      };
+      if (isImageMode && image_url) kieInput.image_urls = [image_url];
     }
 
-    // --- Seedance 2.0 ---
-    // Docs: { prompt, generate_audio, first_frame_url (for image) }
     else if (model === "seedance-2") {
       kieModelString = "bytedance/seedance-2";
       kieInput = { prompt, generate_audio: false };
       if (isImageMode && image_url) kieInput.first_frame_url = image_url;
     }
 
-    // --- Seedance 2.0 Fast ---
     else if (model === "seedance-2-fast") {
       kieModelString = "bytedance/seedance-2-fast";
       kieInput = { prompt, generate_audio: false };
       if (isImageMode && image_url) kieInput.first_frame_url = image_url;
     }
 
-    // --- Hailuo 2.3 Pro ---
     else if (model === "hailuo-pro") {
       if (isImageMode) {
         kieModelString = "hailuo/v2/pro/image-to-video";
@@ -277,17 +262,17 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // --- Sora 2 ---
     else if (model === "sora-2") {
-      kieModelString = "sora2/text-to-video";
-      kieInput = { prompt, aspect_ratio, duration: String(duration) };
-      if (isImageMode && image_url) {
+      if (isImageMode) {
         kieModelString = "sora2/image-to-video";
-        kieInput.image_url = image_url;
+        kieInput = { prompt, duration: String(duration) };
+        if (image_url) kieInput.image_url = image_url;
+      } else {
+        kieModelString = "sora2/text-to-video";
+        kieInput = { prompt, aspect_ratio, duration: String(duration) };
       }
     }
 
-    // --- Wan 2.6 ---
     else if (model === "wan-2-6") {
       if (isImageMode) {
         kieModelString = "wan/v2.6/image-to-video";
@@ -299,7 +284,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // --- Luma Ray 3 ---
     else if (model === "luma-ray-3") {
       if (isImageMode) {
         kieModelString = "luma/ray-3/image-to-video";
@@ -311,11 +295,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // --- Fallback ---
     else {
-      kieModelString = "kling/v2-1-pro";
-      kieInput = { prompt, duration: String(duration), cfg_scale: 0.5 };
-      if (isImageMode && image_url) kieInput.image_url = image_url;
+      // Fallback to Kling 2.6
+      kieModelString = "kling-2.6/text-to-video";
+      kieInput = { prompt, duration: String(duration), aspect_ratio, sound: false };
     }
 
     const kieBody = { model: kieModelString, input: kieInput };
@@ -346,7 +329,10 @@ export async function POST(req: NextRequest) {
 
     if (!taskId) {
       if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-      return NextResponse.json({ error: "Kie.ai did not return a taskId. Raw: " + JSON.stringify(kieData), refunded: true }, { status: 500 });
+      return NextResponse.json({
+        error: "Kie.ai did not return a taskId. Raw: " + JSON.stringify(kieData),
+        refunded: true,
+      }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, task_id: taskId, status: "queued", provider: "kie" });
