@@ -15,6 +15,8 @@ async function getSetting(key: string): Promise<string> {
 function extractVideoUrl(obj: any): string | null {
   if (!obj || typeof obj !== "object") return null;
   return (
+    obj.videoInfo?.videoUrl ??
+    obj.videoInfo?.video_url ??
     obj.resultUrls?.[0] ??
     obj.url ??
     obj.video_url ??
@@ -127,13 +129,17 @@ export async function GET(req: NextRequest) {
     let videoUrl: string | null = null;
 
     if (isDone) {
-      if (jobData.resultJson) {
+      // Try videoInfo directly first (confirmed format from docs)
+      videoUrl = jobData.videoInfo?.videoUrl ?? jobData.videoInfo?.video_url ?? null;
+      // Then try resultJson
+      if (!videoUrl && jobData.resultJson) {
         try {
           const result = JSON.parse(jobData.resultJson);
           console.log("Kie.ai resultJson:", JSON.stringify(result));
           videoUrl = extractVideoUrl(result);
         } catch { /* ignore */ }
       }
+      // Final fallback
       if (!videoUrl) videoUrl = extractVideoUrl(jobData) ?? extractVideoUrl(data);
     }
 

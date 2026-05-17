@@ -194,7 +194,7 @@ export async function POST(req: NextRequest) {
       aspect_ratio,
       ...kieCfg.extraInput,
     };
-    if (isImageMode && image_url) kieInput.image_url = image_url;
+    if (isImageMode && image_url) kieInput.image_urls = [image_url];
 
     const kieBody = { model: kieCfg.model, input: kieInput };
     console.log("Kie.ai POST:", JSON.stringify(kieBody));
