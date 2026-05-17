@@ -34,11 +34,14 @@ function BillingContent() {
   }, []);
 
   const fetchPlans = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("plans")
       .select("*")
       .eq("is_active", true)
       .order("sort_order");
+    console.log("Plans fetched:", data);
+    console.log("Plans error:", error);
+    console.log("Active filter applied - count:", data?.length);
     setPlans(data || []);
     setPlansLoading(false);
   };
