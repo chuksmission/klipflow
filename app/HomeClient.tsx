@@ -18,7 +18,6 @@ export default function HomeClient() {
   const [expandedPrompt, setExpandedPrompt] = useState("");
   const [promptLoading, setPromptLoading] = useState(false);
   const [activeNiche, setActiveNiche] = useState(0);
-  
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [creatorPlans, setCreatorPlans] = useState<any[]>([]);
   const [ecomPlansDb, setEcomPlansDb] = useState<any[]>([]);
@@ -27,18 +26,17 @@ export default function HomeClient() {
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setIsLoggedIn(true);
-      }
+      if (session) setIsLoggedIn(true);
+    };
+    const fetchPlans = async () => {
+      const res = await fetch("/api/plans");
+      const data = await res.json();
+      const all: any[] = data.plans || [];
+      setCreatorPlans(all.filter((p) => p.name.toLowerCase().includes("creator")));
+      setEcomPlansDb(all.filter((p) => !p.name.toLowerCase().includes("creator")));
     };
     checkSession();
-    fetch("/api/plans")
-      .then((r) => r.json())
-      .then((data) => {
-        const all: any[] = data.plans || [];
-        setCreatorPlans(all.filter((p) => p.name.toLowerCase().includes("creator")));
-        setEcomPlansDb(all.filter((p) => !p.name.toLowerCase().includes("creator")));
-      });
+    fetchPlans();
   }, []);
 
   const handleSubmit = async () => {
@@ -82,63 +80,6 @@ export default function HomeClient() {
     { name: "💎 Luxury", script: "Inside the $50 million penthouse that nobody talks about. The rooftop. The private elevator. The view that changes everything...", views: "934K views" },
     { name: "🤖 AI & Tech", script: "This AI tool just made 10 professions completely obsolete. And nobody is talking about the one job it can't replace...", views: "1.8M views" }
   ];
-
-  const ecomPlans = [
-    {
-      name: "Starter",
-      monthly: "$49", sixmonths: "$42", yearly: "$39",
-      desc: "Perfect for small e-com brands",
-      features: [
-        "All 9 AI modules included",
-        "Facebook Ad Spy Radar",
-        "AI Image & Video Ad Generator",
-        "AI Actor Generator",
-        "Upload your own actor",
-        "UGC Avatar videos",
-        "Voice generation",
-        "One-Click Ad Launcher",
-        "1 ad account",
-        "Standard processing",
-        "Email support"
-      ],
-      highlight: false
-    },
-    {
-      name: "Pro",
-      monthly: "$149", sixmonths: "$129", yearly: "$119",
-      desc: "For serious brand builders",
-      features: [
-        "Everything in Starter +",
-        "5 ad accounts",
-        "A/B creative testing",
-        "Priority processing speed",
-        "Priority support"
-      ],
-      highlight: true
-    },
-    {
-      name: "Agency",
-      monthly: "$499", sixmonths: "$429", yearly: "$399",
-      desc: "For agencies and large teams",
-      features: [
-        "Everything in Pro +",
-        "Unlimited ad accounts",
-        "Ultra priority processing",
-        "White label ready",
-        "Full API access",
-        "Team member seats",
-        "Custom onboarding",
-        "Dedicated account manager"
-      ],
-      highlight: false
-    }
-  ];
-
-  const getEcomPrice = (plan: typeof ecomPlans[0]) => {
-    if (ecomBilling === 'monthly') return plan.monthly;
-    if (ecomBilling === 'sixmonths') return plan.sixmonths;
-    return plan.yearly;
-  };
 
   const ecomSavings: Record<string, string> = {
     monthly: '', sixmonths: 'Save 14%', yearly: 'Save 20%'
@@ -385,30 +326,10 @@ export default function HomeClient() {
 
           <div className="grid md:grid-cols-2 gap-8 mb-16">
             {[
-              {
-                icon: "📸",
-                title: "Upload Your Photo — Star in Any Scene",
-                desc: "Upload a single photo of yourself or your talent. Our AI places you in any environment you can imagine — beach, penthouse, studio, outer space. Photorealistic results every time. No green screen. No studio. No travel budget.",
-                badge: "Most Popular Feature"
-              },
-              {
-                icon: "🌍",
-                title: "Any Environment You Can Imagine",
-                desc: "From the streets of Tokyo to the surface of Mars. Describe any environment and our AI generates it with you inside. Every scene is unique, cinematic, and completely owned by you.",
-                badge: "Unlimited Scenes"
-              },
-              {
-                icon: "👥",
-                title: "Multiple People in One Scene",
-                desc: "Need a group shot? A brand team photo? A crowd scene? Generate videos and images with multiple AI-generated people alongside you. Perfect for brand campaigns, testimonials, and social content.",
-                badge: "New Feature"
-              },
-              {
-                icon: "👗",
-                title: "Change Your Outfit & Look Instantly",
-                desc: "Try any outfit without owning it. Business suit, streetwear, formal gown, branded merchandise — our AI dresses you in any style. Change your hair, age, accessories, and entire aesthetic with one prompt.",
-                badge: "Outfit Customization"
-              }
+              { icon: "📸", title: "Upload Your Photo — Star in Any Scene", desc: "Upload a single photo of yourself or your talent. Our AI places you in any environment you can imagine — beach, penthouse, studio, outer space. Photorealistic results every time. No green screen. No studio. No travel budget.", badge: "Most Popular Feature" },
+              { icon: "🌍", title: "Any Environment You Can Imagine", desc: "From the streets of Tokyo to the surface of Mars. Describe any environment and our AI generates it with you inside. Every scene is unique, cinematic, and completely owned by you.", badge: "Unlimited Scenes" },
+              { icon: "👥", title: "Multiple People in One Scene", desc: "Need a group shot? A brand team photo? A crowd scene? Generate videos and images with multiple AI-generated people alongside you. Perfect for brand campaigns, testimonials, and social content.", badge: "New Feature" },
+              { icon: "👗", title: "Change Your Outfit & Look Instantly", desc: "Try any outfit without owning it. Business suit, streetwear, formal gown, branded merchandise — our AI dresses you in any style. Change your hair, age, accessories, and entire aesthetic with one prompt.", badge: "Outfit Customization" }
             ].map((f, i) => (
               <div key={i} className="bg-black border border-white/10 rounded-2xl p-8 hover:border-pink-500/30 transition">
                 <div className="flex items-start gap-4">
@@ -441,9 +362,9 @@ export default function HomeClient() {
               ))}
             </div>
             <div className="text-center mt-8">
-              <button className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-12 rounded-full text-lg transition">
+              <Link href="/signup" className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-12 rounded-full text-lg transition inline-block">
                 Try It Free — 25 Tokens →
-              </button>
+              </Link>
               <p className="text-gray-600 text-xs mt-3">No credit card required</p>
             </div>
           </div>
@@ -506,27 +427,11 @@ export default function HomeClient() {
               Find what's already working in your market. Generate a better version. Launch it to Facebook Ads automatically. No agency. No editor. No waiting.
             </p>
           </div>
-
           <div className="grid md:grid-cols-3 gap-8">
             {[
-              {
-                icon: "🕵️",
-                title: "Spy on Winners",
-                desc: "Find Facebook ads that have been running profitably for 7+ days. Filter by niche, format, and market. One click to remix any winning ad into your own.",
-                badge: "Legal & Official"
-              },
-              {
-                icon: "🎨",
-                title: "Generate Better Ads",
-                desc: "Our AI generates video ads, image ads, and UGC testimonials — all inspired by winning formulas but completely unique to your brand.",
-                badge: "Video + Image + UGC"
-              },
-              {
-                icon: "🚀",
-                title: "Launch in One Click",
-                desc: "Answer 5 quick questions about your audience and budget. KlipflowAI picks the best creative and launches your Facebook campaign automatically.",
-                badge: "No Ad Manager Needed"
-              }
+              { icon: "🕵️", title: "Spy on Winners", desc: "Find Facebook ads that have been running profitably for 7+ days. Filter by niche, format, and market. One click to remix any winning ad into your own.", badge: "Legal & Official" },
+              { icon: "🎨", title: "Generate Better Ads", desc: "Our AI generates video ads, image ads, and UGC testimonials — all inspired by winning formulas but completely unique to your brand.", badge: "Video + Image + UGC" },
+              { icon: "🚀", title: "Launch in One Click", desc: "Answer 5 quick questions about your audience and budget. KlipflowAI picks the best creative and launches your Facebook campaign automatically.", badge: "No Ad Manager Needed" }
             ].map((f, i) => (
               <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-8 hover:border-pink-500/50 transition">
                 <div className="text-4xl mb-4">{f.icon}</div>
@@ -716,9 +621,9 @@ export default function HomeClient() {
                 <h3 className="text-lg font-bold text-purple-300 mb-1">🎁 Free Trial — No Credit Card Required</h3>
                 <p className="text-gray-400 text-sm">Sign up and get 25 free tokens instantly. Generate your first 2 watermarked videos completely free.</p>
               </div>
-              <button className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-full transition whitespace-nowrap">
+              <Link href="/signup" className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-full transition whitespace-nowrap">
                 Sign Up Free
-              </button>
+              </Link>
             </div>
 
             <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
@@ -747,42 +652,6 @@ export default function HomeClient() {
                   <Link href="/signup" className={`block w-full py-3 rounded-full font-bold transition text-center ${plan.is_popular ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-white/10 hover:bg-white/20 text-white"}`}>
                     Get Started
                   </Link>
-                </div>
-              ))}
-            </div>
-                  desc: "Perfect for solo creators",
-                  tokens: "250 tokens/month (~25 videos)",
-                  features: ["All 9 AI modules included", "AI Script Writer", "250 tokens per month", "Watermark-free videos", "Auto-post to 5 platforms", "3 social accounts connected", "Standard processing", "Email support"],
-                  highlight: false
-                },
-                {
-                  name: "Pro", monthly: "$59", yearly: "$45",
-                  desc: "For serious content creators",
-                  tokens: "500 tokens/month (~50 videos)",
-                  features: ["All 9 AI modules included", "AI Script Writer", "500 tokens per month", "Watermark-free videos", "Auto-post to 5 platforms", "10 social accounts connected", "Full autopilot automation", "Priority processing speed", "Early access to new features", "Priority support"],
-                  highlight: true
-                }
-              ].map((plan, i) => (
-                <div key={i} className={`rounded-2xl p-8 border ${plan.highlight ? "border-purple-500 bg-purple-900/20" : "border-white/10 bg-white/5"}`}>
-                  {plan.highlight && <div className="text-xs font-bold text-purple-400 mb-3 uppercase tracking-widest">Most Popular</div>}
-                  <h3 className="text-2xl font-bold mb-1">{plan.name}</h3>
-                  <p className="text-gray-400 text-sm mb-4">{plan.desc}</p>
-                  <div className="text-5xl font-extrabold mb-1">
-                    {creatorBilling === 'monthly' ? plan.monthly : plan.yearly}
-                    <span className="text-lg text-gray-400">/mo</span>
-                  </div>
-                  {creatorBilling === 'yearly' && <p className="text-purple-400 text-xs mb-4">Billed annually</p>}
-                  <p className="text-purple-300 text-sm font-semibold mb-6">{plan.tokens}</p>
-                  <ul className="space-y-3 mb-8">
-                    {plan.features.map((f, j) => (
-                      <li key={j} className="flex items-center gap-2 text-sm text-gray-300">
-                        <span className="text-purple-400">✓</span> {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <button className={`w-full py-3 rounded-full font-bold transition ${plan.highlight ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-white/10 hover:bg-white/20 text-white"}`}>
-                    Get Started
-                  </button>
                 </div>
               ))}
             </div>
@@ -868,9 +737,9 @@ export default function HomeClient() {
             Your AI Employee is <span className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">Ready to Work.</span>
           </h2>
           <p className="text-gray-400 text-xl mb-10">25 free tokens. No credit card. No commitment. Pick your niche and let KlipflowAI do the rest.</p>
-          <button className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-12 rounded-full text-lg transition">
+          <Link href="/signup" className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-12 rounded-full text-lg transition inline-block">
             Sign Up Free →
-          </button>
+          </Link>
           <p className="text-gray-600 text-sm mt-4">Join creators and brands already using KlipflowAI</p>
         </div>
       </section>
