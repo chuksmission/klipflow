@@ -286,12 +286,13 @@ export default function Studio() {
         } catch (e) { console.error("Poll error:", e); }
       }, 5000);
 
+      const timeoutMs = ["veo3-fast", "veo3-quality", "sora-2"].includes(selectedModel) ? 600000 : 300000;
       setTimeout(async () => {
   if (videoUrl) return;
   timedOut = true;
   clearInterval(poll);
   setLoading(false);
-  setError("Generation timed out after 5 minutes. Tokens refunded.");
+  setError("Generation timed out. Tokens refunded.");
   const { data: { session: ts } } = await supabase.auth.getSession();
   if (ts) {
     const rr = await fetch("/api/tokens/refund", {
@@ -302,7 +303,7 @@ export default function Studio() {
     const rd = await rr.json();
     if (rd.balance !== undefined) setTokenBalance(rd.balance);
   }
-}, 300000);
+}, timeoutMs);
 
     } catch (e) { setError("Something went wrong."); setLoading(false); }
   };

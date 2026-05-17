@@ -61,32 +61,33 @@ export async function POST(req: NextRequest) {
 
     if (!prompt) return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
 
-    // ---- HIGGSFIELD ----
+    const isImageMode = mode === "image_to_video" && !!image_url;
+
+    // ================================================================
+    // HIGGSFIELD — reads key from admin_settings
+    // Disable by clearing higgsfield_key_id and higgsfield_key_secret
+    // ================================================================
     if (model === "higgsfield-ugc") {
       const keyId = await getSetting("higgsfield_key_id");
       const keySecret = await getSetting("higgsfield_key_secret");
 
       if (!keyId || !keySecret) {
         if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-        return NextResponse.json({ error: "Higgsfield not configured.", refunded: true }, { status: 503 });
+        return NextResponse.json({ error: "Higgsfield is not configured. Please contact support.", refunded: true }, { status: 503 });
       }
       if (!image_url) {
         if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
         return NextResponse.json({ error: "Higgsfield requires an image. Please upload one.", refunded: true }, { status: 400 });
       }
 
-      const endpoint = "https://platform.higgsfield.ai/bytedance/seedance/v1/pro/image-to-video";
-      const higgsfieldBody = { prompt, image_url, duration: parseInt(duration) };
-      console.log("Higgsfield POST:", endpoint, JSON.stringify(higgsfieldBody));
-
-      const higgsfieldRes = await fetch(endpoint, {
+      const higgsfieldRes = await fetch("https://platform.higgsfield.ai/bytedance/seedance/v1/pro/image-to-video", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
           "Authorization": `Key ${keyId}:${keySecret}`,
         },
-        body: JSON.stringify(higgsfieldBody),
+        body: JSON.stringify({ prompt, image_url, duration: parseInt(duration) }),
       });
 
       const higgsfieldData = await safeJson(higgsfieldRes) as any;
@@ -94,8 +95,10 @@ export async function POST(req: NextRequest) {
 
       if (!higgsfieldRes.ok) {
         if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-        const errMsg = higgsfieldData.error ?? higgsfieldData.message ?? higgsfieldData.detail ?? `Higgsfield error (${higgsfieldRes.status})`;
-        return NextResponse.json({ error: errMsg, refunded: true }, { status: higgsfieldRes.status });
+        return NextResponse.json({
+          error: higgsfieldData.error ?? higgsfieldData.message ?? higgsfieldData.detail ?? `Higgsfield error (${higgsfieldRes.status})`,
+          refunded: true,
+        }, { status: higgsfieldRes.status });
       }
 
       const taskId = higgsfieldData.request_id ?? higgsfieldData.id ?? higgsfieldData.job_id;
@@ -107,23 +110,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, task_id: taskId, status: "queued", provider: "higgsfield" });
     }
 
-    // ---- ALL OTHER MODELS via KIE.AI ----
+    // ================================================================
+    // ALL KIE.AI MODELS — reads key from admin_settings
+    // Disable by clearing kie_api_key
+    // ================================================================
     const kieApiKey = await getSetting("kie_api_key");
     if (!kieApiKey) {
       if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
       return NextResponse.json({ error: "Kie.ai API key not configured in admin settings.", refunded: true }, { status: 503 });
     }
 
-    const isImageMode = mode === "image_to_video" && !!image_url;
-
-    // ---- VEO3 uses a different endpoint ----
+    // ---- VEO3 — dedicated endpoint ----
     if (model === "veo3-fast" || model === "veo3-quality") {
       const veoModel = model === "veo3-fast" ? "veo3_fast" : "veo3_quality";
-      const veoBody: Record<string, unknown> = {
-        prompt,
-        model: veoModel,
-        aspect_ratio,
-      };
+      const veoBody: Record<string, unknown> = { prompt, model: veoModel, aspect_ratio };
       if (isImageMode && image_url) {
         veoBody.imageUrls = [image_url];
         veoBody.generationType = "REFERENCE_2_VIDEO";
@@ -131,111 +131,31 @@ export async function POST(req: NextRequest) {
 
       const veoRes = await fetch("https://api.kie.ai/api/v1/veo/generate", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${kieApiKey}`,
-        },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${kieApiKey}` },
         body: JSON.stringify(veoBody),
       });
 
       const veoData = await safeJson(veoRes) as any;
       console.log("Veo3 response:", veoRes.status, JSON.stringify(veoData));
 
-      if (!veoRes.ok || veoData.code !== 200) {
+      if (!veoRes.ok || (veoData.code !== undefined && veoData.code !== 200)) {
         if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-        const errMsg = veoData.msg ?? veoData.message ?? veoData.error ?? `Veo3 error (${veoRes.status})`;
-        return NextResponse.json({ error: errMsg, refunded: true }, { status: 400 });
+        return NextResponse.json({
+          error: veoData.msg ?? veoData.message ?? veoData.error ?? `Veo3 error (${veoRes.status})`,
+          refunded: true,
+        }, { status: 400 });
       }
 
-      const taskId = veoData.data?.taskId ?? veoData.data?.task_id ?? veoData.taskId;
-      if (!taskId) {
+      const veoTaskId = veoData.data?.taskId ?? veoData.data?.task_id ?? veoData.taskId ?? veoData.task_id;
+      if (!veoTaskId) {
         if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-        return NextResponse.json({ error: "Veo3 did not return a taskId.", refunded: true }, { status: 500 });
+        return NextResponse.json({ error: "Veo3 did not return a taskId. Raw: " + JSON.stringify(veoData), refunded: true }, { status: 500 });
       }
 
-      return NextResponse.json({ success: true, task_id: taskId, status: "queued", provider: "veo3" });
+      return NextResponse.json({ success: true, task_id: veoTaskId, status: "queued", provider: "veo3" });
     }
 
-    // ---- VEO3 uses a different endpoint ----
-    if (model === "veo3-fast" || model === "veo3-quality") {
-      const veoModel = model === "veo3-fast" ? "veo3_fast" : "veo3_quality";
-      const veoBody: Record<string, unknown> = {
-        prompt,
-        model: veoModel,
-        aspect_ratio,
-      };
-      if (isImageMode && image_url) {
-        veoBody.imageUrls = [image_url];
-        veoBody.generationType = "REFERENCE_2_VIDEO";
-      }
-
-      const veoRes = await fetch("https://api.kie.ai/api/v1/veo/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${kieApiKey}`,
-        },
-        body: JSON.stringify(veoBody),
-      });
-
-      const veoData = await safeJson(veoRes) as any;
-      console.log("Veo3 response:", veoRes.status, JSON.stringify(veoData));
-
-      if (!veoRes.ok || veoData.code !== 200) {
-        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-        const errMsg = veoData.msg ?? veoData.message ?? veoData.error ?? `Veo3 error (${veoRes.status})`;
-        return NextResponse.json({ error: errMsg, refunded: true }, { status: 400 });
-      }
-
-      const taskId = veoData.data?.taskId ?? veoData.data?.task_id ?? veoData.taskId;
-      if (!taskId) {
-        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-        return NextResponse.json({ error: "Veo3 did not return a taskId.", refunded: true }, { status: 500 });
-      }
-
-      return NextResponse.json({ success: true, task_id: taskId, status: "queued", provider: "veo3" });
-    }
-
-    // ---- VEO3 uses a different endpoint ----
-    if (model === "veo3-fast" || model === "veo3-quality") {
-      const veoModel = model === "veo3-fast" ? "veo3_fast" : "veo3_quality";
-      const veoBody: Record<string, unknown> = {
-        prompt,
-        model: veoModel,
-        aspect_ratio,
-      };
-      if (isImageMode && image_url) {
-        veoBody.imageUrls = [image_url];
-        veoBody.generationType = "REFERENCE_2_VIDEO";
-      }
-
-      const veoRes = await fetch("https://api.kie.ai/api/v1/veo/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${kieApiKey}`,
-        },
-        body: JSON.stringify(veoBody),
-      });
-
-      const veoData = await safeJson(veoRes) as any;
-      console.log("Veo3 response:", veoRes.status, JSON.stringify(veoData));
-
-      if (!veoRes.ok || veoData.code !== 200) {
-        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-        const errMsg = veoData.msg ?? veoData.message ?? veoData.error ?? `Veo3 error (${veoRes.status})`;
-        return NextResponse.json({ error: errMsg, refunded: true }, { status: 400 });
-      }
-
-      const taskId = veoData.data?.taskId ?? veoData.data?.task_id ?? veoData.taskId;
-      if (!taskId) {
-        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-        return NextResponse.json({ error: "Veo3 did not return a taskId.", refunded: true }, { status: 500 });
-      }
-
-      return NextResponse.json({ success: true, task_id: taskId, status: "queued", provider: "veo3" });
-    }
-
+    // ---- ALL OTHER KIE.AI MODELS via /jobs/createTask ----
     type KieCfg = { model: string; extraInput?: Record<string, unknown> };
 
     const textModelMap: Record<string, KieCfg> = {
@@ -244,8 +164,6 @@ export async function POST(req: NextRequest) {
       "kling-v2-master": { model: "kling/v2-1-master-text-to-video" },
       "kling-v3-std":    { model: "kling-3.0/video", extraInput: { mode: "std", sound: true, multi_shots: false } },
       "kling-v3-pro":    { model: "kling-3.0/video", extraInput: { mode: "pro", sound: true, multi_shots: false } },
-      "veo3-fast":       { model: "veo3/fast" },
-      "veo3-quality":    { model: "veo3/quality" },
       "seedance-2":      { model: "bytedance/seedance-2", extraInput: { generate_audio: true } },
       "seedance-2-fast": { model: "bytedance/seedance-2-fast" },
       "hailuo-pro":      { model: "hailuo/v2/pro/text-to-video" },
@@ -276,7 +194,6 @@ export async function POST(req: NextRequest) {
       aspect_ratio,
       ...kieCfg.extraInput,
     };
-
     if (isImageMode && image_url) kieInput.image_url = image_url;
 
     const kieBody = { model: kieCfg.model, input: kieInput };
@@ -284,10 +201,7 @@ export async function POST(req: NextRequest) {
 
     const kieRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${kieApiKey}`,
-      },
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${kieApiKey}` },
       body: JSON.stringify(kieBody),
     });
 
@@ -296,12 +210,14 @@ export async function POST(req: NextRequest) {
 
     if (kieData.code !== 200 || !kieData.data) {
       if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-      const errMsg = kieData.msg ?? kieData.message ?? kieData.error ?? `Kie.ai error (${kieRes.status})`;
-      return NextResponse.json({ error: errMsg, refunded: true }, { status: 400 });
+      return NextResponse.json({
+        error: kieData.msg ?? kieData.message ?? kieData.error ?? `Kie.ai error (${kieRes.status})`,
+        refunded: true,
+      }, { status: 400 });
     }
 
     const taskId = kieData.data?.taskId ?? kieData.data?.task_id ?? kieData.taskId;
-    console.log("Kie.ai taskId:", taskId, "raw:", JSON.stringify(kieData));
+    console.log("Kie.ai taskId:", taskId);
     if (!taskId) {
       if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
       return NextResponse.json({ error: "Kie.ai did not return a taskId. Raw: " + JSON.stringify(kieData), refunded: true }, { status: 500 });

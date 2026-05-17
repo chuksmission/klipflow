@@ -11,6 +11,27 @@ async function getSetting(key: string): Promise<string> {
   return data?.value ?? "";
 }
 
+// Try every known URL field across all providers
+function extractVideoUrl(obj: any): string | null {
+  if (!obj || typeof obj !== "object") return null;
+  return (
+    obj.resultUrls?.[0] ??
+    obj.url ??
+    obj.video_url ??
+    obj.videoUrl ??
+    obj.works?.[0]?.resource?.resource ??
+    obj.works?.[0]?.url ??
+    obj.works?.[0]?.video_url ??
+    obj.videos?.[0]?.url ??
+    obj.output?.url ??
+    obj.output?.video_url ??
+    obj.result?.url ??
+    obj.result?.video_url ??
+    obj.urls?.[0] ??
+    null
+  );
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -19,48 +40,9 @@ export async function GET(req: NextRequest) {
 
     if (!task_id) return NextResponse.json({ error: "task_id is required" }, { status: 400 });
 
-    // ---- VEO3 status ----
-    if (provider === "veo3") {
-      const kieApiKey = await getSetting("kie_api_key");
-      if (!kieApiKey) return NextResponse.json({ error: "Kie.ai not configured" }, { status: 503 });
-
-      const res = await fetch(`https://api.kie.ai/api/v1/veo/record-info?taskId=${task_id}`, {
-        headers: { "Authorization": `Bearer ${kieApiKey}` },
-      });
-
-      const rawText = await res.text();
-      console.log("Veo3 status raw:", rawText);
-      let data: any = {};
-      try { data = JSON.parse(rawText); } catch { data = {}; }
-
-      const jobData = data.data ?? {};
-      const state = jobData.state ?? jobData.status ?? "";
-      const isDone = state === "success" || state === "completed";
-      const isFailed = state === "fail" || state === "failed";
-      let videoUrl: string | null = null;
-
-      if (isDone) {
-        try {
-          const result = jobData.resultJson ? JSON.parse(jobData.resultJson) : jobData;
-          videoUrl = result.resultUrls?.[0]
-            ?? result.url
-            ?? result.video_url
-            ?? result.videoUrl
-            ?? result.works?.[0]?.resource?.resource
-            ?? null;
-        } catch { videoUrl = null; }
-      }
-
-      return NextResponse.json({
-        success: true,
-        status: state,
-        video_url: videoUrl,
-        completed: isDone,
-        failed: isFailed,
-      });
-    }
-
-    // ---- HIGGSFIELD status ----
+    // ================================================================
+    // HIGGSFIELD status
+    // ================================================================
     if (provider === "higgsfield") {
       const keyId = await getSetting("higgsfield_key_id");
       const keySecret = await getSetting("higgsfield_key_secret");
@@ -75,20 +57,56 @@ export async function GET(req: NextRequest) {
       let data: any = {};
       try { data = JSON.parse(rawText); } catch { data = {}; }
 
-      const videoUrl = data?.video?.url ?? data?.videos?.[0]?.url ?? data?.output?.url ?? null;
       const isDone = data.status === "completed";
       const isFailed = data.status === "failed" || data.status === "nsfw";
+      const videoUrl = data?.video?.url ?? data?.videos?.[0]?.url ?? data?.output?.url ?? extractVideoUrl(data) ?? null;
 
-      return NextResponse.json({
-        success: true,
-        status: data.status,
-        video_url: videoUrl,
-        completed: isDone,
-        failed: isFailed,
-      });
+      console.log("Higgsfield status:", data.status, "videoUrl:", videoUrl);
+      return NextResponse.json({ success: true, status: data.status, video_url: videoUrl, completed: isDone, failed: isFailed });
     }
 
-    // ---- KIE.AI status (all other models) ----
+    // ================================================================
+    // VEO3 status — dedicated endpoint
+    // ================================================================
+    if (provider === "veo3") {
+      const kieApiKey = await getSetting("kie_api_key");
+      if (!kieApiKey) return NextResponse.json({ error: "Kie.ai not configured" }, { status: 503 });
+
+      const res = await fetch(`https://api.kie.ai/api/v1/veo/record-info?taskId=${task_id}`, {
+        headers: { "Authorization": `Bearer ${kieApiKey}` },
+      });
+
+      const rawText = await res.text();
+      console.log("Veo3 status raw:", rawText);
+      let data: any = {};
+      try { data = JSON.parse(rawText); } catch { data = {}; }
+
+      const jobData = data.data ?? {};
+      const state = jobData.state ?? jobData.status ?? data.status ?? "";
+      const isDone = state === "success" || state === "succeed" || state === "completed";
+      const isFailed = state === "fail" || state === "failed" || state === "error";
+      let videoUrl: string | null = null;
+
+      if (isDone) {
+        // Try resultJson first
+        if (jobData.resultJson) {
+          try {
+            const parsed = JSON.parse(jobData.resultJson);
+            console.log("Veo3 resultJson:", JSON.stringify(parsed));
+            videoUrl = extractVideoUrl(parsed);
+          } catch { /* ignore */ }
+        }
+        // Fallback to direct fields on jobData or data
+        if (!videoUrl) videoUrl = extractVideoUrl(jobData) ?? extractVideoUrl(data);
+      }
+
+      console.log("Veo3 status:", state, "isDone:", isDone, "videoUrl:", videoUrl);
+      return NextResponse.json({ success: true, status: state, video_url: videoUrl, completed: isDone, failed: isFailed });
+    }
+
+    // ================================================================
+    // KIE.AI status — all other models
+    // ================================================================
     const kieApiKey = await getSetting("kie_api_key");
     if (!kieApiKey) return NextResponse.json({ error: "Kie.ai not configured" }, { status: 503 });
 
@@ -101,35 +119,26 @@ export async function GET(req: NextRequest) {
     let data: any = {};
     try { data = JSON.parse(rawText); } catch { data = {}; }
 
-    // Kie.ai status values: pending, processing, completed, failed
     const jobData = data.data ?? {};
     const state = jobData.state ?? "";
-    const isDone = state === "success";
-    const isFailed = state === "fail";
+    // Kie.ai can return: pending, processing, success, succeed, completed, fail, failed
+    const isDone = state === "success" || state === "succeed" || state === "completed";
+    const isFailed = state === "fail" || state === "failed" || state === "error";
     let videoUrl: string | null = null;
-    if (isDone && jobData.resultJson) {
-      try {
-        const result = JSON.parse(jobData.resultJson);
-        console.log("Kie.ai resultJson parsed:", JSON.stringify(result));
-        videoUrl = result.resultUrls?.[0] 
-          ?? result.url 
-          ?? result.video_url 
-          ?? result.urls?.[0]
-          ?? result.works?.[0]?.resource?.resource
-          ?? result.works?.[0]?.url
-          ?? null;
-      } catch { videoUrl = null; }
+
+    if (isDone) {
+      if (jobData.resultJson) {
+        try {
+          const result = JSON.parse(jobData.resultJson);
+          console.log("Kie.ai resultJson:", JSON.stringify(result));
+          videoUrl = extractVideoUrl(result);
+        } catch { /* ignore */ }
+      }
+      if (!videoUrl) videoUrl = extractVideoUrl(jobData) ?? extractVideoUrl(data);
     }
 
-    console.log("Kie.ai status check — state:", state, "videoUrl:", videoUrl, "jobData keys:", Object.keys(jobData));
-
-    return NextResponse.json({
-      success: true,
-      status: state,
-      video_url: videoUrl,
-      completed: isDone,
-      failed: isFailed,
-    });
+    console.log("Kie.ai status:", state, "isDone:", isDone, "videoUrl:", videoUrl, "jobData keys:", Object.keys(jobData));
+    return NextResponse.json({ success: true, status: state, video_url: videoUrl, completed: isDone, failed: isFailed });
 
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Something went wrong";
