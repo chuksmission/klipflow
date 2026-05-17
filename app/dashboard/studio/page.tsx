@@ -220,16 +220,21 @@ export default function Studio() {
       const capturedMode = needsImage ? "image_to_video" : "text_to_video";
       const useAudio = modelData?.hasSound === true;
 
+      const generatePayload = {
+        prompt, mode: capturedMode,
+        image_url: imageUrl || undefined,
+        duration: String(duration),
+        aspect_ratio: aspectRatio,
+        model: selectedModel,
+        with_audio: useAudio,
+        user_id: session.user.id,
+        tokens_used: tokenCost,
+      };
+      console.log("Generate payload:", JSON.stringify(generatePayload));
       const res = await fetch("/api/generate-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt, mode: capturedMode,
-          image_url: imageUrl || undefined,
-          duration, aspect_ratio: aspectRatio,
-          model: selectedModel, with_audio: useAudio,
-          user_id: session.user.id, tokens_used: tokenCost,
-        }),
+        body: JSON.stringify(generatePayload),
       });
 
       const data = await res.json() as { task_id?: string; error?: string; refunded?: boolean; provider?: string };
