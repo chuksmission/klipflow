@@ -9,7 +9,7 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const stripe = getStripe();
+    const stripe = await getStripe();
     if (!stripe) {
       return NextResponse.json({ error: "Payment system not configured. Please contact support." }, { status: 503 });
     }

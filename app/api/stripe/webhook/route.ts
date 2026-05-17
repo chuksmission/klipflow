@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getStripe } from "../../../lib/stripe";
+import { getStripe, getStripeWebhookSecret } from "../../../lib/stripe";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,19 +9,20 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const stripe = getStripe();
+    const stripe = await getStripe();
     if (!stripe) return NextResponse.json({ error: "Stripe not configured" }, { status: 503 });
 
     const body = await req.text();
     const signature = req.headers.get("stripe-signature");
+    const webhookSecret = await getStripeWebhookSecret();
 
-    if (!signature || !process.env.STRIPE_WEBHOOK_SECRET) {
+    if (!signature || !webhookSecret) {
       return NextResponse.json({ error: "Missing signature" }, { status: 400 });
     }
 
     let event;
     try {
-      event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET);
+      event = stripe.webhooks.constructEvent(body, signature, webhookSecret!);
     } catch (err: any) {
       console.error("Webhook signature failed:", err.message);
       return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
