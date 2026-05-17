@@ -19,6 +19,47 @@ export async function GET(req: NextRequest) {
 
     if (!task_id) return NextResponse.json({ error: "task_id is required" }, { status: 400 });
 
+    // ---- VEO3 status ----
+    if (provider === "veo3") {
+      const kieApiKey = await getSetting("kie_api_key");
+      if (!kieApiKey) return NextResponse.json({ error: "Kie.ai not configured" }, { status: 503 });
+
+      const res = await fetch(`https://api.kie.ai/api/v1/veo/record-info?taskId=${task_id}`, {
+        headers: { "Authorization": `Bearer ${kieApiKey}` },
+      });
+
+      const rawText = await res.text();
+      console.log("Veo3 status raw:", rawText);
+      let data: any = {};
+      try { data = JSON.parse(rawText); } catch { data = {}; }
+
+      const jobData = data.data ?? {};
+      const state = jobData.state ?? jobData.status ?? "";
+      const isDone = state === "success" || state === "completed";
+      const isFailed = state === "fail" || state === "failed";
+      let videoUrl: string | null = null;
+
+      if (isDone) {
+        try {
+          const result = jobData.resultJson ? JSON.parse(jobData.resultJson) : jobData;
+          videoUrl = result.resultUrls?.[0]
+            ?? result.url
+            ?? result.video_url
+            ?? result.videoUrl
+            ?? result.works?.[0]?.resource?.resource
+            ?? null;
+        } catch { videoUrl = null; }
+      }
+
+      return NextResponse.json({
+        success: true,
+        status: state,
+        video_url: videoUrl,
+        completed: isDone,
+        failed: isFailed,
+      });
+    }
+
     // ---- HIGGSFIELD status ----
     if (provider === "higgsfield") {
       const keyId = await getSetting("higgsfield_key_id");

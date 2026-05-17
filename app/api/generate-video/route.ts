@@ -116,6 +116,126 @@ export async function POST(req: NextRequest) {
 
     const isImageMode = mode === "image_to_video" && !!image_url;
 
+    // ---- VEO3 uses a different endpoint ----
+    if (model === "veo3-fast" || model === "veo3-quality") {
+      const veoModel = model === "veo3-fast" ? "veo3_fast" : "veo3_quality";
+      const veoBody: Record<string, unknown> = {
+        prompt,
+        model: veoModel,
+        aspect_ratio,
+      };
+      if (isImageMode && image_url) {
+        veoBody.imageUrls = [image_url];
+        veoBody.generationType = "REFERENCE_2_VIDEO";
+      }
+
+      const veoRes = await fetch("https://api.kie.ai/api/v1/veo/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${kieApiKey}`,
+        },
+        body: JSON.stringify(veoBody),
+      });
+
+      const veoData = await safeJson(veoRes) as any;
+      console.log("Veo3 response:", veoRes.status, JSON.stringify(veoData));
+
+      if (!veoRes.ok || veoData.code !== 200) {
+        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+        const errMsg = veoData.msg ?? veoData.message ?? veoData.error ?? `Veo3 error (${veoRes.status})`;
+        return NextResponse.json({ error: errMsg, refunded: true }, { status: 400 });
+      }
+
+      const taskId = veoData.data?.taskId ?? veoData.data?.task_id ?? veoData.taskId;
+      if (!taskId) {
+        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+        return NextResponse.json({ error: "Veo3 did not return a taskId.", refunded: true }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, task_id: taskId, status: "queued", provider: "veo3" });
+    }
+
+    // ---- VEO3 uses a different endpoint ----
+    if (model === "veo3-fast" || model === "veo3-quality") {
+      const veoModel = model === "veo3-fast" ? "veo3_fast" : "veo3_quality";
+      const veoBody: Record<string, unknown> = {
+        prompt,
+        model: veoModel,
+        aspect_ratio,
+      };
+      if (isImageMode && image_url) {
+        veoBody.imageUrls = [image_url];
+        veoBody.generationType = "REFERENCE_2_VIDEO";
+      }
+
+      const veoRes = await fetch("https://api.kie.ai/api/v1/veo/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${kieApiKey}`,
+        },
+        body: JSON.stringify(veoBody),
+      });
+
+      const veoData = await safeJson(veoRes) as any;
+      console.log("Veo3 response:", veoRes.status, JSON.stringify(veoData));
+
+      if (!veoRes.ok || veoData.code !== 200) {
+        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+        const errMsg = veoData.msg ?? veoData.message ?? veoData.error ?? `Veo3 error (${veoRes.status})`;
+        return NextResponse.json({ error: errMsg, refunded: true }, { status: 400 });
+      }
+
+      const taskId = veoData.data?.taskId ?? veoData.data?.task_id ?? veoData.taskId;
+      if (!taskId) {
+        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+        return NextResponse.json({ error: "Veo3 did not return a taskId.", refunded: true }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, task_id: taskId, status: "queued", provider: "veo3" });
+    }
+
+    // ---- VEO3 uses a different endpoint ----
+    if (model === "veo3-fast" || model === "veo3-quality") {
+      const veoModel = model === "veo3-fast" ? "veo3_fast" : "veo3_quality";
+      const veoBody: Record<string, unknown> = {
+        prompt,
+        model: veoModel,
+        aspect_ratio,
+      };
+      if (isImageMode && image_url) {
+        veoBody.imageUrls = [image_url];
+        veoBody.generationType = "REFERENCE_2_VIDEO";
+      }
+
+      const veoRes = await fetch("https://api.kie.ai/api/v1/veo/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${kieApiKey}`,
+        },
+        body: JSON.stringify(veoBody),
+      });
+
+      const veoData = await safeJson(veoRes) as any;
+      console.log("Veo3 response:", veoRes.status, JSON.stringify(veoData));
+
+      if (!veoRes.ok || veoData.code !== 200) {
+        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+        const errMsg = veoData.msg ?? veoData.message ?? veoData.error ?? `Veo3 error (${veoRes.status})`;
+        return NextResponse.json({ error: errMsg, refunded: true }, { status: 400 });
+      }
+
+      const taskId = veoData.data?.taskId ?? veoData.data?.task_id ?? veoData.taskId;
+      if (!taskId) {
+        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+        return NextResponse.json({ error: "Veo3 did not return a taskId.", refunded: true }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, task_id: taskId, status: "queued", provider: "veo3" });
+    }
+
     type KieCfg = { model: string; extraInput?: Record<string, unknown> };
 
     const textModelMap: Record<string, KieCfg> = {
