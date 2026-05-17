@@ -34,16 +34,9 @@ function BillingContent() {
   }, []);
 
   const fetchPlans = async () => {
-    const { data } = await supabase
-      .from("plans")
-      .select("*")
-      .eq("is_active", true)
-      .order("sort_order")
-      .limit(50);
-    
-    // Filter client-side as extra safety
-    const activePlans = (data || []).filter((p: any) => p.is_active === true);
-    setPlans(activePlans);
+    const res = await fetch("/api/plans");
+    const data = await res.json();
+    setPlans(data.plans || []);
     setPlansLoading(false);
   };
 
