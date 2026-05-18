@@ -255,6 +255,8 @@ export default function Studio() {
       }
 
       let timedOut = false;
+      let generationComplete = false;
+      let timeoutHandle: ReturnType<typeof setTimeout>;
       const poll = setInterval(async () => {
         try {
           const sr = await fetch("/api/video-status?task_id=" + data.task_id + "&mode=" + capturedMode + "&provider=" + genProvider);
@@ -262,6 +264,8 @@ export default function Studio() {
 
           if (sd.completed && sd.video_url) {
             if (timedOut) return;
+            generationComplete = true;
+            clearTimeout(timeoutHandle);
             setVideoUrl(sd.video_url); setProgress(100); setLoading(false); clearInterval(poll);
             try {
               const { data: { session: fs } } = await supabase.auth.getSession();
@@ -292,8 +296,8 @@ export default function Studio() {
       }, 5000);
 
       const timeoutMs = ["veo3-fast", "veo3-quality", "sora-2"].includes(selectedModel) ? 600000 : 300000;
-      setTimeout(async () => {
-  if (videoUrl) return;
+      timeoutHandle = setTimeout(async () => {
+  if (generationComplete) return;
   timedOut = true;
   clearInterval(poll);
   setLoading(false);
