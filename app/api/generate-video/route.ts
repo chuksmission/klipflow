@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
     // VEO3 - dedicated endpoint
     // ----------------------------------------------------------------
     if (model === "veo3-fast" || model === "veo3-quality") {
-      const veoModel = model === "veo3-fast" ? "veo3_fast" : "veo3_quality";
+      const veoModel = model === "veo3-fast" ? "veo3.1_fast" : "veo3.1_quality";
       const veoBody: Record<string, unknown> = {
         prompt,
         model: veoModel,
@@ -285,6 +285,28 @@ export async function POST(req: NextRequest) {
         if (image_url) kieInput.image_url = image_url;
       } else {
         kieModelString = "wan/v2.6/text-to-video";
+        kieInput = { prompt, aspect_ratio, duration: String(duration) };
+      }
+    }
+
+    else if (model === "grok-imagine") {
+      if (isImageMode) {
+        kieModelString = "grok-imagine/image-to-video";
+        kieInput = { prompt, duration: String(duration) };
+        if (image_url) kieInput.image_url = image_url;
+      } else {
+        kieModelString = "grok-imagine/text-to-video";
+        kieInput = { prompt, aspect_ratio, duration: String(duration) };
+      }
+    }
+
+    else if (model === "grok-imagine") {
+      if (isImageMode) {
+        kieModelString = "grok-imagine/image-to-video";
+        kieInput = { prompt, duration: String(duration) };
+        if (image_url) kieInput.image_url = image_url;
+      } else {
+        kieModelString = "grok-imagine/text-to-video";
         kieInput = { prompt, aspect_ratio, duration: String(duration) };
       }
     }

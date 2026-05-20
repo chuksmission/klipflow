@@ -8,6 +8,7 @@ interface Model {
   desc: string;
   tokens: number;
   badge: string;
+  badges?: string[];
   available: boolean;
   provider: string;
   hasSound: boolean;
@@ -40,7 +41,7 @@ export default function Studio() {
   const [enabledKeys, setEnabledKeys] = useState<Record<string, boolean>>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const tokenCostRef = useRef(15);
+  const tokenCostRef = useRef(10);
   const selectedModelRef = useRef("kling-v1-6-pro");
   const activeModuleRef = useRef<string | null>(null);
   const providerRef = useRef("kie");
@@ -50,29 +51,31 @@ export default function Studio() {
 
   const ALL_MODELS: Model[] = [
     // Kling via Kie.ai
-    { id: "kling-v1-6-std",  name: "Kling 1.6 Standard", desc: "Fast, great for drafts",          tokens: 10,  badge: "",              available: true,  provider: "kie",        hasSound: false, enabledKey: "kling_v1_6_enabled" },
-    { id: "kling-v1-6-pro",  name: "Kling 1.6 Pro",      desc: "High quality, smooth motion",      tokens: 15,  badge: "Recommended",   available: true,  provider: "kie",        hasSound: false, enabledKey: "kling_v1_6_enabled" },
-    { id: "kling-v2-master", name: "Kling 2.1 Master",    desc: "Best realism and motion",          tokens: 20,  badge: "Best Quality",  available: true,  provider: "kie",        hasSound: false, enabledKey: "kling_v2_master_enabled" },
-    { id: "kling-v3-std",    name: "Kling 3.0 Standard",  desc: "Cinematic quality, up to 15s",    tokens: 25,  badge: "Best Quality",  available: true,  provider: "kie",        hasSound: true,  enabledKey: "kling_v3_enabled" },
-    { id: "kling-v3-pro",    name: "Kling 3.0 Pro",       desc: "1080p cinematic, multi-shot",     tokens: 35,  badge: "Ultra Quality", available: true,  provider: "kie",        hasSound: true,  enabledKey: "kling_v3_enabled" },
-    // Google Veo 3
-    { id: "veo3-fast",       name: "Veo 3 Fast",          desc: "Google AI, native audio, 8s",     tokens: 30,  badge: "With Audio",    available: true,  provider: "kie",        hasSound: true,  enabledKey: "veo3_fast_enabled" },
-    { id: "veo3-quality",    name: "Veo 3 Quality",       desc: "Google AI, cinematic, 8s",         tokens: 80,  badge: "Premium",       available: true,  provider: "kie",        hasSound: true,  enabledKey: "veo3_quality_enabled" },
+    { id: "kling-v1-6-std",  name: "Kling 1.6 Standard", desc: "Fast, great for drafts",               tokens: 8,   badge: "",                available: true,  provider: "kie",        hasSound: false, enabledKey: "kling_v1_6_enabled" },
+    { id: "kling-v1-6-pro",  name: "Kling 1.6 Pro",      desc: "High quality, smooth motion",           tokens: 10,  badge: "Recommended",     available: true,  provider: "kie",        hasSound: false, enabledKey: "kling_v1_6_enabled" },
+    { id: "kling-v2-master", name: "Kling 2.1 Master",   desc: "Best realism and motion",               tokens: 20,  badge: "Best Quality",    available: true,  provider: "kie",        hasSound: false, enabledKey: "kling_v2_master_enabled" },
+    { id: "kling-v3-std",    name: "Kling 3.0 Standard", desc: "Cinematic quality, audio, up to 15s",   tokens: 15,  badge: "Best Quality",    badges: ["Best Quality", "With Audio"], available: true, provider: "kie", hasSound: true, enabledKey: "kling_v3_enabled" },
+    { id: "kling-v3-pro",    name: "Kling 3.0 Pro",      desc: "1080p cinematic, audio, multi-shot",    tokens: 20,  badge: "Ultra Quality",   badges: ["Ultra Quality", "With Audio"], available: true, provider: "kie", hasSound: true, enabledKey: "kling_v3_enabled" },
+    // Google Veo 3.1
+    { id: "veo3-fast",       name: "Veo 3.1 Fast",       desc: "Google AI, native audio, 720p",         tokens: 15,  badge: "With Audio",      available: true,  provider: "kie",        hasSound: true,  enabledKey: "veo3_fast_enabled" },
+    { id: "veo3-quality",    name: "Veo 3.1 Quality",    desc: "Google AI, cinematic, 1080p",            tokens: 60,  badge: "Premium",         badges: ["Premium", "With Audio"], available: true, provider: "kie", hasSound: true, enabledKey: "veo3_quality_enabled" },
     // ByteDance Seedance
-    { id: "seedance-2",      name: "Seedance 2.0",        desc: "ByteDance, best quality + audio",  tokens: 50,  badge: "Best Quality",  available: true,  provider: "kie",        hasSound: true,  enabledKey: "seedance2_enabled" },
-    { id: "seedance-2-fast", name: "Seedance 2.0 Fast",   desc: "ByteDance, fast and affordable",   tokens: 20,  badge: "",              available: true,  provider: "kie",        hasSound: true,  enabledKey: "seedance2_fast_enabled" },
+    { id: "seedance-2",      name: "Seedance 2.0",       desc: "ByteDance, best quality + audio",        tokens: 30,  badge: "Best Quality",    badges: ["Best Quality", "With Audio"], available: true, provider: "kie", hasSound: true, enabledKey: "seedance2_enabled" },
+    { id: "seedance-2-fast", name: "Seedance 2.0 Fast",  desc: "ByteDance, fast + audio",                tokens: 15,  badge: "With Audio",      available: true,  provider: "kie",        hasSound: true,  enabledKey: "seedance2_fast_enabled" },
     // Hailuo
-    { id: "hailuo-pro",      name: "Hailuo 2.3 Pro",      desc: "MiniMax, fast generation",         tokens: 20,  badge: "",              available: true,  provider: "kie",        hasSound: false, enabledKey: "hailuo_enabled" },
+    { id: "hailuo-pro",      name: "Hailuo 2.3",         desc: "MiniMax, fast generation",               tokens: 8,   badge: "",                available: true,  provider: "kie",        hasSound: false, enabledKey: "hailuo_enabled" },
     // Sora 2
-    { id: "sora-2",          name: "Sora 2",              desc: "OpenAI, premium realism",           tokens: 60,  badge: "Premium",       available: true,  provider: "kie",        hasSound: false, enabledKey: "sora2_enabled" },
+    { id: "sora-2",          name: "Sora 2",             desc: "OpenAI, premium realism",                tokens: 10,  badge: "Premium",         available: true,  provider: "kie",        hasSound: false, enabledKey: "sora2_enabled" },
     // Wan
-    { id: "wan-2-6",         name: "Wan 2.6",             desc: "Alibaba, fast and cheap",           tokens: 8,   badge: "Cheapest",      available: true,  provider: "kie",        hasSound: false, enabledKey: "wan26_enabled" },
+    { id: "wan-2-6",         name: "Wan 2.6",            desc: "Alibaba, fast and affordable",           tokens: 10,  badge: "Cheapest",        available: true,  provider: "kie",        hasSound: false, enabledKey: "wan26_enabled" },
+    // Grok Imagine
+    { id: "grok-imagine",    name: "Grok Imagine",       desc: "xAI, fast and cheap",                    tokens: 5,   badge: "Most Affordable", available: true,  provider: "kie",        hasSound: false, enabledKey: "grok_enabled" },
     // Luma
-    { id: "luma-ray-3",      name: "Luma Ray 3",          desc: "Cinematic quality",                 tokens: 35,  badge: "",              available: true,  provider: "kie",        hasSound: false, enabledKey: "luma_enabled" },
+    { id: "luma-ray-3",      name: "Luma Ray 3",         desc: "Cinematic quality",                      tokens: 15,  badge: "",                available: true,  provider: "kie",        hasSound: false, enabledKey: "luma_enabled" },
     // Higgsfield
-    { id: "higgsfield-ugc",  name: "Higgsfield UGC",      desc: "Most realistic UGC ad videos",     tokens: 20,  badge: "Best for Ads",  available: true,  provider: "higgsfield", hasSound: false, enabledKey: "higgsfield_enabled" },
+    { id: "higgsfield-ugc",  name: "Higgsfield UGC",     desc: "Realistic UGC ad videos",                tokens: 10,  badge: "Best for Ads",    available: true,  provider: "higgsfield", hasSound: false, enabledKey: "higgsfield_enabled" },
     // Coming soon
-    { id: "runway-gen4",     name: "Runway Gen-4",        desc: "Professional cinematic quality",    tokens: 40,  badge: "Coming Soon",   available: false, provider: "runway",     hasSound: false, enabledKey: "" },
+    { id: "runway-gen4",     name: "Runway Gen-4",       desc: "Professional cinematic quality",         tokens: 40,  badge: "Coming Soon",     available: false, provider: "runway",     hasSound: false, enabledKey: "" },
   ];
 
   const modules: Module[] = [
@@ -89,11 +92,9 @@ export default function Studio() {
   const visibleModels = ALL_MODELS.filter((m) => {
     if (!m.available) return false;
     if (!m.enabledKey) return false;
-    // If no setting found default to true for core models, false for new ones
     const coreModels = ["kling_v1_6_enabled", "kling_v2_master_enabled", "kling_v3_enabled", "higgsfield_enabled"];
     if (enabledKeys[m.enabledKey] === false) return false;
     if (enabledKeys[m.enabledKey] === true) return true;
-    // Default: show core models, hide new ones until admin enables
     return coreModels.includes(m.enabledKey);
   });
 
@@ -120,7 +121,6 @@ export default function Studio() {
       const data = await res.json();
       if (data.balance !== undefined) setTokenBalance(data.balance);
 
-      // Fetch enabled models from admin settings
       const sRes = await fetch("/api/settings/models");
       const sData = await sRes.json();
       setEnabledKeys(sData.models ?? {});
@@ -175,7 +175,7 @@ export default function Studio() {
     setLoading(true); setError(""); setVideoUrl(null); setProgress(0);
 
     const modelData = ALL_MODELS.find((m) => m.id === selectedModel);
-    const tokenCost = modelData?.tokens ?? 15;
+    const tokenCost = modelData?.tokens ?? 10;
     const provider = modelData?.provider ?? "kie";
     tokenCostRef.current = tokenCost;
     providerRef.current = provider;
@@ -221,7 +221,8 @@ export default function Studio() {
       const useAudio = modelData?.hasSound === true;
 
       const generatePayload = {
-        prompt, mode: capturedMode,
+        prompt,
+        mode: capturedMode,
         image_url: imageUrl || undefined,
         duration: String(duration),
         aspect_ratio: aspectRatio,
@@ -230,7 +231,7 @@ export default function Studio() {
         user_id: session.user.id,
         tokens_used: tokenCost,
       };
-      console.log("Generate payload:", JSON.stringify(generatePayload));
+
       const res = await fetch("/api/generate-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -257,6 +258,7 @@ export default function Studio() {
       let timedOut = false;
       let generationComplete = false;
       let timeoutHandle: ReturnType<typeof setTimeout>;
+
       const poll = setInterval(async () => {
         try {
           const sr = await fetch("/api/video-status?task_id=" + data.task_id + "&mode=" + capturedMode + "&provider=" + genProvider);
@@ -295,24 +297,24 @@ export default function Studio() {
         } catch (e) { console.error("Poll error:", e); }
       }, 5000);
 
-      const timeoutMs = ["veo3-fast", "veo3-quality", "sora-2"].includes(selectedModel) ? 600000 : 300000;
+      const timeoutMs = ["veo3-fast", "veo3-quality", "sora-2", "seedance-2", "seedance-2-fast"].includes(selectedModel) ? 600000 : 300000;
       timeoutHandle = setTimeout(async () => {
-  if (generationComplete) return;
-  timedOut = true;
-  clearInterval(poll);
-  setLoading(false);
-  setError("Generation timed out. Tokens refunded.");
-  const { data: { session: ts } } = await supabase.auth.getSession();
-  if (ts) {
-    const rr = await fetch("/api/tokens/refund", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + ts.access_token },
-      body: JSON.stringify({ amount: capturedCost }),
-    });
-    const rd = await rr.json();
-    if (rd.balance !== undefined) setTokenBalance(rd.balance);
-  }
-}, timeoutMs);
+        if (generationComplete) return;
+        timedOut = true;
+        clearInterval(poll);
+        setLoading(false);
+        setError("Generation timed out. Tokens refunded.");
+        const { data: { session: ts } } = await supabase.auth.getSession();
+        if (ts) {
+          const rr = await fetch("/api/tokens/refund", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + ts.access_token },
+            body: JSON.stringify({ amount: capturedCost }),
+          });
+          const rd = await rr.json();
+          if (rd.balance !== undefined) setTokenBalance(rd.balance);
+        }
+      }, timeoutMs);
 
     } catch (e) { setError("Something went wrong."); setLoading(false); }
   };
@@ -337,7 +339,7 @@ export default function Studio() {
 
   const currentModel = ALL_MODELS.find((m) => m.id === selectedModel);
   const durationMultiplier = duration === "5" ? 1 : duration === "8" ? 1.6 : duration === "10" ? 2 : duration === "15" ? 3 : 1;
-  const tokenCost = Math.ceil((currentModel?.tokens ?? 15) * durationMultiplier);
+  const tokenCost = Math.ceil((currentModel?.tokens ?? 10) * durationMultiplier);
   const needsImage = activeModule === "image_to_video" || activeModule === "ugc_ad";
   const showModels = activeModule === "text_to_video" || activeModule === "image_to_video" || activeModule === "ugc_ad" || activeModule === "ai_actor";
 
@@ -429,7 +431,11 @@ export default function Studio() {
                       <button key={model.id} onClick={() => model.available && setSelectedModel(model.id)} disabled={!model.available}
                         className={"p-3 rounded-xl border text-left transition " + (selectedModel === model.id ? "border-purple-500 bg-purple-900/30" : model.available ? "border-white/10 bg-white/5 hover:border-purple-500/50" : "border-white/5 opacity-40 cursor-not-allowed")}
                       >
-                        {model.badge && <div className={"text-xs font-bold px-1.5 py-0.5 rounded-full mb-1 inline-block " + (model.available ? "bg-purple-900/40 text-purple-300" : "bg-gray-900/40 text-gray-500")}>{model.badge}</div>}
+                        <div className="flex flex-wrap gap-1 mb-1">
+                          {(model.badges ?? (model.badge ? [model.badge] : [])).map((b, bi) => (
+                            <div key={bi} className={"text-xs font-bold px-1.5 py-0.5 rounded-full inline-block " + (model.available ? "bg-purple-900/40 text-purple-300" : "bg-gray-900/40 text-gray-500")}>{b}</div>
+                          ))}
+                        </div>
                         <div className="font-bold text-xs mb-0.5">{model.name}</div>
                         <div className="text-gray-500 text-xs">{model.tokens} tokens — {model.desc}</div>
                       </button>

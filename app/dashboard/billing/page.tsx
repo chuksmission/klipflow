@@ -6,9 +6,9 @@ import { supabase } from "../../lib/supabase";
 const TOKEN_PACKS = [
   { tokens: 50, price: 5 },
   { tokens: 100, price: 9 },
-  { tokens: 250, price: 19, popular: true },
-  { tokens: 600, price: 39 },
-  { tokens: 1200, price: 69 },
+  { tokens: 250, price: 20, popular: true },
+  { tokens: 600, price: 38 },
+  { tokens: 1200, price: 72 },
 ];
 
 function BillingContent() {
