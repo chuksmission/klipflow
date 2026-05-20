@@ -28,6 +28,7 @@ export default function AdminAIProviders() {
     "wan-2-6":         0.010,
     "luma-ray-3":      0.080,
     "higgsfield-ugc":  0.060,
+    "grok-imagine":    0.008,
   };
 
   const providers = [
@@ -44,14 +45,15 @@ export default function AdminAIProviders() {
         { key: "kling_v1_6_enabled",    label: "Kling 1.6 Standard + Pro" },
         { key: "kling_v2_master_enabled",label: "Kling 2.1 Master" },
         { key: "kling_v3_enabled",       label: "Kling 3.0 Standard + Pro — With Audio" },
-        { key: "veo3_fast_enabled",      label: "Veo 3 Fast — Google, with audio ($0.40/8s)" },
-        { key: "veo3_quality_enabled",   label: "Veo 3 Quality — Google, with audio ($2.00/8s)" },
+        { key: "veo3_fast_enabled",      label: "Veo 3.1 Fast — Google, with audio" },
+        { key: "veo3_quality_enabled",   label: "Veo 3.1 Quality — Google, cinematic 1080p" },
         { key: "seedance2_enabled",      label: "Seedance 2.0 — ByteDance, best quality" },
         { key: "seedance2_fast_enabled", label: "Seedance 2.0 Fast — ByteDance, cheaper" },
         { key: "hailuo_enabled",         label: "Hailuo 2.3 Pro — MiniMax, fast" },
         { key: "sora2_enabled",          label: "Sora 2 — OpenAI, premium realism" },
         { key: "wan26_enabled",          label: "Wan 2.6 — Alibaba, cheapest option" },
         { key: "luma_enabled",           label: "Luma Ray 3 — cinematic quality" },
+        { key: "grok_enabled",           label: "Grok Imagine — xAI, fast and affordable" },
       ],
     },
     {
