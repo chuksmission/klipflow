@@ -7,31 +7,13 @@ export default function AdminAIProviders() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [editingModel, setEditingModel] = useState<string | null>(null);
+  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
   const [stats, setStats] = useState({
     totalGenerations: 0,
     totalCost: 0,
     byModel: {} as Record<string, { count: number; cost: number }>,
   });
-  const [editingModel, setEditingModel] = useState<string | null>(null);
-  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
-  const [editingModel, setEditingModel] = useState<string | null>(null);
-  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
-  const [editingModel, setEditingModel] = useState<string | null>(null);
-  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
-  const [editingModel, setEditingModel] = useState<string | null>(null);
-  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
-  const [editingModel, setEditingModel] = useState<string | null>(null);
-  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
-  const [editingModel, setEditingModel] = useState<string | null>(null);
-  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
-  const [editingModel, setEditingModel] = useState<string | null>(null);
-  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
-  const [editingModel, setEditingModel] = useState<string | null>(null);
-  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
-  const [editingModel, setEditingModel] = useState<string | null>(null);
-  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
-  const [editingModel, setEditingModel] = useState<string | null>(null);
-  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
 
   const MODEL_COSTS: Record<string, number> = {
     "kling-v1-6-std":  0.007,
@@ -84,6 +66,11 @@ export default function AdminAIProviders() {
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
       body: JSON.stringify({ settings: settingsToSave }),
     });
+    setSettings((prev) => {
+      const updated = { ...prev };
+      settingsToSave.forEach((s) => { updated[s.key] = s.value; });
+      return updated;
+    });
     setEditingModel(null);
   };
 
@@ -98,18 +85,18 @@ export default function AdminAIProviders() {
         { key: "kie_api_key", label: "API Key", secret: true },
       ],
       models: [
-        { key: "kling_v1_6_enabled",    label: "Kling 1.6 Standard + Pro" },
-        { key: "kling_v2_master_enabled",label: "Kling 2.1 Master" },
-        { key: "kling_v3_enabled",       label: "Kling 3.0 Standard + Pro — With Audio" },
-        { key: "veo3_fast_enabled",      label: "Veo 3.1 Fast — Google, with audio" },
-        { key: "veo3_quality_enabled",   label: "Veo 3.1 Quality — Google, cinematic 1080p" },
-        { key: "seedance2_enabled",      label: "Seedance 2.0 — ByteDance, best quality" },
-        { key: "seedance2_fast_enabled", label: "Seedance 2.0 Fast — ByteDance, cheaper" },
-        { key: "hailuo_enabled",         label: "Hailuo 2.3 Pro — MiniMax, fast" },
-        { key: "sora2_enabled",          label: "Sora 2 — OpenAI, premium realism" },
-        { key: "wan26_enabled",          label: "Wan 2.6 — Alibaba, cheapest option" },
-        { key: "luma_enabled",           label: "Luma Ray 3 — cinematic quality" },
-        { key: "grok_enabled",           label: "Grok Imagine — xAI, fast and affordable" },
+        { key: "kling_v1_6_enabled",     label: "Kling 1.6 Standard + Pro" },
+        { key: "kling_v2_master_enabled", label: "Kling 2.1 Master" },
+        { key: "kling_v3_enabled",        label: "Kling 3.0 Standard + Pro — With Audio" },
+        { key: "veo3_fast_enabled",       label: "Veo 3.1 Fast — Google, with audio" },
+        { key: "veo3_quality_enabled",    label: "Veo 3.1 Quality — Google, cinematic 1080p" },
+        { key: "seedance2_enabled",       label: "Seedance 2.0 — ByteDance, best quality" },
+        { key: "seedance2_fast_enabled",  label: "Seedance 2.0 Fast — ByteDance, cheaper" },
+        { key: "hailuo_enabled",          label: "Hailuo 2.3 — MiniMax, fast" },
+        { key: "sora2_enabled",           label: "Sora 2 — OpenAI, premium realism" },
+        { key: "wan26_enabled",           label: "Wan 2.6 — Alibaba, cheapest option" },
+        { key: "luma_enabled",            label: "Luma Ray 3 — cinematic quality" },
+        { key: "grok_enabled",            label: "Grok Imagine — xAI, fast and affordable" },
       ],
     },
     {
