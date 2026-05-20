@@ -39,6 +39,7 @@ export default function Studio() {
   const [tokenBalance, setTokenBalance] = useState(25);
   const [selectedModel, setSelectedModel] = useState("kling-v1-6-pro");
   const [enabledKeys, setEnabledKeys] = useState<Record<string, boolean>>({});
+  const [tokenPricing, setTokenPricing] = useState<Record<string, number>>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tokenCostRef = useRef(10);
@@ -124,6 +125,10 @@ export default function Studio() {
       const sRes = await fetch("/api/settings/models");
       const sData = await sRes.json();
       setEnabledKeys(sData.models ?? {});
+
+      const pRes = await fetch("/api/token-pricing");
+      const pData = await pRes.json();
+      setTokenPricing(pData.pricing ?? {});
     };
     init();
   }, []);
@@ -175,7 +180,7 @@ export default function Studio() {
     setLoading(true); setError(""); setVideoUrl(null); setProgress(0);
 
     const modelData = ALL_MODELS.find((m) => m.id === selectedModel);
-    const tokenCost = modelData?.tokens ?? 10;
+    const tokenCost = tokenPricing[selectedModel] ?? modelData?.tokens ?? 10;
     const provider = modelData?.provider ?? "kie";
     tokenCostRef.current = tokenCost;
     providerRef.current = provider;
@@ -339,7 +344,8 @@ export default function Studio() {
 
   const currentModel = ALL_MODELS.find((m) => m.id === selectedModel);
   const durationMultiplier = duration === "5" ? 1 : duration === "8" ? 1.6 : duration === "10" ? 2 : duration === "15" ? 3 : 1;
-  const tokenCost = Math.ceil((currentModel?.tokens ?? 10) * durationMultiplier);
+  const baseTokens = tokenPricing[selectedModel] ?? currentModel?.tokens ?? 10;
+  const tokenCost = Math.ceil(baseTokens * durationMultiplier);
   const needsImage = activeModule === "image_to_video" || activeModule === "ugc_ad";
   const showModels = activeModule === "text_to_video" || activeModule === "image_to_video" || activeModule === "ugc_ad" || activeModule === "ai_actor";
 
@@ -437,7 +443,7 @@ export default function Studio() {
                           ))}
                         </div>
                         <div className="font-bold text-xs mb-0.5">{model.name}</div>
-                        <div className="text-gray-500 text-xs">{model.tokens} tokens — {model.desc}</div>
+                        <div className="text-gray-500 text-xs">{tokenPricing[model.id] ?? model.tokens} tokens — {model.desc}</div>
                       </button>
                     ))}
                   </div>
