@@ -12,6 +12,26 @@ export default function AdminAIProviders() {
     totalCost: 0,
     byModel: {} as Record<string, { count: number; cost: number }>,
   });
+  const [editingModel, setEditingModel] = useState<string | null>(null);
+  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
+  const [editingModel, setEditingModel] = useState<string | null>(null);
+  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
+  const [editingModel, setEditingModel] = useState<string | null>(null);
+  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
+  const [editingModel, setEditingModel] = useState<string | null>(null);
+  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
+  const [editingModel, setEditingModel] = useState<string | null>(null);
+  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
+  const [editingModel, setEditingModel] = useState<string | null>(null);
+  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
+  const [editingModel, setEditingModel] = useState<string | null>(null);
+  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
+  const [editingModel, setEditingModel] = useState<string | null>(null);
+  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
+  const [editingModel, setEditingModel] = useState<string | null>(null);
+  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
+  const [editingModel, setEditingModel] = useState<string | null>(null);
+  const [modelEdits, setModelEdits] = useState<Record<string, { label: string; desc: string; badges: string }>>({});
 
   const MODEL_COSTS: Record<string, number> = {
     "kling-v1-6-std":  0.007,
@@ -29,6 +49,42 @@ export default function AdminAIProviders() {
     "luma-ray-3":      0.080,
     "higgsfield-ugc":  0.060,
     "grok-imagine":    0.008,
+  };
+
+  const MODEL_IDS: Record<string, string> = {
+    "kling_v1_6_enabled":     "kling-v1-6-std,kling-v1-6-pro",
+    "kling_v2_master_enabled": "kling-v2-master",
+    "kling_v3_enabled":       "kling-v3-std,kling-v3-pro",
+    "veo3_fast_enabled":      "veo3-fast",
+    "veo3_quality_enabled":   "veo3-quality",
+    "seedance2_enabled":      "seedance-2",
+    "seedance2_fast_enabled": "seedance-2-fast",
+    "hailuo_enabled":         "hailuo-pro",
+    "sora2_enabled":          "sora-2",
+    "wan26_enabled":          "wan-2-6",
+    "luma_enabled":           "luma-ray-3",
+    "grok_enabled":           "grok-imagine",
+    "higgsfield_enabled":     "higgsfield-ugc",
+  };
+
+  const saveModelEdit = async (modelKey: string) => {
+    const edit = modelEdits[modelKey];
+    if (!edit) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const ids = MODEL_IDS[modelKey]?.split(",") ?? [];
+    const settingsToSave: { key: string; value: string; category: string }[] = [];
+    ids.forEach((id) => {
+      settingsToSave.push({ key: `model_label_${id}`, value: edit.label, category: "ai_providers" });
+      settingsToSave.push({ key: `model_desc_${id}`, value: edit.desc, category: "ai_providers" });
+      settingsToSave.push({ key: `model_badges_${id}`, value: edit.badges, category: "ai_providers" });
+    });
+    await fetch("/api/admin/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
+      body: JSON.stringify({ settings: settingsToSave }),
+    });
+    setEditingModel(null);
   };
 
   const providers = [
@@ -239,14 +295,76 @@ export default function AdminAIProviders() {
                   <p className="text-gray-400 text-xs font-semibold mb-2">Enable Models</p>
                   <div className="space-y-2">
                     {provider.models.map((model) => (
-                      <div key={model.key} className="flex items-center justify-between bg-black/20 rounded-xl px-4 py-2.5">
-                        <span className="text-sm">{model.label}</span>
-                        <button
-                          onClick={() => toggleEnabled(model.key)}
-                          className={"relative w-10 h-5 rounded-full transition-colors " + (settings[model.key] === "true" ? "bg-purple-600" : "bg-white/20")}
-                        >
-                          <div className={"absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all " + (settings[model.key] === "true" ? "left-5" : "left-0.5")} />
-                        </button>
+                      <div key={model.key} className="bg-black/20 rounded-xl px-4 py-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">{settings[`model_label_${MODEL_IDS[model.key]?.split(",")[0]}`] || model.label}</span>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => {
+                                const id = MODEL_IDS[model.key]?.split(",")[0] ?? "";
+                                setEditingModel(editingModel === model.key ? null : model.key);
+                                if (editingModel !== model.key) {
+                                  setModelEdits({
+                                    ...modelEdits,
+                                    [model.key]: {
+                                      label: settings[`model_label_${id}`] || model.label,
+                                      desc: settings[`model_desc_${id}`] || "",
+                                      badges: settings[`model_badges_${id}`] || "",
+                                    }
+                                  });
+                                }
+                              }}
+                              className="text-purple-400 hover:text-white text-xs transition"
+                            >
+                              {editingModel === model.key ? "Cancel" : "Edit"}
+                            </button>
+                            <button
+                              onClick={() => toggleEnabled(model.key)}
+                              className={"relative w-10 h-5 rounded-full transition-colors " + (settings[model.key] === "true" ? "bg-purple-600" : "bg-white/20")}
+                            >
+                              <div className={"absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all " + (settings[model.key] === "true" ? "left-5" : "left-0.5")} />
+                            </button>
+                          </div>
+                        </div>
+                        {editingModel === model.key && (
+                          <div className="mt-3 space-y-2">
+                            <div>
+                              <label className="text-gray-500 text-xs mb-1 block">Display Name</label>
+                              <input
+                                type="text"
+                                value={modelEdits[model.key]?.label || ""}
+                                onChange={(e) => setModelEdits({ ...modelEdits, [model.key]: { ...modelEdits[model.key], label: e.target.value } })}
+                                className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-gray-500 text-xs mb-1 block">Description</label>
+                              <input
+                                type="text"
+                                value={modelEdits[model.key]?.desc || ""}
+                                onChange={(e) => setModelEdits({ ...modelEdits, [model.key]: { ...modelEdits[model.key], desc: e.target.value } })}
+                                placeholder="e.g. High quality, smooth motion"
+                                className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-gray-500 text-xs mb-1 block">Badges (comma separated)</label>
+                              <input
+                                type="text"
+                                value={modelEdits[model.key]?.badges || ""}
+                                onChange={(e) => setModelEdits({ ...modelEdits, [model.key]: { ...modelEdits[model.key], badges: e.target.value } })}
+                                placeholder="e.g. Recommended, With Audio"
+                                className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500"
+                              />
+                            </div>
+                            <button
+                              onClick={() => saveModelEdit(model.key)}
+                              className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-4 py-1.5 rounded-lg transition"
+                            >
+                              Save Changes
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

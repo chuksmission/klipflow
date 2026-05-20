@@ -6,23 +6,28 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Public endpoint — returns only enabled/disabled flags, no secrets
 export async function GET() {
   try {
     const { data: settings } = await supabase
       .from("admin_settings")
       .select("key, value")
       .eq("category", "ai_providers")
-      .eq("is_secret", false)
-      .like("key", "%_enabled%");
+      .eq("is_secret", false);
 
-    const map: Record<string, boolean> = {};
+    const models: Record<string, boolean> = {};
+    const labels: Record<string, string> = {};
+    const descs: Record<string, string> = {};
+    const badges: Record<string, string> = {};
+
     settings?.forEach((s) => {
-      map[s.key] = s.value === "true";
+      if (s.key.endsWith("_enabled")) models[s.key] = s.value === "true";
+      else if (s.key.startsWith("model_label_")) labels[s.key.replace("model_label_", "")] = s.value ?? "";
+      else if (s.key.startsWith("model_desc_")) descs[s.key.replace("model_desc_", "")] = s.value ?? "";
+      else if (s.key.startsWith("model_badges_")) badges[s.key.replace("model_badges_", "")] = s.value ?? "";
     });
 
-    return NextResponse.json({ models: map });
+    return NextResponse.json({ models, labels, descs, badges });
   } catch {
-    return NextResponse.json({ models: {} });
+    return NextResponse.json({ models: {}, labels: {}, descs: {}, badges: {} });
   }
 }

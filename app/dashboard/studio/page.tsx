@@ -40,6 +40,9 @@ export default function Studio() {
   const [selectedModel, setSelectedModel] = useState("kling-v1-6-pro");
   const [enabledKeys, setEnabledKeys] = useState<Record<string, boolean>>({});
   const [tokenPricing, setTokenPricing] = useState<Record<string, number>>({});
+  const [modelLabels, setModelLabels] = useState<Record<string, string>>({});
+  const [modelDescs, setModelDescs] = useState<Record<string, string>>({});
+  const [modelBadges, setModelBadges] = useState<Record<string, string>>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tokenCostRef = useRef(10);
@@ -125,6 +128,9 @@ export default function Studio() {
       const sRes = await fetch("/api/settings/models");
       const sData = await sRes.json();
       setEnabledKeys(sData.models ?? {});
+      setModelLabels(sData.labels ?? {});
+      setModelDescs(sData.descs ?? {});
+      setModelBadges(sData.badges ?? {});
 
       const pRes = await fetch("/api/token-pricing");
       const pData = await pRes.json();
@@ -438,12 +444,15 @@ export default function Studio() {
                         className={"p-3 rounded-xl border text-left transition " + (selectedModel === model.id ? "border-purple-500 bg-purple-900/30" : model.available ? "border-white/10 bg-white/5 hover:border-purple-500/50" : "border-white/5 opacity-40 cursor-not-allowed")}
                       >
                         <div className="flex flex-wrap gap-1 mb-1">
-                          {(model.badges ?? (model.badge ? [model.badge] : [])).map((b, bi) => (
+                          {(modelBadges[model.id]
+                            ? modelBadges[model.id].split(",").map(b => b.trim()).filter(Boolean)
+                            : model.badges ?? (model.badge ? [model.badge] : [])
+                          ).map((b, bi) => (
                             <div key={bi} className={"text-xs font-bold px-1.5 py-0.5 rounded-full inline-block " + (model.available ? "bg-purple-900/40 text-purple-300" : "bg-gray-900/40 text-gray-500")}>{b}</div>
                           ))}
                         </div>
-                        <div className="font-bold text-xs mb-0.5">{model.name}</div>
-                        <div className="text-gray-500 text-xs">{tokenPricing[model.id] ?? model.tokens} tokens — {model.desc}</div>
+                        <div className="font-bold text-xs mb-0.5">{modelLabels[model.id] || model.name}</div>
+                        <div className="text-gray-500 text-xs">{tokenPricing[model.id] ?? model.tokens} tokens — {modelDescs[model.id] || model.desc}</div>
                       </button>
                     ))}
                   </div>
