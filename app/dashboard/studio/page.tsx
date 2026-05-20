@@ -88,6 +88,7 @@ export default function Studio() {
     { id: "ugc_ad",         title: "UGC Ad Creator",   desc: "AI avatar testimonial and product review videos",  badge: "Best for Ads" },
     { id: "ai_actor",       title: "AI Actor",         desc: "Create photorealistic AI human avatars",           badge: "" },
     { id: "voice",          title: "Voice Generation", desc: "Natural AI voiceovers for videos",                 badge: "" },
+    { id: "text_to_image",  title: "Text to Image",    desc: "Generate images from text or reference photo",      badge: "2 Tokens" },
     { id: "image_ad",       title: "Image Ad",         desc: "Scroll-stopping image advertisements",             badge: "Cheapest" },
     { id: "prompt",         title: "Prompt Expander",  desc: "Transform ideas into cinematic prompts",           badge: "" },
     { id: "script",         title: "Script Writer",    desc: "Generate viral video scripts",                     badge: "" },
@@ -178,8 +179,120 @@ export default function Studio() {
     return publicUrl;
   };
 
+  const handleGenerateImage = async () => {
+    setLoading(true); setError(""); setVideoUrl(null); setProgress(0);
+    const tokenCostImg = tokenPricing["text_to_image"] ?? 2;
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setError("Please sign in."); setLoading(false); return; }
+
+      const tokenRes = await fetch("/api/tokens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
+        body: JSON.stringify({ amount: tokenCostImg }),
+      });
+      const tokenData = await tokenRes.json();
+      if (!tokenRes.ok) { setError(tokenData.error ?? "Insufficient tokens."); setLoading(false); return; }
+      setTokenBalance(tokenData.balance);
+
+      let refImageUrl = imageUrlInput;
+      if (imageFile && !useUrl) {
+        const uploaded = await uploadImage(imageFile);
+        if (uploaded) refImageUrl = uploaded;
+      }
+
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          image_url: refImageUrl || undefined,
+          size: aspectRatio === "9:16" ? "1024x1792" : aspectRatio === "1:1" ? "1024x1024" : "1792x1024",
+          user_id: session.user.id,
+          tokens_used: tokenCostImg,
+        }),
+      });
+
+      const data = await res.json() as { task_id?: string; error?: string; refunded?: boolean };
+      if (!res.ok) {
+        setError((data.error ?? "Generation failed.") + (data.refunded ? " Tokens refunded." : ""));
+        setLoading(false);
+        if (data.refunded) setTokenBalance((p) => p + tokenCostImg);
+        return;
+      }
+
+      if (!data.task_id) { setError("Failed to start generation."); setLoading(false); return; }
+
+      let timedOut = false;
+      let generationComplete = false;
+      let timeoutHandle: ReturnType<typeof setTimeout>;
+
+      const poll = setInterval(async () => {
+        try {
+          const sr = await fetch("/api/video-status?task_id=" + data.task_id + "&provider=kie");
+          const sd = await sr.json() as { completed?: boolean; failed?: boolean; video_url?: string };
+
+          if (sd.completed && sd.video_url) {
+            if (timedOut) return;
+            generationComplete = true;
+            clearTimeout(timeoutHandle);
+            setVideoUrl(sd.video_url); setProgress(100); setLoading(false); clearInterval(poll);
+            try {
+              const { data: { session: fs } } = await supabase.auth.getSession();
+              if (fs) {
+                await fetch("/api/generations", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", Authorization: "Bearer " + fs.access_token },
+                  body: JSON.stringify({
+                    type: "text_to_image",
+                    prompt,
+                    image_url: sd.video_url,
+                    output_type: "image",
+                    status: "completed",
+                    tokens_used: tokenCostImg,
+                  }),
+                });
+              }
+            } catch (e) { console.error("Save error:", e); }
+          } else if (sd.failed) {
+            setError("Generation failed. Tokens refunded."); setLoading(false); clearInterval(poll);
+            await fetch("/api/tokens/refund", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
+              body: JSON.stringify({ amount: tokenCostImg }),
+            });
+            setTokenBalance((p) => p + tokenCostImg);
+          }
+        } catch (e) { console.error("Poll error:", e); }
+      }, 5000);
+
+      timeoutHandle = setTimeout(async () => {
+        if (generationComplete) return;
+        timedOut = true;
+        clearInterval(poll);
+        setLoading(false);
+        setError("Generation timed out. Tokens refunded.");
+        await fetch("/api/tokens/refund", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
+          body: JSON.stringify({ amount: tokenCostImg }),
+        });
+        setTokenBalance((p) => p + tokenCostImg);
+      }, 120000);
+
+    } catch (e) { setError("Something went wrong."); setLoading(false); }
+  };
+
   const handleGenerate = async () => {
     if (!prompt) { setError("Please enter a prompt."); return; }
+
+    // Handle Text to Image separately
+    if (activeModule === "text_to_image") {
+      await handleGenerateImage();
+      return;
+    }
+
     const needsImage = activeModule === "image_to_video" || activeModule === "ugc_ad";
     if (needsImage && !imageFile && !imageUrlInput) { setError("Please upload an image or enter an image URL."); return; }
 
@@ -352,8 +465,9 @@ export default function Studio() {
   const durationMultiplier = duration === "5" ? 1 : duration === "8" ? 1.6 : duration === "10" ? 2 : duration === "15" ? 3 : 1;
   const baseTokens = tokenPricing[selectedModel] ?? currentModel?.tokens ?? 10;
   const tokenCost = Math.ceil(baseTokens * durationMultiplier);
-  const needsImage = activeModule === "image_to_video" || activeModule === "ugc_ad";
+  const needsImage = activeModule === "image_to_video" || activeModule === "ugc_ad" || activeModule === "text_to_image";
   const showModels = activeModule === "text_to_video" || activeModule === "image_to_video" || activeModule === "ugc_ad" || activeModule === "ai_actor";
+  const isImageModule = activeModule === "text_to_image";
 
   return (
     <div className="space-y-4 max-w-2xl mx-auto">
@@ -420,6 +534,12 @@ export default function Studio() {
               <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3">
                 <p className="text-purple-300 text-xs font-semibold mb-1">UGC Ad Mode</p>
                 <p className="text-gray-400 text-xs">Upload a photo of your avatar for the most realistic AI UGC ads.</p>
+              </div>
+            )}
+            {activeModule === "text_to_image" && (
+              <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3">
+                <p className="text-purple-300 text-xs font-semibold mb-1">Reference Image (Optional)</p>
+                <p className="text-gray-400 text-xs">Upload a reference image to generate variations or repurpose existing visuals.</p>
               </div>
             )}
 
@@ -490,7 +610,7 @@ export default function Studio() {
             {error && <p className="text-red-400 text-sm">{error}</p>}
 
             <button onClick={handleGenerate} disabled={loading} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition">
-              Generate — {tokenCost} tokens
+              {isImageModule ? `Generate Image — ${tokenPricing["text_to_image"] ?? 2} tokens` : `Generate — ${tokenCost} tokens`}
             </button>
           </div>
         </div>
@@ -533,11 +653,15 @@ export default function Studio() {
         <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-4">
           <div className="flex items-center gap-2">
             <span className="text-green-400 font-bold">Done!</span>
-            <h3 className="font-bold">Your Video is Ready</h3>
+            <h3 className="font-bold">{isImageModule ? "Your Image is Ready" : "Your Video is Ready"}</h3>
           </div>
-          <video src={videoUrl} controls playsInline className="w-full rounded-xl" />
+          {isImageModule ? (
+            <img src={videoUrl} alt="Generated image" className="w-full rounded-xl" />
+          ) : (
+            <video src={videoUrl} controls playsInline className="w-full rounded-xl" />
+          )}
           <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => handleDownload(videoUrl)} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition text-sm">Save Video</button>
+            <button onClick={() => handleDownload(videoUrl)} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition text-sm">{isImageModule ? "Save Image" : "Save Video"}</button>
             <button onClick={resetForm} className="bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition text-sm">Generate Another</button>
           </div>
           <div className="bg-blue-900/20 border border-blue-500/20 rounded-xl p-3">
