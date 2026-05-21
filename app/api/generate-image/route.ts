@@ -74,52 +74,82 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Kie.ai API key not configured.", refunded: true }, { status: 503 });
     }
 
-    // Use GPT Image via Kie.ai
-    // Text to Image: gpt-image-1/text-to-image
-    // Image to Image: gpt-image-1/image-to-image
     const isImageToImage = !!image_url;
-    const model = isImageToImage ? "gpt-image/1.5-image-to-image" : "gpt-image/1.5-text-to-image";
 
-    const input: Record<string, unknown> = {
-      prompt,
-    };
-    if (isImageToImage && image_url) input.image_url = image_url;
+    if (isImageToImage) {
+      // Image-to-image uses dedicated 4o Image API
+      const body4o: Record<string, unknown> = {
+        prompt,
+        imageUrls: [image_url],
+        aspectRatio: size === "1024x1792" ? "2:3" : size === "1792x1024" ? "3:2" : "1:1",
+        nVariants: 1,
+      };
+      console.log("4o Image API POST:", JSON.stringify(body4o));
 
-    const kieBody = { model, input };
-    console.log("Kie.ai image POST:", JSON.stringify(kieBody));
+      const res4o = await fetch("https://api.kie.ai/api/v1/4o-image/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${kieApiKey}`,
+        },
+        body: JSON.stringify(body4o),
+      });
 
-    const kieRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${kieApiKey}`,
-      },
-      body: JSON.stringify(kieBody),
-    });
+      const data4o = await safeJson(res4o);
+      console.log("4o Image response:", res4o.status, JSON.stringify(data4o));
 
-    const kieData = await safeJson(kieRes);
-    console.log("Kie.ai image response:", kieRes.status, JSON.stringify(kieData));
+      if (!res4o.ok || data4o.code !== 200) {
+        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+        return NextResponse.json({
+          error: data4o.msg ?? data4o.message ?? data4o.error ?? `4o Image error (${res4o.status}): ${JSON.stringify(data4o)}`,
+          refunded: true,
+        }, { status: 400 });
+      }
 
-    if (kieData.code !== 200 || !kieData.data) {
-      if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-      return NextResponse.json({
-        error: kieData.msg ?? kieData.message ?? kieData.error ?? `Kie.ai error (${kieRes.status}): ${JSON.stringify(kieData)}`,
-        refunded: true,
-      }, { status: 400 });
+      const taskId4o = data4o.data?.taskId ?? data4o.data?.task_id ?? data4o.taskId;
+      if (!taskId4o) {
+        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+        return NextResponse.json({ error: "4o Image did not return a taskId. Raw: " + JSON.stringify(data4o), refunded: true }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, task_id: taskId4o, status: "queued", provider: "4o-image" });
+
+    } else {
+      // Text-to-image uses Market API
+      const kieBody = {
+        model: "gpt-image/1.5-text-to-image",
+        input: { prompt },
+      };
+      console.log("Kie.ai image POST:", JSON.stringify(kieBody));
+
+      const kieRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${kieApiKey}`,
+        },
+        body: JSON.stringify(kieBody),
+      });
+
+      const kieData = await safeJson(kieRes);
+      console.log("Kie.ai image response:", kieRes.status, JSON.stringify(kieData));
+
+      if (kieData.code !== 200 || !kieData.data) {
+        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+        return NextResponse.json({
+          error: kieData.msg ?? kieData.message ?? kieData.error ?? `Kie.ai error (${kieRes.status}): ${JSON.stringify(kieData)}`,
+          refunded: true,
+        }, { status: 400 });
+      }
+
+      const taskId = kieData.data?.taskId ?? kieData.data?.task_id ?? kieData.taskId;
+      if (!taskId) {
+        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+        return NextResponse.json({ error: "Kie.ai did not return a taskId. Raw: " + JSON.stringify(kieData), refunded: true }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, task_id: taskId, status: "queued", provider: "kie" });
     }
-
-    const taskId = kieData.data?.taskId ?? kieData.data?.task_id ?? kieData.taskId;
-    console.log("Kie.ai image taskId:", taskId);
-
-    if (!taskId) {
-      if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-      return NextResponse.json({
-        error: "Kie.ai did not return a taskId. Raw: " + JSON.stringify(kieData),
-        refunded: true,
-      }, { status: 500 });
-    }
-
-    return NextResponse.json({ success: true, task_id: taskId, status: "queued", provider: "kie" });
 
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Something went wrong";
