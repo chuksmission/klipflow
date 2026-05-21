@@ -279,7 +279,7 @@ export default function Studio() {
           body: JSON.stringify({ amount: tokenCostImg }),
         });
         setTokenBalance((p) => p + tokenCostImg);
-      }, 120000);
+      }, 600000);
 
     } catch (e) { setError("Something went wrong."); setLoading(false); }
   };
