@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Only track public and dashboard pages, skip API, static, and admin
   const shouldTrack =
     !pathname.startsWith("/api/") &&
     !pathname.startsWith("/_next/") &&
@@ -13,49 +12,48 @@ export async function middleware(req: NextRequest) {
 
   if (shouldTrack) {
     try {
-      // Get visitor info from Vercel headers
       const country = req.headers.get("x-vercel-ip-country") || "";
-      const countryCode = req.headers.get("x-vercel-ip-country") || "";
       const region = req.headers.get("x-vercel-ip-country-region") || "";
       const city = req.headers.get("x-vercel-ip-city") || "";
       const userAgent = req.headers.get("user-agent") || "";
       const referrer = req.headers.get("referer") || "";
 
-      // Detect device type
       const isMobile = /mobile|android|iphone|ipad|ipod/i.test(userAgent);
       const isTablet = /ipad|tablet/i.test(userAgent);
       const device = isTablet ? "tablet" : isMobile ? "mobile" : "desktop";
 
-      // Detect browser
       const browser =
         userAgent.includes("Chrome") ? "Chrome" :
         userAgent.includes("Firefox") ? "Firefox" :
         userAgent.includes("Safari") ? "Safari" :
         userAgent.includes("Edge") ? "Edge" : "Other";
 
-      // Generate session ID from IP + user agent (simple fingerprint)
-      const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
-      const sessionSeed = ip + userAgent.slice(0, 50) + new Date().toDateString();
-      const sessionId = Buffer.from(sessionSeed).toString("base64").slice(0, 32);
+      const ip = req.headers.get("x-forwarded-for")?.split(",")[0] || req.headers.get("x-real-ip") || "unknown";
+      // Simple session ID without Buffer (Edge compatible)
+      const sessionSeed = ip + "-" + userAgent.slice(0, 30) + "-" + new Date().toDateString();
+      const sessionId = sessionSeed.split("").reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0).toString(36) + sessionSeed.length.toString(36);
 
-      // Fire and forget — don't await to avoid slowing down the response
-      fetch(new URL("/api/track-visit", req.url).toString(), {
+      let referrerHost = "";
+      try { referrerHost = referrer ? new URL(referrer).hostname : ""; } catch { referrerHost = ""; }
+
+      const baseUrl = req.nextUrl.origin;
+      fetch(`${baseUrl}/api/track-visit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           session_id: sessionId,
           page: pathname,
           country: city ? city + ", " + country : country,
-          country_code: countryCode,
+          country_code: country,
           region,
           city,
           device,
           browser,
-          referrer: referrer ? new URL(referrer).hostname : "",
+          referrer: referrerHost,
         }),
       }).catch(() => {});
     } catch {
-      // Never block the request due to tracking errors
+      // Never block request due to tracking errors
     }
   }
 
@@ -63,7 +61,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
