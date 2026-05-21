@@ -267,19 +267,7 @@ export default function Studio() {
         } catch (e) { console.error("Poll error:", e); }
       }, 5000);
 
-      timeoutHandle = setTimeout(async () => {
-        if (generationComplete) return;
-        timedOut = true;
-        clearInterval(poll);
-        setLoading(false);
-        setError("Generation timed out. Tokens refunded.");
-        await fetch("/api/tokens/refund", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
-          body: JSON.stringify({ amount: tokenCostImg }),
-        });
-        setTokenBalance((p) => p + tokenCostImg);
-      }, 600000);
+      // No timeout for image generation — user can navigate away if needed
 
     } catch (e) { setError("Something went wrong."); setLoading(false); }
   };
