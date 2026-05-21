@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
   let body: {
     prompt: string;
     image_url?: string;
-    size?: string;
+    aspect_ratio?: string;
     user_id?: string;
     tokens_used?: number;
   } = { prompt: "" };
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     const {
       prompt,
       image_url,
-      size = "1024x1024",
+      aspect_ratio = "1:1",
       user_id,
       tokens_used = 2,
     } = body;
@@ -77,13 +77,12 @@ export async function POST(req: NextRequest) {
     const isImageToImage = !!image_url;
 
     if (isImageToImage) {
-      // Image-to-image uses Market API with gpt-image/1.5-image-to-image
       const kieBody = {
         model: "gpt-image/1.5-image-to-image",
         input: {
           prompt,
           input_urls: [image_url],
-          aspect_ratio: size === "1024x1792" ? "2:3" : size === "1792x1024" ? "3:2" : "1:1",
+          aspect_ratio,
           quality: "medium",
         },
       };
@@ -118,12 +117,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, task_id: taskId, status: "queued", provider: "kie" });
 
     } else {
-      // Text-to-image uses Market API
       const kieBody = {
         model: "gpt-image/1.5-text-to-image",
-        input: { prompt },
+        input: { prompt, aspect_ratio },
       };
-      console.log("Kie.ai image POST:", JSON.stringify(kieBody));
+      console.log("Kie.ai text-to-image POST:", JSON.stringify(kieBody));
 
       const kieRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
         method: "POST",
@@ -135,7 +133,7 @@ export async function POST(req: NextRequest) {
       });
 
       const kieData = await safeJson(kieRes);
-      console.log("Kie.ai image response:", kieRes.status, JSON.stringify(kieData));
+      console.log("Kie.ai text-to-image response:", kieRes.status, JSON.stringify(kieData));
 
       if (kieData.code !== 200 || !kieData.data) {
         if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
