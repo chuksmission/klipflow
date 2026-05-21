@@ -236,7 +236,6 @@ export default function Studio() {
           if (sd.completed && sd.video_url) {
             if (timedOut) return;
             generationComplete = true;
-            clearTimeout(timeoutHandle);
             setVideoUrl(sd.video_url); setProgress(100); setLoading(false); clearInterval(poll);
             try {
               const { data: { session: fs } } = await supabase.auth.getSession();
@@ -369,7 +368,7 @@ export default function Studio() {
 
       let timedOut = false;
       let generationComplete = false;
-      let timeoutHandle: ReturnType<typeof setTimeout>;
+      let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
       const poll = setInterval(async () => {
         try {
