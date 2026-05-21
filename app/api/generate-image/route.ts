@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     // Text to Image: gpt-image-1/text-to-image
     // Image to Image: gpt-image-1/image-to-image
     const isImageToImage = !!image_url;
-    const model = isImageToImage ? "gpt-image-1/image-to-image" : "gpt-image-1/text-to-image";
+    const model = isImageToImage ? "gpt-image/1.5-image-to-image" : "gpt-image/1.5-text-to-image";
 
     const input: Record<string, unknown> = {
       prompt,
