@@ -21,29 +21,51 @@ export async function POST(req: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { type, priceId, tokens, amount } = await req.json();
+    const { type, priceId, planId, tokens, amount } = await req.json();
+
+    // Check if user already has a Stripe customer ID
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("stripe_customer_id")
+      .eq("id", user.id)
+      .single();
+
+    let customerId = profile?.stripe_customer_id;
+
+    // Create Stripe customer if doesn't exist
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: user.email,
+        metadata: { user_id: user.id },
+      });
+      customerId = customer.id;
+      await supabase.from("user_profiles").update({
+        stripe_customer_id: customerId,
+      }).eq("id", user.id);
+    }
 
     let session;
 
     if (type === "subscription") {
-      // Subscription plan checkout
       session = await stripe.checkout.sessions.create({
         mode: "subscription",
         payment_method_types: ["card"],
+        customer: customerId,
         line_items: [{ price: priceId, quantity: 1 }],
         success_url: process.env.NEXT_PUBLIC_APP_URL + "/dashboard/billing?success=true&session_id={CHECKOUT_SESSION_ID}",
         cancel_url: process.env.NEXT_PUBLIC_APP_URL + "/dashboard/billing?cancelled=true",
-        customer_email: user.email,
         metadata: {
           user_id: user.id,
           type: "subscription",
+          plan_id: planId ? planId.toString() : "",
         },
       });
+
     } else if (type === "token_topup") {
-      // Token top-up one-time payment
       session = await stripe.checkout.sessions.create({
         mode: "payment",
         payment_method_types: ["card"],
+        customer: customerId,
         line_items: [{
           price_data: {
             currency: "usd",
@@ -51,19 +73,19 @@ export async function POST(req: NextRequest) {
               name: tokens + " KlipflowAI Tokens",
               description: "AI video generation credits for KlipflowAI",
             },
-            unit_amount: amount * 100, // amount in cents
+            unit_amount: amount * 100,
           },
           quantity: 1,
         }],
         success_url: process.env.NEXT_PUBLIC_APP_URL + "/dashboard/billing?success=true&session_id={CHECKOUT_SESSION_ID}",
         cancel_url: process.env.NEXT_PUBLIC_APP_URL + "/dashboard/billing?cancelled=true",
-        customer_email: user.email,
         metadata: {
           user_id: user.id,
           type: "token_topup",
           tokens: tokens.toString(),
         },
       });
+
     } else {
       return NextResponse.json({ error: "Invalid checkout type" }, { status: 400 });
     }

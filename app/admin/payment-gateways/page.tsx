@@ -10,7 +10,7 @@ export default function AdminPaymentGateways() {
   const [saved, setSaved] = useState(false);
 
   const gateways = [
-    { id: "stripe", name: "Stripe", desc: "Global payments", fields: [{ key: "stripe_publishable_key", label: "Publishable Key", secret: false }, { key: "stripe_secret_key", label: "Secret Key", secret: true }] },
+    { id: "stripe", name: "Stripe", desc: "Global payments", fields: [{ key: "stripe_publishable_key", label: "Publishable Key", secret: false }, { key: "stripe_secret_key", label: "Secret Key", secret: true }, { key: "stripe_webhook_secret", label: "Webhook Secret", secret: true }] },
     { id: "paypal", name: "PayPal", desc: "Global payments", fields: [{ key: "paypal_client_id", label: "Client ID", secret: false }, { key: "paypal_client_secret", label: "Client Secret", secret: true }] },
     { id: "paystack", name: "Paystack", desc: "Africa payments — Nigeria, Ghana, Kenya, South Africa", fields: [{ key: "paystack_public_key", label: "Public Key", secret: false }, { key: "paystack_secret_key", label: "Secret Key", secret: true }] },
     { id: "flutterwave", name: "Flutterwave", desc: "Africa and Global payments", fields: [{ key: "flutterwave_public_key", label: "Public Key", secret: false }, { key: "flutterwave_secret_key", label: "Secret Key", secret: true }] },
