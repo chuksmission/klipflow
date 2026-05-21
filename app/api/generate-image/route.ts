@@ -82,7 +82,6 @@ export async function POST(req: NextRequest) {
 
     const input: Record<string, unknown> = {
       prompt,
-      size,
     };
     if (isImageToImage && image_url) input.image_url = image_url;
 
