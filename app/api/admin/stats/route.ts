@@ -27,153 +27,127 @@ export async function GET(req: NextRequest) {
     const last7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const last30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const last5min = new Date(now.getTime() - 5 * 60 * 1000);
-    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
     // ---- USERS ----
-    const { data: usersData } = await supabase.auth.admin.listUsers();
-    const users = usersData?.users || [];
-    const totalUsers = users.length;
-    const newToday = users.filter((u) => new Date(u.created_at) >= today).length;
-    const recentUsers = users
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, 5)
-      .map((u) => ({ email: u.email, created_at: u.created_at }));
+    let totalUsers = 0, newToday = 0, recentUsers: any[] = [];
+    try {
+      const { data: usersData } = await supabase.auth.admin.listUsers();
+      const users = usersData?.users || [];
+      totalUsers = users.length;
+      newToday = users.filter((u) => new Date(u.created_at) >= today).length;
+      recentUsers = users
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 5)
+        .map((u) => ({ email: u.email, created_at: u.created_at }));
+    } catch (e) { console.error("Users error:", e); }
 
     // ---- GENERATIONS ----
-    const { data: generations } = await supabase
-      .from("generations")
-      .select("tokens_used, type, prompt, created_at, model")
-      .order("created_at", { ascending: false });
+    let totalGenerations = 0, generationsToday = 0, totalTokensUsed = 0, recentActivity: any[] = [];
+    try {
+      const { data: generations } = await supabase
+        .from("generations")
+        .select("tokens_used, type, prompt, created_at")
+        .order("created_at", { ascending: false });
+      totalGenerations = generations?.length || 0;
+      totalTokensUsed = generations?.reduce((sum, g) => sum + (g.tokens_used || 0), 0) || 0;
+      generationsToday = generations?.filter(g => new Date(g.created_at) >= today).length || 0;
+      recentActivity = generations?.slice(0, 5) || [];
+    } catch (e) { console.error("Generations error:", e); }
 
-    const totalGenerations = generations?.length || 0;
-    const totalTokensUsed = generations?.reduce((sum, g) => sum + (g.tokens_used || 0), 0) || 0;
-    const generationsToday = generations?.filter(g => new Date(g.created_at) >= today).length || 0;
-    const generationsThisWeek = generations?.filter(g => new Date(g.created_at) >= last7).length || 0;
-    const recentActivity = generations?.slice(0, 5) || [];
+    // ---- SUBSCRIPTIONS ----
+    let activeSubscriptions = 0, mrr = 0;
+    try {
+      const { data: subscriptions } = await supabase
+        .from("subscriptions")
+        .select("status, plan_id")
+        .eq("status", "active");
+      activeSubscriptions = subscriptions?.length || 0;
 
-    // ---- SUBSCRIPTIONS & REVENUE ----
-    const { data: subscriptions } = await supabase
-      .from("subscriptions")
-      .select("status, current_period_start, current_period_end, plan_id")
-      .eq("status", "active");
-
-    const activeSubscriptions = subscriptions?.length || 0;
-
-    // Get plan prices for MRR calculation
-    const { data: plans } = await supabase
-      .from("plans")
-      .select("id, price_monthly");
-
-    const planPriceMap: Record<number, number> = {};
-    plans?.forEach(p => { planPriceMap[p.id] = p.price_monthly || 0; });
-
-    const mrr = subscriptions?.reduce((sum, sub) => {
-      return sum + (sub.plan_id ? planPriceMap[sub.plan_id] || 0 : 0);
-    }, 0) || 0;
+      if (activeSubscriptions > 0) {
+        const { data: plans } = await supabase.from("plans").select("id, price_monthly");
+        const planPriceMap: Record<number, number> = {};
+        plans?.forEach(p => { planPriceMap[p.id] = p.price_monthly || 0; });
+        mrr = subscriptions?.reduce((sum, sub) => sum + (sub.plan_id ? planPriceMap[sub.plan_id] || 0 : 0), 0) || 0;
+      }
+    } catch (e) { console.error("Subscriptions error:", e); }
 
     // ---- TRAFFIC ----
-    const { data: visitsActive } = await supabase
-      .from("page_visits")
-      .select("session_id")
-      .gte("created_at", last5min.toISOString());
+    let activeNow = 0, visitorsToday = 0, visitors7d = 0, visitors30d = 0;
+    let topCountries: any[] = [], topPages: any[] = [], trafficChart: any[] = [];
+    try {
+      const [r1, r2, r3, r4] = await Promise.all([
+        supabase.from("page_visits").select("session_id").gte("created_at", last5min.toISOString()),
+        supabase.from("page_visits").select("session_id").gte("created_at", today.toISOString()),
+        supabase.from("page_visits").select("session_id").gte("created_at", last7.toISOString()),
+        supabase.from("page_visits").select("session_id, country, country_code, page, created_at").gte("created_at", last30.toISOString()),
+      ]);
 
-    const { data: visitsToday } = await supabase
-      .from("page_visits")
-      .select("session_id")
-      .gte("created_at", today.toISOString());
+      activeNow = new Set(r1.data?.map(v => v.session_id)).size;
+      visitorsToday = new Set(r2.data?.map(v => v.session_id)).size;
+      visitors7d = new Set(r3.data?.map(v => v.session_id)).size;
+      visitors30d = new Set(r4.data?.map(v => v.session_id)).size;
 
-    const { data: visits7d } = await supabase
-      .from("page_visits")
-      .select("session_id")
-      .gte("created_at", last7.toISOString());
+      // Top countries
+      const countryMap: Record<string, { count: number; code: string }> = {};
+      r4.data?.forEach(v => {
+        if (!v.country) return;
+        if (!countryMap[v.country]) countryMap[v.country] = { count: 0, code: v.country_code || "" };
+        countryMap[v.country].count++;
+      });
+      topCountries = Object.entries(countryMap)
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 5)
+        .map(([country, data]) => ({ country, code: data.code, visits: data.count }));
 
-    const { data: visits30d } = await supabase
-      .from("page_visits")
-      .select("session_id, country, country_code, page, created_at")
-      .gte("created_at", last30.toISOString());
+      // Top pages
+      const pageMap: Record<string, number> = {};
+      r4.data?.forEach(v => { if (v.page) pageMap[v.page] = (pageMap[v.page] || 0) + 1; });
+      topPages = Object.entries(pageMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([page, visits]) => ({ page, visits }));
 
-    // Unique visitors (by session_id)
-    const uniqueActive = new Set(visitsActive?.map(v => v.session_id)).size;
-    const uniqueToday = new Set(visitsToday?.map(v => v.session_id)).size;
-    const unique7d = new Set(visits7d?.map(v => v.session_id)).size;
-    const unique30d = new Set(visits30d?.map(v => v.session_id)).size;
+      // Daily chart last 7 days
+      const dailyMap: Record<string, number> = {};
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+        dailyMap[d.toISOString().split("T")[0]] = 0;
+      }
+      r3.data?.forEach(v => {
+        const key = new Date(v.session_id || now).toISOString().split("T")[0];
+      });
+      // Use r4 for daily breakdown
+      const { data: daily7d } = await supabase
+        .from("page_visits")
+        .select("created_at")
+        .gte("created_at", last7.toISOString());
+      daily7d?.forEach(v => {
+        const key = new Date(v.created_at).toISOString().split("T")[0];
+        if (dailyMap[key] !== undefined) dailyMap[key]++;
+      });
+      trafficChart = Object.entries(dailyMap).map(([date, visits]) => ({ date, visits }));
 
-    // Top countries
-    const countryMap: Record<string, { count: number; code: string }> = {};
-    visits30d?.forEach(v => {
-      if (!v.country) return;
-      if (!countryMap[v.country]) countryMap[v.country] = { count: 0, code: v.country_code || "" };
-      countryMap[v.country].count++;
-    });
-    const topCountries = Object.entries(countryMap)
-      .sort((a, b) => b[1].count - a[1].count)
-      .slice(0, 5)
-      .map(([country, data]) => ({ country, code: data.code, visits: data.count }));
+    } catch (e) { console.error("Traffic error:", e); }
 
-    // Top pages
-    const pageMap: Record<string, number> = {};
-    visits30d?.forEach(v => {
-      if (!v.page) return;
-      pageMap[v.page] = (pageMap[v.page] || 0) + 1;
-    });
-    const topPages = Object.entries(pageMap)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([page, visits]) => ({ page, visits }));
-
-    // Daily traffic for chart (last 7 days)
-    const dailyTraffic: Record<string, number> = {};
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-      const key = d.toISOString().split("T")[0];
-      dailyTraffic[key] = 0;
-    }
-    visits7d?.forEach(v => {
-      const key = new Date(v.session_id || now).toISOString().split("T")[0];
-    });
-    // Use visits30d for daily breakdown
-    const { data: visits7dFull } = await supabase
-      .from("page_visits")
-      .select("created_at")
-      .gte("created_at", last7.toISOString());
-    visits7dFull?.forEach(v => {
-      const key = new Date(v.created_at).toISOString().split("T")[0];
-      if (dailyTraffic[key] !== undefined) dailyTraffic[key]++;
-    });
-    const trafficChart = Object.entries(dailyTraffic).map(([date, visits]) => ({ date, visits }));
-
-    // ---- LEADS ----
-    const { count: totalLeads } = await supabase
-      .from("leads")
-      .select("*", { count: "exact", head: true });
-
-    const { count: abuseAttempts } = await supabase
-      .from("device_fingerprints")
-      .select("*", { count: "exact", head: true })
-      .eq("verified", false);
+    // ---- LEADS & ABUSE ----
+    let totalLeads = 0, abuseAttempts = 0;
+    try {
+      const { count: l } = await supabase.from("leads").select("*", { count: "exact", head: true });
+      totalLeads = l || 0;
+    } catch (e) { console.error("Leads error:", e); }
+    try {
+      const { count: a } = await supabase.from("device_fingerprints").select("*", { count: "exact", head: true }).eq("verified", false);
+      abuseAttempts = a || 0;
+    } catch (e) { console.error("Abuse error:", e); }
 
     return NextResponse.json({
       stats: {
-        totalUsers,
-        newToday,
-        totalGenerations,
-        generationsToday,
-        generationsThisWeek,
-        totalTokensUsed,
-        totalRevenue: mrr,
-        mrr,
-        activeSubscriptions,
-        totalLeads: totalLeads || 0,
-        abuseAttempts: abuseAttempts || 0,
+        totalUsers, newToday, totalGenerations, generationsToday,
+        totalTokensUsed, mrr, activeSubscriptions, totalLeads, abuseAttempts,
       },
       traffic: {
-        activeNow: uniqueActive,
-        today: uniqueToday,
-        last7days: unique7d,
-        last30days: unique30d,
-        topCountries,
-        topPages,
-        chart: trafficChart,
+        activeNow, today: visitorsToday, last7days: visitors7d, last30days: visitors30d,
+        topCountries, topPages, chart: trafficChart,
       },
       recentUsers,
       recentActivity,
