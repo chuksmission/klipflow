@@ -8,7 +8,9 @@ export async function middleware(req: NextRequest) {
     !pathname.startsWith("/_next/") &&
     !pathname.startsWith("/admin") &&
     !pathname.includes(".") &&
-    pathname !== "/favicon.ico";
+    pathname !== "/favicon.ico" &&
+    pathname !== "/icon" &&
+    !pathname.startsWith("/icon");
 
   if (shouldTrack) {
     try {
