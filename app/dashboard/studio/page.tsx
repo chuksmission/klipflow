@@ -54,31 +54,21 @@ export default function Studio() {
   useEffect(() => { activeModuleRef.current = activeModule; }, [activeModule]);
 
   const ALL_MODELS: Model[] = [
-    // Kling via Kie.ai
     { id: "kling-v1-6-std",  name: "Kling 1.6 Standard", desc: "Fast, great for drafts",               tokens: 8,   badge: "",                available: true,  provider: "kie",        hasSound: false, enabledKey: "kling_v1_6_enabled" },
     { id: "kling-v1-6-pro",  name: "Kling 1.6 Pro",      desc: "High quality, smooth motion",           tokens: 10,  badge: "Recommended",     available: true,  provider: "kie",        hasSound: false, enabledKey: "kling_v1_6_enabled" },
     { id: "kling-v2-master", name: "Kling 2.1 Master",   desc: "Best realism and motion",               tokens: 20,  badge: "Best Quality",    available: true,  provider: "kie",        hasSound: false, enabledKey: "kling_v2_master_enabled" },
     { id: "kling-v3-std",    name: "Kling 3.0 Standard", desc: "Cinematic quality, audio, up to 15s",   tokens: 15,  badge: "Best Quality",    badges: ["Best Quality", "With Audio"], available: true, provider: "kie", hasSound: true, enabledKey: "kling_v3_enabled" },
     { id: "kling-v3-pro",    name: "Kling 3.0 Pro",      desc: "1080p cinematic, audio, multi-shot",    tokens: 20,  badge: "Ultra Quality",   badges: ["Ultra Quality", "With Audio"], available: true, provider: "kie", hasSound: true, enabledKey: "kling_v3_enabled" },
-    // Google Veo 3.1
     { id: "veo3-fast",       name: "Veo 3.1 Fast",       desc: "Google AI, native audio, 720p",         tokens: 15,  badge: "With Audio",      available: true,  provider: "kie",        hasSound: true,  enabledKey: "veo3_fast_enabled" },
     { id: "veo3-quality",    name: "Veo 3.1 Quality",    desc: "Google AI, cinematic, 1080p",            tokens: 60,  badge: "Premium",         badges: ["Premium", "With Audio"], available: true, provider: "kie", hasSound: true, enabledKey: "veo3_quality_enabled" },
-    // ByteDance Seedance
     { id: "seedance-2",      name: "Seedance 2.0",       desc: "ByteDance, best quality + audio",        tokens: 30,  badge: "Best Quality",    badges: ["Best Quality", "With Audio"], available: true, provider: "kie", hasSound: true, enabledKey: "seedance2_enabled" },
     { id: "seedance-2-fast", name: "Seedance 2.0 Fast",  desc: "ByteDance, fast + audio",                tokens: 15,  badge: "With Audio",      available: true,  provider: "kie",        hasSound: true,  enabledKey: "seedance2_fast_enabled" },
-    // Hailuo
     { id: "hailuo-pro",      name: "Hailuo 2.3",         desc: "MiniMax, fast generation",               tokens: 8,   badge: "",                available: true,  provider: "kie",        hasSound: false, enabledKey: "hailuo_enabled" },
-    // Sora 2
     { id: "sora-2",          name: "Sora 2",             desc: "OpenAI, premium realism",                tokens: 10,  badge: "Premium",         available: true,  provider: "kie",        hasSound: false, enabledKey: "sora2_enabled" },
-    // Wan
     { id: "wan-2-6",         name: "Wan 2.6",            desc: "Alibaba, fast and affordable",           tokens: 10,  badge: "Cheapest",        available: true,  provider: "kie",        hasSound: false, enabledKey: "wan26_enabled" },
-    // Grok Imagine
     { id: "grok-imagine",    name: "Grok Imagine",       desc: "xAI, fast and cheap",                    tokens: 5,   badge: "Most Affordable", available: true,  provider: "kie",        hasSound: false, enabledKey: "grok_enabled" },
-    // Luma
     { id: "luma-ray-3",      name: "Luma Ray 3",         desc: "Cinematic quality",                      tokens: 15,  badge: "",                available: true,  provider: "kie",        hasSound: false, enabledKey: "luma_enabled" },
-    // Higgsfield
     { id: "higgsfield-ugc",  name: "Higgsfield UGC",     desc: "Realistic UGC ad videos",                tokens: 10,  badge: "Best for Ads",    available: true,  provider: "higgsfield", hasSound: false, enabledKey: "higgsfield_enabled" },
-    // Coming soon
     { id: "runway-gen4",     name: "Runway Gen-4",       desc: "Professional cinematic quality",         tokens: 40,  badge: "Coming Soon",     available: false, provider: "runway",     hasSound: false, enabledKey: "" },
   ];
 
@@ -88,7 +78,7 @@ export default function Studio() {
     { id: "ugc_ad",         title: "UGC Ad Creator",   desc: "AI avatar testimonial and product review videos",  badge: "Best for Ads" },
     { id: "ai_actor",       title: "AI Actor",         desc: "Create photorealistic AI human avatars",           badge: "" },
     { id: "voice",          title: "Voice Generation", desc: "Natural AI voiceovers for videos",                 badge: "" },
-    { id: "text_to_image",  title: "Text to Image",    desc: "Generate images from text or reference photo",      badge: "2 Tokens" },
+    { id: "text_to_image",  title: "Text to Image",    desc: "Generate images from text or reference photo",     badge: "2 Tokens" },
     { id: "image_ad",       title: "Image Ad",         desc: "Scroll-stopping image advertisements",             badge: "Cheapest" },
     { id: "prompt",         title: "Prompt Expander",  desc: "Transform ideas into cinematic prompts",           badge: "" },
     { id: "script",         title: "Script Writer",    desc: "Generate viral video scripts",                     badge: "" },
@@ -202,13 +192,16 @@ export default function Studio() {
         if (uploaded) refImageUrl = uploaded;
       }
 
+      // Convert aspectRatio to Kie.ai format
+      const imgAspectRatio = aspectRatio === "9:16" ? "2:3" : aspectRatio === "1:1" ? "1:1" : "3:2";
+
       const res = await fetch("/api/generate-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt,
           image_url: refImageUrl || undefined,
-          size: aspectRatio === "9:16" ? "1024x1792" : aspectRatio === "1:1" ? "1024x1024" : "1792x1024",
+          aspect_ratio: imgAspectRatio,
           user_id: session.user.id,
           tokens_used: tokenCostImg,
         }),
@@ -224,9 +217,7 @@ export default function Studio() {
 
       if (!data.task_id) { setError("Failed to start generation."); setLoading(false); return; }
 
-      let timedOut = false;
       let generationComplete = false;
-      let timeoutHandle: ReturnType<typeof setTimeout>;
 
       const poll = setInterval(async () => {
         try {
@@ -234,7 +225,6 @@ export default function Studio() {
           const sd = await sr.json() as { completed?: boolean; failed?: boolean; video_url?: string };
 
           if (sd.completed && sd.video_url) {
-            if (timedOut) return;
             generationComplete = true;
             setVideoUrl(sd.video_url); setProgress(100); setLoading(false); clearInterval(poll);
             try {
@@ -266,7 +256,8 @@ export default function Studio() {
         } catch (e) { console.error("Poll error:", e); }
       }, 5000);
 
-      // No timeout for image generation — user can navigate away if needed
+      // No timeout for image generation - user can navigate away if needed
+      void generationComplete;
 
     } catch (e) { setError("Something went wrong."); setLoading(false); }
   };
@@ -274,7 +265,6 @@ export default function Studio() {
   const handleGenerate = async () => {
     if (!prompt) { setError("Please enter a prompt."); return; }
 
-    // Handle Text to Image separately
     if (activeModule === "text_to_image") {
       await handleGenerateImage();
       return;
@@ -436,7 +426,7 @@ export default function Studio() {
       const b = await r.blob();
       const bu = window.URL.createObjectURL(b);
       const a = document.createElement("a");
-      a.href = bu; a.download = "klipflowai-" + Date.now() + ".mp4";
+      a.href = bu; a.download = "klipflowai-" + Date.now() + (isImageModule ? ".png" : ".mp4");
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       window.URL.revokeObjectURL(bu);
     } catch { window.open(url, "_blank"); }
@@ -491,6 +481,7 @@ export default function Studio() {
           </div>
 
           <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-4">
+
             {needsImage && (
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
@@ -523,19 +514,30 @@ export default function Studio() {
                 <p className="text-gray-400 text-xs">Upload a photo of your avatar for the most realistic AI UGC ads.</p>
               </div>
             )}
-            {activeModule === "text_to_image" && (
-              <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3">
-                <p className="text-purple-300 text-xs font-semibold mb-1">Reference Image (Optional)</p>
-                <p className="text-gray-400 text-xs">Upload a reference image to generate variations or repurpose existing visuals.</p>
-              </div>
+
+            {isImageModule && (
+              <>
+                <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3">
+                  <p className="text-purple-300 text-xs font-semibold mb-1">Reference Image (Optional)</p>
+                  <p className="text-gray-400 text-xs">Upload a reference image to generate variations or repurpose existing visuals.</p>
+                </div>
+                <div>
+                  <label className="text-gray-400 text-xs mb-1 block">Aspect Ratio</label>
+                  <select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm">
+                    <option value="16:9">16:9 Landscape</option>
+                    <option value="9:16">9:16 Portrait / Reels</option>
+                    <option value="1:1">1:1 Square</option>
+                  </select>
+                </div>
+              </>
             )}
 
             <div>
               <label className="text-gray-400 text-xs mb-1 block">
-                {activeModule === "ugc_ad" ? "Describe the UGC ad scenario" : activeModule === "script" ? "Describe your video topic" : activeModule === "prompt" ? "Simple idea to expand" : "Describe your video"}
+                {activeModule === "ugc_ad" ? "Describe the UGC ad scenario" : activeModule === "script" ? "Describe your video topic" : activeModule === "prompt" ? "Simple idea to expand" : activeModule === "text_to_image" ? "Describe the image you want" : "Describe your video"}
               </label>
               <textarea
-                placeholder={activeModule === "ugc_ad" ? "Woman in kitchen holding product, smiling, authentic testimonial style..." : "A luxury watch rotating slowly on a marble surface, golden hour lighting, cinematic 4K..."}
+                placeholder={activeModule === "ugc_ad" ? "Woman in kitchen holding product, smiling, authentic testimonial style..." : activeModule === "text_to_image" ? "A photorealistic portrait of a woman in golden hour light, cinematic, sharp details..." : "A luxury watch rotating slowly on a marble surface, golden hour lighting, cinematic 4K..."}
                 value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={4}
                 className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition text-sm resize-none"
               />
@@ -606,7 +608,7 @@ export default function Studio() {
       {loading && (
         <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-4">
           <div className="text-center">
-            <h3 className="font-bold mb-1">Generating Your Video</h3>
+            <h3 className="font-bold mb-1">{isImageModule ? "Generating Your Image" : "Generating Your Video"}</h3>
             <p className="text-gray-400 text-sm">{getStatusMsg(elapsedTime)}</p>
           </div>
           <div>
@@ -622,9 +624,9 @@ export default function Studio() {
             {[
               { label: "AI models initialized", done: elapsedTime >= 10 },
               { label: "Prompt analyzed", done: elapsedTime >= 30 },
-              { label: "Video frames generated", done: elapsedTime >= 60 },
-              { label: "Cinematic details rendered", done: elapsedTime >= 120 },
-              { label: "Video finalized", done: !!videoUrl },
+              { label: isImageModule ? "Image frames generated" : "Video frames generated", done: elapsedTime >= 60 },
+              { label: "Details rendered", done: elapsedTime >= 120 },
+              { label: isImageModule ? "Image finalized" : "Video finalized", done: !!videoUrl },
             ].map((step, i) => (
               <div key={i} className="flex items-center gap-2 text-xs">
                 <span className={step.done ? "text-green-400" : "text-gray-600"}>{step.done ? "✓" : "○"}</span>
@@ -632,7 +634,9 @@ export default function Studio() {
               </div>
             ))}
           </div>
-          <p className="text-gray-500 text-xs text-center">Keep this page open. Average: 1-3 minutes.</p>
+          <p className="text-gray-500 text-xs text-center">
+            {isImageModule ? "Keep this page open. Image generation may take several minutes." : "Keep this page open. Average: 1-3 minutes."}
+          </p>
         </div>
       )}
 
@@ -648,12 +652,14 @@ export default function Studio() {
             <video src={videoUrl} controls playsInline className="w-full rounded-xl" />
           )}
           <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => handleDownload(videoUrl)} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition text-sm">{isImageModule ? "Save Image" : "Save Video"}</button>
+            <button onClick={() => handleDownload(videoUrl)} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition text-sm">
+              {isImageModule ? "Save Image" : "Save Video"}
+            </button>
             <button onClick={resetForm} className="bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition text-sm">Generate Another</button>
           </div>
           <div className="bg-blue-900/20 border border-blue-500/20 rounded-xl p-3">
             <p className="text-blue-300 text-xs font-semibold mb-1">iPhone users</p>
-            <p className="text-gray-400 text-xs">Tap and hold the video, then select Save to Photos.</p>
+            <p className="text-gray-400 text-xs">Tap and hold the {isImageModule ? "image" : "video"}, then select Save to Photos.</p>
           </div>
         </div>
       )}
