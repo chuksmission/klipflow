@@ -779,6 +779,7 @@ export default function HomeClient() {
               <li><Link href="/contact" className="hover:text-white transition">Contact</Link></li>
               <li><Link href="/privacy-policy" className="hover:text-white transition">Privacy Policy</Link></li>
               <li><Link href="/terms-of-service" className="hover:text-white transition">Terms of Service</Link></li>
+              <li><Link href="/refund-policy" className="hover:text-white transition">Refund Policy</Link></li>
             </ul>
           </div>
         </div>
