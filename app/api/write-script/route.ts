@@ -27,53 +27,55 @@ export async function POST(req: NextRequest) {
     const { topic, format, duration, platform } = await req.json();
     if (!topic) return NextResponse.json({ error: "Topic is required" }, { status: 400 });
 
-    const openaiKey = await getSetting("openai_api_key");
-    if (!openaiKey) return NextResponse.json({ error: "OpenAI is not configured. Please add your API key in Admin → AI Providers." }, { status: 503 });
+    const claudeKey = await getSetting("claude_api_key");
+    if (!claudeKey) return NextResponse.json({ error: "Claude API key not configured. Please add it in Admin → AI Providers." }, { status: 503 });
 
-    const videoLength = duration === "15" ? "15 seconds" : duration === "10" ? "10 seconds" : duration === "8" ? "8 seconds" : "5-8 seconds";
-    const platformHint = platform === "tiktok" ? "TikTok" : platform === "youtube" ? "YouTube Shorts" : platform === "instagram" ? "Instagram Reels" : "short-form social media";
-    const formatHint = format || "engaging storytelling";
+    const platformLabel = platform === "tiktok" ? "TikTok" :
+      platform === "instagram" ? "Instagram Reels" :
+      platform === "youtube" ? "YouTube Shorts" : "Facebook";
+    const formatLabel = format || "storytelling";
+    const videoLength = duration === "15" ? "15 seconds" :
+      duration === "30" ? "30 seconds" :
+      duration === "60" ? "60 seconds" : "90 seconds";
 
-    const systemPrompt = `You are a viral content creator and scriptwriter specializing in short-form video scripts for ${platformHint}. You write scripts that get millions of views.
-
-Rules:
-- Write a complete script for a ${videoLength} video
-- Format: Hook (first 2-3 seconds), Body (main content), CTA (call to action)
-- Make the hook irresistible — viewers must keep watching
-- Use conversational, punchy language
-- Include [VISUAL CUE] tags to indicate what should be shown on screen
-- Keep it tight and punchy for ${videoLength}
-- Format: storytelling style is ${formatHint}
-- Output the script only, no explanations`;
-
-    const userMessage = `Write a viral ${platformHint} script about:\n\n"${topic}"`;
-
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${openaiKey}`,
+        "x-api-key": claudeKey,
+        "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "claude-haiku-4-5",
+        max_tokens: 800,
+        system: `You are a viral content creator and scriptwriter specializing in short-form video scripts for ${platformLabel}. You write scripts that get millions of views.
+
+Rules:
+- Write a complete script for a ${videoLength} video
+- Format with clear sections: HOOK, BODY, CTA
+- Make the hook irresistible — first 2-3 seconds must grab attention
+- Use conversational, punchy language
+- Include [VISUAL CUE] tags to indicate what should be shown on screen
+- Script style: ${formatLabel}
+- Output the script only, no explanations or preamble`,
         messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
+          {
+            role: "user",
+            content: `Write a viral ${platformLabel} script about:\n\n"${topic}"`,
+          },
         ],
-        max_tokens: 500,
-        temperature: 0.9,
       }),
     });
 
     const data = await res.json();
 
     if (!res.ok) {
-      console.error("OpenAI error:", data);
-      return NextResponse.json({ error: data.error?.message ?? "OpenAI request failed" }, { status: 400 });
+      console.error("Claude error:", data);
+      return NextResponse.json({ error: data.error?.message ?? "Claude request failed" }, { status: 400 });
     }
 
-    const script = data.choices?.[0]?.message?.content?.trim();
-    if (!script) return NextResponse.json({ error: "No response from OpenAI" }, { status: 500 });
+    const script = data.content?.[0]?.text?.trim();
+    if (!script) return NextResponse.json({ error: "No response from Claude" }, { status: 500 });
 
     return NextResponse.json({ success: true, script });
 

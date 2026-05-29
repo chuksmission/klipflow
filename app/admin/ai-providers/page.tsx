@@ -114,6 +114,17 @@ export default function AdminAIProviders() {
       ],
     },
     {
+      id: "anthropic",
+      name: "Anthropic Claude",
+      desc: "Claude AI for script writing and prompt expansion",
+      docsUrl: "https://console.anthropic.com",
+      enabledKey: "claude_enabled",
+      fields: [
+        { key: "claude_api_key", label: "API Key", secret: true },
+      ],
+      models: [],
+    },
+    {
       id: "openai",
       name: "OpenAI",
       desc: "GPT-4 for scripts and prompt expansion",

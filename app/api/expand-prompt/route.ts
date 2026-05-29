@@ -24,16 +24,26 @@ export async function POST(req: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { idea, style, aspect_ratio } = await req.json();
+    const { idea, aspect_ratio } = await req.json();
     if (!idea) return NextResponse.json({ error: "Idea is required" }, { status: 400 });
 
-    const openaiKey = await getSetting("openai_api_key");
-    if (!openaiKey) return NextResponse.json({ error: "OpenAI is not configured. Please add your API key in Admin → AI Providers." }, { status: 503 });
+    const claudeKey = await getSetting("claude_api_key");
+    if (!claudeKey) return NextResponse.json({ error: "Claude API key not configured. Please add it in Admin → AI Providers." }, { status: 503 });
 
-    const orientation = aspect_ratio === "9:16" ? "vertical portrait, TikTok/Reels style" : aspect_ratio === "1:1" ? "square format" : "horizontal widescreen, cinematic";
-    const styleHint = style ? `Visual style: ${style}.` : "";
+    const orientation = aspect_ratio === "9:16" ? "vertical portrait, TikTok/Reels style" :
+      aspect_ratio === "1:1" ? "square format" : "horizontal widescreen, cinematic";
 
-    const systemPrompt = `You are a world-class AI video prompt engineer. Your job is to transform simple ideas into detailed, cinematic video generation prompts that produce stunning results with AI video models like Kling, Veo, and Sora.
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": claudeKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5",
+        max_tokens: 400,
+        system: `You are a world-class AI video prompt engineer. Transform simple ideas into detailed, cinematic video generation prompts that produce stunning results with AI video models like Kling, Veo, and Sora.
 
 Rules:
 - Output ONLY the expanded prompt, nothing else
@@ -41,36 +51,25 @@ Rules:
 - Make it vivid, specific, and cinematic
 - Include: subject, action, environment, lighting, camera movement, mood, visual style
 - Keep it under 200 words
-- Make it optimized for ${orientation}`;
-
-    const userMessage = `Expand this simple idea into a detailed cinematic video prompt:\n\n"${idea}"\n\n${styleHint}`;
-
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${openaiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
+- Optimized for ${orientation}`,
         messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
+          {
+            role: "user",
+            content: `Expand this simple idea into a detailed cinematic video prompt:\n\n"${idea}"`,
+          },
         ],
-        max_tokens: 300,
-        temperature: 0.8,
       }),
     });
 
     const data = await res.json();
 
     if (!res.ok) {
-      console.error("OpenAI error:", data);
-      return NextResponse.json({ error: data.error?.message ?? "OpenAI request failed" }, { status: 400 });
+      console.error("Claude error:", data);
+      return NextResponse.json({ error: data.error?.message ?? "Claude request failed" }, { status: 400 });
     }
 
-    const expanded = data.choices?.[0]?.message?.content?.trim();
-    if (!expanded) return NextResponse.json({ error: "No response from OpenAI" }, { status: 500 });
+    const expanded = data.content?.[0]?.text?.trim();
+    if (!expanded) return NextResponse.json({ error: "No response from Claude" }, { status: 500 });
 
     return NextResponse.json({ success: true, prompt: expanded });
 
