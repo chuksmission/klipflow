@@ -22,6 +22,14 @@ interface Module {
   badge: string;
 }
 
+interface Scene {
+  scene_number: number;
+  narration: string;
+  visual_prompt: string;
+  video_url?: string;
+  status?: "pending" | "generating" | "done" | "failed";
+}
+
 export default function Studio() {
   const [activeModule, setActiveModule] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
@@ -44,17 +52,26 @@ export default function Studio() {
   const [modelDescs, setModelDescs] = useState<Record<string, string>>({});
   const [modelBadges, setModelBadges] = useState<Record<string, string>>({});
 
-  // Prompt Expander state
+  // Prompt Expander
   const [expandedPrompt, setExpandedPrompt] = useState("");
   const [expandLoading, setExpandLoading] = useState(false);
 
-  // Script Writer state
+  // Script Writer
   const [scriptTopic, setScriptTopic] = useState("");
   const [scriptFormat, setScriptFormat] = useState("storytelling");
   const [scriptPlatform, setScriptPlatform] = useState("tiktok");
   const [scriptDuration, setScriptDuration] = useState("30");
   const [generatedScript, setGeneratedScript] = useState("");
   const [scriptLoading, setScriptLoading] = useState(false);
+
+  // Script to Video
+  const [s2vScript, setS2vScript] = useState("");
+  const [s2vModel, setS2vModel] = useState("kling-v3-std");
+  const [s2vAspectRatio, setS2vAspectRatio] = useState("9:16");
+  const [s2vScenes, setS2vScenes] = useState<Scene[]>([]);
+  const [s2vStep, setS2vStep] = useState<"input" | "review" | "generating" | "done">("input");
+  const [s2vSplitting, setS2vSplitting] = useState(false);
+  const [s2vCurrentScene, setS2vCurrentScene] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tokenCostRef = useRef(10);
@@ -66,34 +83,42 @@ export default function Studio() {
   useEffect(() => { activeModuleRef.current = activeModule; }, [activeModule]);
 
   const ALL_MODELS: Model[] = [
-    { id: "kling-v1-6-std",  name: "Kling 1.6 Standard", desc: "Fast, great for drafts",               tokens: 8,   badge: "",                available: true,  provider: "kie",        hasSound: false, enabledKey: "kling_v1_6_enabled" },
-    { id: "kling-v1-6-pro",  name: "Kling 1.6 Pro",      desc: "High quality, smooth motion",           tokens: 10,  badge: "Recommended",     available: true,  provider: "kie",        hasSound: false, enabledKey: "kling_v1_6_enabled" },
-    { id: "kling-v2-master", name: "Kling 2.1 Master",   desc: "Best realism and motion",               tokens: 20,  badge: "Best Quality",    available: true,  provider: "kie",        hasSound: false, enabledKey: "kling_v2_master_enabled" },
+    { id: "kling-v1-6-std",  name: "Kling 1.6 Standard", desc: "Fast, great for drafts",               tokens: 8,   badge: "",                available: true,  provider: "kie", hasSound: false, enabledKey: "kling_v1_6_enabled" },
+    { id: "kling-v1-6-pro",  name: "Kling 1.6 Pro",      desc: "High quality, smooth motion",           tokens: 10,  badge: "Recommended",     available: true,  provider: "kie", hasSound: false, enabledKey: "kling_v1_6_enabled" },
+    { id: "kling-v2-master", name: "Kling 2.1 Master",   desc: "Best realism and motion",               tokens: 20,  badge: "Best Quality",    available: true,  provider: "kie", hasSound: false, enabledKey: "kling_v2_master_enabled" },
     { id: "kling-v3-std",    name: "Kling 3.0 Standard", desc: "Cinematic quality, audio, up to 15s",   tokens: 15,  badge: "Best Quality",    badges: ["Best Quality", "With Audio"], available: true, provider: "kie", hasSound: true, enabledKey: "kling_v3_enabled" },
     { id: "kling-v3-pro",    name: "Kling 3.0 Pro",      desc: "1080p cinematic, audio, multi-shot",    tokens: 20,  badge: "Ultra Quality",   badges: ["Ultra Quality", "With Audio"], available: true, provider: "kie", hasSound: true, enabledKey: "kling_v3_enabled" },
-    { id: "veo3-fast",       name: "Veo 3.1 Fast",       desc: "Google AI, native audio, 720p",         tokens: 15,  badge: "With Audio",      available: true,  provider: "kie",        hasSound: true,  enabledKey: "veo3_fast_enabled" },
+    { id: "veo3-fast",       name: "Veo 3.1 Fast",       desc: "Google AI, native audio, 720p",         tokens: 15,  badge: "With Audio",      available: true,  provider: "kie", hasSound: true,  enabledKey: "veo3_fast_enabled" },
     { id: "veo3-quality",    name: "Veo 3.1 Quality",    desc: "Google AI, cinematic, 1080p",            tokens: 60,  badge: "Premium",         badges: ["Premium", "With Audio"], available: true, provider: "kie", hasSound: true, enabledKey: "veo3_quality_enabled" },
     { id: "seedance-2",      name: "Seedance 2.0",       desc: "ByteDance, best quality + audio",        tokens: 30,  badge: "Best Quality",    badges: ["Best Quality", "With Audio"], available: true, provider: "kie", hasSound: true, enabledKey: "seedance2_enabled" },
-    { id: "seedance-2-fast", name: "Seedance 2.0 Fast",  desc: "ByteDance, fast + audio",                tokens: 15,  badge: "With Audio",      available: true,  provider: "kie",        hasSound: true,  enabledKey: "seedance2_fast_enabled" },
-    { id: "hailuo-pro",      name: "Hailuo 2.3",         desc: "MiniMax, fast generation",               tokens: 8,   badge: "",                available: true,  provider: "kie",        hasSound: false, enabledKey: "hailuo_enabled" },
-    { id: "sora-2",          name: "Sora 2",             desc: "OpenAI, premium realism",                tokens: 10,  badge: "Premium",         available: true,  provider: "kie",        hasSound: false, enabledKey: "sora2_enabled" },
-    { id: "wan-2-6",         name: "Wan 2.6",            desc: "Alibaba, fast and affordable",           tokens: 10,  badge: "Cheapest",        available: true,  provider: "kie",        hasSound: false, enabledKey: "wan26_enabled" },
-    { id: "grok-imagine",    name: "Grok Imagine",       desc: "xAI, fast and cheap",                    tokens: 5,   badge: "Most Affordable", available: true,  provider: "kie",        hasSound: false, enabledKey: "grok_enabled" },
-    { id: "luma-ray-3",      name: "Luma Ray 3",         desc: "Cinematic quality",                      tokens: 15,  badge: "",                available: true,  provider: "kie",        hasSound: false, enabledKey: "luma_enabled" },
+    { id: "seedance-2-fast", name: "Seedance 2.0 Fast",  desc: "ByteDance, fast + audio",                tokens: 15,  badge: "With Audio",      available: true,  provider: "kie", hasSound: true,  enabledKey: "seedance2_fast_enabled" },
+    { id: "hailuo-pro",      name: "Hailuo 2.3",         desc: "MiniMax, fast generation",               tokens: 8,   badge: "",                available: true,  provider: "kie", hasSound: false, enabledKey: "hailuo_enabled" },
+    { id: "sora-2",          name: "Sora 2",             desc: "OpenAI, premium realism",                tokens: 10,  badge: "Premium",         available: true,  provider: "kie", hasSound: false, enabledKey: "sora2_enabled" },
+    { id: "wan-2-6",         name: "Wan 2.6",            desc: "Alibaba, fast and affordable",           tokens: 10,  badge: "Cheapest",        available: true,  provider: "kie", hasSound: false, enabledKey: "wan26_enabled" },
+    { id: "grok-imagine",    name: "Grok Imagine",       desc: "xAI, fast and cheap",                    tokens: 5,   badge: "Most Affordable", available: true,  provider: "kie", hasSound: false, enabledKey: "grok_enabled" },
+    { id: "luma-ray-3",      name: "Luma Ray 3",         desc: "Cinematic quality",                      tokens: 15,  badge: "",                available: true,  provider: "kie", hasSound: false, enabledKey: "luma_enabled" },
     { id: "higgsfield-ugc",  name: "Higgsfield UGC",     desc: "Realistic UGC ad videos",                tokens: 10,  badge: "Best for Ads",    available: true,  provider: "higgsfield", hasSound: false, enabledKey: "higgsfield_enabled" },
-    { id: "runway-gen4",     name: "Runway Gen-4",       desc: "Professional cinematic quality",         tokens: 40,  badge: "Coming Soon",     available: false, provider: "runway",     hasSound: false, enabledKey: "" },
+    { id: "runway-gen4",     name: "Runway Gen-4",       desc: "Professional cinematic quality",         tokens: 40,  badge: "Coming Soon",     available: false, provider: "runway", hasSound: false, enabledKey: "" },
+  ];
+
+  // Only confirmed audio models for Script to Video
+  const AUDIO_MODELS = [
+    { id: "kling-v3-std", name: "Kling 3.0 Standard", tokens: 15, desc: "Cinematic + native audio" },
+    { id: "kling-v3-pro", name: "Kling 3.0 Pro",      tokens: 20, desc: "1080p cinematic + native audio" },
+    { id: "veo3-fast",    name: "Veo 3.1 Fast",        tokens: 15, desc: "Google AI + native audio" },
   ];
 
   const modules: Module[] = [
-    { id: "text_to_video",  title: "Text to Video",    desc: "Generate cinematic videos from text descriptions", badge: "Most Popular" },
-    { id: "image_to_video", title: "Image to Video",   desc: "Animate any still image into a stunning video",    badge: "" },
-    { id: "ugc_ad",         title: "UGC Ad Creator",   desc: "AI avatar testimonial and product review videos",  badge: "Best for Ads" },
-    { id: "ai_actor",       title: "AI Actor",         desc: "Create photorealistic AI human avatars",           badge: "" },
-    { id: "voice",          title: "Voice Generation", desc: "Natural AI voiceovers for videos",                 badge: "" },
-    { id: "text_to_image",  title: "Text to Image",    desc: "Generate images from text or reference photo",     badge: "2 Tokens" },
-    { id: "image_ad",       title: "Image Ad",         desc: "Scroll-stopping image advertisements",             badge: "Cheapest" },
-    { id: "prompt",         title: "Prompt Expander",  desc: "Transform simple ideas into cinematic prompts",    badge: "Free" },
-    { id: "script",         title: "Script Writer",    desc: "Generate viral video scripts with AI",             badge: "Free" },
+    { id: "text_to_video",   title: "Text to Video",    desc: "Generate cinematic videos from text descriptions", badge: "Most Popular" },
+    { id: "image_to_video",  title: "Image to Video",   desc: "Animate any still image into a stunning video",    badge: "" },
+    { id: "ugc_ad",          title: "UGC Ad Creator",   desc: "AI avatar testimonial and product review videos",  badge: "Best for Ads" },
+    { id: "ai_actor",        title: "AI Actor",         desc: "Create photorealistic AI human avatars",           badge: "" },
+    { id: "voice",           title: "Voice Generation", desc: "Natural AI voiceovers for videos",                 badge: "" },
+    { id: "text_to_image",   title: "Text to Image",    desc: "Generate images from text or reference photo",     badge: "2 Tokens" },
+    { id: "script_to_video", title: "Script to Video",  desc: "Turn a script into multiple video scenes with audio", badge: "New" },
+    { id: "image_ad",        title: "Image Ad",         desc: "Scroll-stopping image advertisements",             badge: "Cheapest" },
+    { id: "prompt",          title: "Prompt Expander",  desc: "Transform simple ideas into cinematic prompts",    badge: "Free" },
+    { id: "script",          title: "Script Writer",    desc: "Generate viral video scripts with AI",             badge: "Free" },
   ];
 
   const visibleModels = ALL_MODELS.filter((m) => {
@@ -217,6 +242,145 @@ export default function Studio() {
     setScriptLoading(false);
   };
 
+  // ---- SCRIPT TO VIDEO: Split into scenes ----
+  const handleSplitScenes = async () => {
+    if (!s2vScript.trim()) { setError("Please enter or paste your script."); return; }
+    setS2vSplitting(true); setError(""); setS2vScenes([]);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setError("Please sign in."); setS2vSplitting(false); return; }
+      const res = await fetch("/api/script-to-scenes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
+        body: JSON.stringify({ script: s2vScript, aspect_ratio: s2vAspectRatio }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "Failed to split script."); setS2vSplitting(false); return; }
+      setS2vScenes(data.scenes.map((s: Scene) => ({ ...s, status: "pending" })));
+      setS2vStep("review");
+    } catch { setError("Something went wrong."); }
+    setS2vSplitting(false);
+  };
+
+  // ---- SCRIPT TO VIDEO: Generate all scenes ----
+  const handleGenerateScenes = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setError("Please sign in."); return; }
+
+    const modelData = AUDIO_MODELS.find(m => m.id === s2vModel);
+    const tokenCostPerScene = tokenPricing[s2vModel] ?? modelData?.tokens ?? 15;
+    const totalCost = tokenCostPerScene * s2vScenes.length;
+
+    if (tokenBalance < totalCost) {
+      setError(`Insufficient tokens. Need ${totalCost} tokens for ${s2vScenes.length} scenes. You have ${tokenBalance}.`);
+      return;
+    }
+
+    setS2vStep("generating");
+    setS2vCurrentScene(0);
+    setError("");
+
+    const updatedScenes = [...s2vScenes];
+
+    for (let i = 0; i < updatedScenes.length; i++) {
+      setS2vCurrentScene(i);
+      updatedScenes[i] = { ...updatedScenes[i], status: "generating" };
+      setS2vScenes([...updatedScenes]);
+
+      try {
+        // Deduct tokens
+        const tokenRes = await fetch("/api/tokens", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
+          body: JSON.stringify({ amount: tokenCostPerScene }),
+        });
+        const tokenData = await tokenRes.json();
+        if (!tokenRes.ok) { setError(tokenData.error ?? "Insufficient tokens."); break; }
+        setTokenBalance(tokenData.balance);
+
+        // Generate video
+        const genRes = await fetch("/api/generate-video", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: updatedScenes[i].visual_prompt,
+            mode: "text_to_video",
+            duration: "5",
+            aspect_ratio: s2vAspectRatio,
+            model: s2vModel,
+            with_audio: true,
+            user_id: session.user.id,
+            tokens_used: tokenCostPerScene,
+          }),
+        });
+        const genData = await genRes.json();
+
+        if (!genRes.ok || !genData.task_id) {
+          updatedScenes[i] = { ...updatedScenes[i], status: "failed" };
+          setS2vScenes([...updatedScenes]);
+          // Refund
+          await fetch("/api/tokens/refund", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token }, body: JSON.stringify({ amount: tokenCostPerScene }) });
+          setTokenBalance(p => p + tokenCostPerScene);
+          continue;
+        }
+
+        // Poll for completion
+        const videoUrl = await pollForVideo(genData.task_id, genData.provider ?? "kie");
+
+        if (videoUrl) {
+          updatedScenes[i] = { ...updatedScenes[i], status: "done", video_url: videoUrl };
+          setS2vScenes([...updatedScenes]);
+
+          // Save to gallery
+          try {
+            await fetch("/api/generations", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
+              body: JSON.stringify({
+                type: "script_to_video",
+                prompt: updatedScenes[i].visual_prompt,
+                video_url: videoUrl,
+                output_type: "video",
+                status: "completed",
+                tokens_used: tokenCostPerScene,
+                model: s2vModel,
+                scene_index: i + 1,
+              }),
+            });
+          } catch { /* non-critical */ }
+        } else {
+          updatedScenes[i] = { ...updatedScenes[i], status: "failed" };
+          setS2vScenes([...updatedScenes]);
+          await fetch("/api/tokens/refund", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token }, body: JSON.stringify({ amount: tokenCostPerScene }) });
+          setTokenBalance(p => p + tokenCostPerScene);
+        }
+      } catch (e) {
+        console.error("Scene generation error:", e);
+        updatedScenes[i] = { ...updatedScenes[i], status: "failed" };
+        setS2vScenes([...updatedScenes]);
+      }
+    }
+
+    setS2vStep("done");
+  };
+
+  const pollForVideo = (taskId: string, provider: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const maxAttempts = 120; // 10 minutes
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        if (attempts > maxAttempts) { clearInterval(poll); resolve(null); return; }
+        try {
+          const sr = await fetch(`/api/video-status?task_id=${taskId}&provider=${provider}`);
+          const sd = await sr.json();
+          if (sd.completed && sd.video_url) { clearInterval(poll); resolve(sd.video_url); }
+          else if (sd.failed) { clearInterval(poll); resolve(null); }
+        } catch { /* continue polling */ }
+      }, 5000);
+    });
+  };
+
   // ---- IMAGE GENERATION ----
   const handleGenerateImage = async () => {
     setLoading(true); setError(""); setVideoUrl(null); setProgress(0);
@@ -224,32 +388,16 @@ export default function Studio() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { setError("Please sign in."); setLoading(false); return; }
-      const tokenRes = await fetch("/api/tokens", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
-        body: JSON.stringify({ amount: tokenCostImg }),
-      });
+      const tokenRes = await fetch("/api/tokens", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token }, body: JSON.stringify({ amount: tokenCostImg }) });
       const tokenData = await tokenRes.json();
       if (!tokenRes.ok) { setError(tokenData.error ?? "Insufficient tokens."); setLoading(false); return; }
       setTokenBalance(tokenData.balance);
       let refImageUrl = imageUrlInput;
-      if (imageFile && !useUrl) {
-        const uploaded = await uploadImage(imageFile);
-        if (uploaded) refImageUrl = uploaded;
-      }
+      if (imageFile && !useUrl) { const uploaded = await uploadImage(imageFile); if (uploaded) refImageUrl = uploaded; }
       const imgAspectRatio = aspectRatio === "9:16" ? "2:3" : aspectRatio === "1:1" ? "1:1" : "3:2";
-      const res = await fetch("/api/generate-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, image_url: refImageUrl || undefined, aspect_ratio: imgAspectRatio, user_id: session.user.id, tokens_used: tokenCostImg }),
-      });
+      const res = await fetch("/api/generate-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, image_url: refImageUrl || undefined, aspect_ratio: imgAspectRatio, user_id: session.user.id, tokens_used: tokenCostImg }) });
       const data = await res.json() as { task_id?: string; error?: string; refunded?: boolean };
-      if (!res.ok) {
-        setError((data.error ?? "Generation failed.") + (data.refunded ? " Tokens refunded." : ""));
-        setLoading(false);
-        if (data.refunded) setTokenBalance((p) => p + tokenCostImg);
-        return;
-      }
+      if (!res.ok) { setError((data.error ?? "Generation failed.") + (data.refunded ? " Tokens refunded." : "")); setLoading(false); if (data.refunded) setTokenBalance((p) => p + tokenCostImg); return; }
       if (!data.task_id) { setError("Failed to start generation."); setLoading(false); return; }
       let generationComplete = false;
       const poll = setInterval(async () => {
@@ -261,13 +409,7 @@ export default function Studio() {
             setVideoUrl(sd.video_url); setProgress(100); setLoading(false); clearInterval(poll);
             try {
               const { data: { session: fs } } = await supabase.auth.getSession();
-              if (fs) {
-                await fetch("/api/generations", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", Authorization: "Bearer " + fs.access_token },
-                  body: JSON.stringify({ type: "text_to_image", prompt, image_url: sd.video_url, output_type: "image", status: "completed", tokens_used: tokenCostImg }),
-                });
-              }
+              if (fs) { await fetch("/api/generations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + fs.access_token }, body: JSON.stringify({ type: "text_to_image", prompt, image_url: sd.video_url, output_type: "image", status: "completed", tokens_used: tokenCostImg }) }); }
             } catch (e) { console.error("Save error:", e); }
           } else if (sd.failed) {
             setError("Generation failed. Tokens refunded."); setLoading(false); clearInterval(poll);
@@ -290,29 +432,18 @@ export default function Studio() {
     const modelData = ALL_MODELS.find((m) => m.id === selectedModel);
     const tokenCost = tokenPricing[selectedModel] ?? modelData?.tokens ?? 10;
     const provider = modelData?.provider ?? "kie";
-    tokenCostRef.current = tokenCost;
-    providerRef.current = provider;
+    tokenCostRef.current = tokenCost; providerRef.current = provider;
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { setError("Please sign in."); setLoading(false); return; }
-      const tokenRes = await fetch("/api/tokens", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
-        body: JSON.stringify({ amount: tokenCost }),
-      });
+      const tokenRes = await fetch("/api/tokens", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token }, body: JSON.stringify({ amount: tokenCost }) });
       const tokenData = await tokenRes.json();
       if (!tokenRes.ok) { setError(tokenData.error ?? "Insufficient tokens."); setLoading(false); return; }
       setTokenBalance(tokenData.balance);
       let imageUrl = imageUrlInput;
       if (needsImage && imageFile && !useUrl) {
         const uploaded = await uploadImage(imageFile);
-        if (!uploaded) {
-          setError("Image upload failed. Try URL instead.");
-          setLoading(false);
-          const { data: { session: rs } } = await supabase.auth.getSession();
-          if (rs) { await fetch("/api/tokens/refund", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + rs.access_token }, body: JSON.stringify({ amount: tokenCost }) }); setTokenBalance((p) => p + tokenCost); }
-          return;
-        }
+        if (!uploaded) { setError("Image upload failed. Try URL instead."); setLoading(false); const { data: { session: rs } } = await supabase.auth.getSession(); if (rs) { await fetch("/api/tokens/refund", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + rs.access_token }, body: JSON.stringify({ amount: tokenCost }) }); setTokenBalance((p) => p + tokenCost); } return; }
         imageUrl = uploaded;
       }
       const capturedModule = activeModuleRef.current;
@@ -321,56 +452,41 @@ export default function Studio() {
       const capturedProvider = providerRef.current;
       const capturedMode = needsImage ? "image_to_video" : "text_to_video";
       const useAudio = modelData?.hasSound === true;
-      const res = await fetch("/api/generate-video", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, mode: capturedMode, image_url: imageUrl || undefined, duration: String(duration), aspect_ratio: aspectRatio, model: selectedModel, with_audio: useAudio, user_id: session.user.id, tokens_used: tokenCost }),
-      });
+      const res = await fetch("/api/generate-video", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, mode: capturedMode, image_url: imageUrl || undefined, duration: String(duration), aspect_ratio: aspectRatio, model: selectedModel, with_audio: useAudio, user_id: session.user.id, tokens_used: tokenCost }) });
       const data = await res.json() as { task_id?: string; error?: string; refunded?: boolean; provider?: string };
       if (!res.ok) { setError((data.error ?? "Generation failed.") + (data.refunded ? " Tokens refunded." : "")); setLoading(false); if (data.refunded) setTokenBalance((p) => p + tokenCost); return; }
       const genProvider = data.provider ?? capturedProvider;
-      if (!data.task_id) { setError("Failed to start generation. Please try again."); setLoading(false); if (data.refunded) setTokenBalance((p) => p + tokenCost); return; }
-      let timedOut = false;
-      let generationComplete = false;
-      let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+      if (!data.task_id) { setError("Failed to start generation."); setLoading(false); if (data.refunded) setTokenBalance((p) => p + tokenCost); return; }
+      let timedOut = false; let generationComplete = false; let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
       const poll = setInterval(async () => {
         try {
           const sr = await fetch("/api/video-status?task_id=" + data.task_id + "&mode=" + capturedMode + "&provider=" + genProvider);
           const sd = await sr.json() as { completed?: boolean; failed?: boolean; video_url?: string };
           if (sd.completed && sd.video_url) {
-            if (timedOut) return;
-            generationComplete = true;
-            clearTimeout(timeoutHandle);
+            if (timedOut) return; generationComplete = true; clearTimeout(timeoutHandle);
             setVideoUrl(sd.video_url); setProgress(100); setLoading(false); clearInterval(poll);
-            try {
-              const { data: { session: fs } } = await supabase.auth.getSession();
-              if (fs) { await fetch("/api/generations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + fs.access_token }, body: JSON.stringify({ type: capturedModule, prompt, video_url: sd.video_url, status: "completed", tokens_used: capturedCost, duration, aspect_ratio: aspectRatio, model: capturedModel }) }); }
-            } catch (e) { console.error("Save error:", e); }
+            try { const { data: { session: fs } } = await supabase.auth.getSession(); if (fs) { await fetch("/api/generations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + fs.access_token }, body: JSON.stringify({ type: capturedModule, prompt, video_url: sd.video_url, status: "completed", tokens_used: capturedCost, duration, aspect_ratio: aspectRatio, model: capturedModel }) }); } } catch (e) { console.error("Save error:", e); }
           } else if (sd.failed) {
             setError("Generation failed. Tokens refunded."); setLoading(false); clearInterval(poll);
-            try {
-              const { data: { session: rs } } = await supabase.auth.getSession();
-              if (rs) { const rr = await fetch("/api/tokens/refund", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + rs.access_token }, body: JSON.stringify({ amount: capturedCost }) }); const rd = await rr.json(); if (rd.balance !== undefined) setTokenBalance(rd.balance); }
-            } catch (e) { console.error("Refund error:", e); }
+            try { const { data: { session: rs } } = await supabase.auth.getSession(); if (rs) { const rr = await fetch("/api/tokens/refund", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + rs.access_token }, body: JSON.stringify({ amount: capturedCost }) }); const rd = await rr.json(); if (rd.balance !== undefined) setTokenBalance(rd.balance); } } catch (e) { console.error("Refund error:", e); }
           }
         } catch (e) { console.error("Poll error:", e); }
       }, 5000);
       const timeoutMs = ["veo3-fast", "veo3-quality", "sora-2", "seedance-2", "seedance-2-fast"].includes(selectedModel) ? 600000 : 300000;
       timeoutHandle = setTimeout(async () => {
-        if (generationComplete) return;
-        timedOut = true; clearInterval(poll); setLoading(false); setError("Generation timed out. Tokens refunded.");
+        if (generationComplete) return; timedOut = true; clearInterval(poll); setLoading(false); setError("Generation timed out. Tokens refunded.");
         const { data: { session: ts } } = await supabase.auth.getSession();
         if (ts) { const rr = await fetch("/api/tokens/refund", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + ts.access_token }, body: JSON.stringify({ amount: capturedCost }) }); const rd = await rr.json(); if (rd.balance !== undefined) setTokenBalance(rd.balance); }
       }, timeoutMs);
     } catch (e) { setError("Something went wrong."); setLoading(false); }
   };
 
-  const handleDownload = async (url: string) => {
+  const handleDownload = async (url: string, isImg = false) => {
     try {
       const r = await fetch(url); const b = await r.blob();
       const bu = window.URL.createObjectURL(b);
       const a = document.createElement("a");
-      a.href = bu; a.download = "klipflowai-" + Date.now() + (isImageModule ? ".png" : ".mp4");
+      a.href = bu; a.download = "klipflowai-" + Date.now() + (isImg ? ".png" : ".mp4");
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       window.URL.revokeObjectURL(bu);
     } catch { window.open(url, "_blank"); }
@@ -381,6 +497,7 @@ export default function Studio() {
     setImageFile(null); setImagePreview(""); setImageUrlInput(""); setUseUrl(false);
     setProgress(0); setElapsedTime(0); setSelectedModel("kling-v1-6-pro");
     setExpandedPrompt(""); setGeneratedScript(""); setScriptTopic("");
+    setS2vScript(""); setS2vScenes([]); setS2vStep("input"); setS2vCurrentScene(0);
   };
 
   const currentModel = ALL_MODELS.find((m) => m.id === selectedModel);
@@ -392,12 +509,17 @@ export default function Studio() {
   const isImageModule = activeModule === "text_to_image";
   const isPromptModule = activeModule === "prompt";
   const isScriptModule = activeModule === "script";
+  const isS2VModule = activeModule === "script_to_video";
+
+  const s2vModelData = AUDIO_MODELS.find(m => m.id === s2vModel);
+  const s2vTokensPerScene = tokenPricing[s2vModel] ?? s2vModelData?.tokens ?? 15;
+  const s2vTotalTokens = s2vScenes.length * s2vTokensPerScene;
 
   return (
     <div className="space-y-4 max-w-2xl mx-auto">
       <div>
         <h1 className="text-xl font-extrabold mb-0.5">Video Studio</h1>
-        <p className="text-gray-400 text-xs">8 AI modules — all plans include all features</p>
+        <p className="text-gray-400 text-xs">10 AI modules — all plans include all features</p>
       </div>
 
       <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3 flex items-center justify-between">
@@ -429,16 +551,12 @@ export default function Studio() {
           </div>
           <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-4">
             <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3">
-              <p className="text-purple-300 text-xs font-semibold mb-1">Free to use — no tokens required</p>
-              <p className="text-gray-400 text-xs">Type a simple idea and AI will transform it into a detailed cinematic prompt ready for video generation.</p>
+              <p className="text-purple-300 text-xs font-semibold mb-1">Free — no tokens required</p>
+              <p className="text-gray-400 text-xs">Type a simple idea and AI transforms it into a detailed cinematic prompt.</p>
             </div>
             <div>
               <label className="text-gray-400 text-xs mb-1 block">Your simple idea</label>
-              <textarea
-                placeholder="e.g. cat playing piano, sunset over mountains, product showcase..."
-                value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3}
-                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition text-sm resize-none"
-              />
+              <textarea placeholder="e.g. cat playing piano, sunset over mountains, product showcase..." value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition text-sm resize-none" />
             </div>
             <div>
               <label className="text-gray-400 text-xs mb-1 block">Target Format</label>
@@ -457,17 +575,11 @@ export default function Studio() {
                 <div className="bg-black/30 border border-white/10 rounded-xl p-4">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-green-400 text-xs font-bold">Expanded Prompt</p>
-                    <button
-                      onClick={() => navigator.clipboard.writeText(expandedPrompt)}
-                      className="text-gray-400 hover:text-white text-xs transition"
-                    >Copy</button>
+                    <button onClick={() => navigator.clipboard.writeText(expandedPrompt)} className="text-gray-400 hover:text-white text-xs transition">Copy</button>
                   </div>
                   <p className="text-gray-200 text-sm leading-relaxed">{expandedPrompt}</p>
                 </div>
-                <button
-                  onClick={() => { setPrompt(expandedPrompt); setActiveModule("text_to_video"); setExpandedPrompt(""); }}
-                  className="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-2.5 rounded-xl transition text-sm"
-                >
+                <button onClick={() => { setPrompt(expandedPrompt); setActiveModule("text_to_video"); setExpandedPrompt(""); }} className="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-2.5 rounded-xl transition text-sm">
                   Use this prompt to generate a video →
                 </button>
               </div>
@@ -485,16 +597,12 @@ export default function Studio() {
           </div>
           <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-4">
             <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3">
-              <p className="text-purple-300 text-xs font-semibold mb-1">Free to use — no tokens required</p>
-              <p className="text-gray-400 text-xs">AI writes a complete viral script with hook, body, and call to action optimized for your platform.</p>
+              <p className="text-purple-300 text-xs font-semibold mb-1">Free — no tokens required</p>
+              <p className="text-gray-400 text-xs">AI writes a complete viral script with hook, body, and call to action.</p>
             </div>
             <div>
               <label className="text-gray-400 text-xs mb-1 block">Video Topic</label>
-              <textarea
-                placeholder="e.g. 5 signs your gut health is ruined, how I made $10k with AI, the truth about Batana oil..."
-                value={scriptTopic} onChange={(e) => setScriptTopic(e.target.value)} rows={3}
-                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition text-sm resize-none"
-              />
+              <textarea placeholder="e.g. 5 signs your gut health is ruined, how I made $10k with AI..." value={scriptTopic} onChange={(e) => setScriptTopic(e.target.value)} rows={3} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition text-sm resize-none" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -536,18 +644,15 @@ export default function Studio() {
                 <div className="bg-black/30 border border-white/10 rounded-xl p-4">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-green-400 text-xs font-bold">Your Script</p>
-                    <button
-                      onClick={() => navigator.clipboard.writeText(generatedScript)}
-                      className="text-gray-400 hover:text-white text-xs transition"
-                    >Copy</button>
+                    <button onClick={() => navigator.clipboard.writeText(generatedScript)} className="text-gray-400 hover:text-white text-xs transition">Copy</button>
                   </div>
                   <pre className="text-gray-200 text-xs leading-relaxed whitespace-pre-wrap">{generatedScript}</pre>
                 </div>
                 <button
-                  onClick={() => { setPrompt(scriptTopic); setActiveModule("text_to_video"); setGeneratedScript(""); }}
-                  className="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-2.5 rounded-xl transition text-sm"
+                  onClick={() => { setS2vScript(generatedScript); setActiveModule("script_to_video"); setGeneratedScript(""); }}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl transition text-sm"
                 >
-                  Use this topic to generate a video →
+                  Turn this script into a video →
                 </button>
               </div>
             )}
@@ -555,8 +660,190 @@ export default function Studio() {
         </div>
       )}
 
+      {/* ---- SCRIPT TO VIDEO ---- */}
+      {isS2VModule && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <button onClick={resetForm} className="text-gray-400 hover:text-white text-sm transition">Back</button>
+            <h2 className="font-bold text-sm">Script to Video</h2>
+            {s2vStep !== "input" && (
+              <div className="ml-auto flex gap-2">
+                {["input", "review", "generating", "done"].map((step, i) => (
+                  <div key={step} className={"w-2 h-2 rounded-full " + (["input", "review", "generating", "done"].indexOf(s2vStep) >= i ? "bg-purple-500" : "bg-white/20")} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* STEP 1 — Input */}
+          {s2vStep === "input" && (
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-4">
+              <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3">
+                <p className="text-purple-300 text-xs font-semibold mb-1">How it works</p>
+                <p className="text-gray-400 text-xs">Paste your script → AI splits it into 3-5 scenes → Review visual prompts → Generate all videos with native audio</p>
+              </div>
+              <div>
+                <label className="text-gray-400 text-xs mb-1 block">Your Script</label>
+                <textarea
+                  placeholder="Paste your script here, or write it directly. AI will split it into scenes automatically..."
+                  value={s2vScript} onChange={(e) => setS2vScript(e.target.value)} rows={8}
+                  className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition text-sm resize-none"
+                />
+              </div>
+              <div>
+                <label className="text-gray-400 text-xs mb-1 block">Video Format</label>
+                <select value={s2vAspectRatio} onChange={(e) => setS2vAspectRatio(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm">
+                  <option value="9:16">9:16 TikTok / Reels (Recommended)</option>
+                  <option value="16:9">16:9 YouTube</option>
+                  <option value="1:1">1:1 Square Feed</option>
+                </select>
+              </div>
+              {error && <p className="text-red-400 text-sm">{error}</p>}
+              <button onClick={handleSplitScenes} disabled={s2vSplitting} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition">
+                {s2vSplitting ? "AI is analyzing your script..." : "Split into Scenes →"}
+              </button>
+            </div>
+          )}
+
+          {/* STEP 2 — Review scenes */}
+          {s2vStep === "review" && (
+            <div className="space-y-4">
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-4">
+                <div>
+                  <p className="text-white font-bold text-sm mb-1">AI found {s2vScenes.length} scenes</p>
+                  <p className="text-gray-400 text-xs">Review and edit the visual prompts before generating. Each scene is 5 seconds.</p>
+                </div>
+                <div className="space-y-3">
+                  {s2vScenes.map((scene, i) => (
+                    <div key={i} className="bg-black/20 border border-white/10 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="bg-purple-600 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center">{scene.scene_number}</span>
+                        <span className="text-gray-400 text-xs font-semibold">Scene {scene.scene_number}</span>
+                      </div>
+                      <p className="text-gray-400 text-xs mb-2 italic">"{scene.narration}"</p>
+                      <label className="text-gray-500 text-xs mb-1 block">Visual Prompt (editable)</label>
+                      <textarea
+                        value={scene.visual_prompt}
+                        onChange={(e) => {
+                          const updated = [...s2vScenes];
+                          updated[i] = { ...updated[i], visual_prompt: e.target.value };
+                          setS2vScenes(updated);
+                        }}
+                        rows={3}
+                        className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500 transition resize-none"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div>
+                  <label className="text-gray-400 text-xs mb-2 block">AI Model (audio models only)</label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {AUDIO_MODELS.map((model) => (
+                      <button key={model.id} onClick={() => setS2vModel(model.id)}
+                        className={"p-3 rounded-xl border text-left transition " + (s2vModel === model.id ? "border-purple-500 bg-purple-900/30" : "border-white/10 bg-white/5 hover:border-purple-500/50")}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-bold text-xs">{model.name}</div>
+                            <div className="text-gray-500 text-xs">{model.desc}</div>
+                          </div>
+                          <div className="text-purple-300 text-xs font-bold">{tokenPricing[model.id] ?? model.tokens} tokens/scene</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-3">
+                  <p className="text-yellow-400 text-xs font-bold">Total cost: {s2vTotalTokens} tokens</p>
+                  <p className="text-gray-500 text-xs">{s2vScenes.length} scenes × {s2vTokensPerScene} tokens each • You have {tokenBalance} tokens</p>
+                </div>
+
+                {error && <p className="text-red-400 text-sm">{error}</p>}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => setS2vStep("input")} className="bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition text-sm">← Edit Script</button>
+                  <button onClick={handleGenerateScenes} disabled={tokenBalance < s2vTotalTokens} className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition text-sm">
+                    Generate {s2vScenes.length} Videos →
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3 — Generating */}
+          {s2vStep === "generating" && (
+            <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-4">
+              <div className="text-center">
+                <h3 className="font-bold mb-1">Generating Your Videos</h3>
+                <p className="text-gray-400 text-sm">Scene {s2vCurrentScene + 1} of {s2vScenes.length} — please keep this page open</p>
+              </div>
+              <div className="space-y-3">
+                {s2vScenes.map((scene, i) => (
+                  <div key={i} className="flex items-center gap-3 bg-black/20 rounded-xl px-4 py-3">
+                    <div className={"w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 " +
+                      (scene.status === "done" ? "bg-green-600 text-white" :
+                       scene.status === "generating" ? "bg-purple-600 text-white animate-pulse" :
+                       scene.status === "failed" ? "bg-red-600 text-white" :
+                       "bg-white/20 text-gray-400")}>
+                      {scene.status === "done" ? "✓" : scene.status === "failed" ? "✗" : scene.scene_number}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-gray-300 truncate">{scene.narration}</p>
+                    </div>
+                    <span className={"text-xs font-bold " +
+                      (scene.status === "done" ? "text-green-400" :
+                       scene.status === "generating" ? "text-purple-400" :
+                       scene.status === "failed" ? "text-red-400" : "text-gray-600")}>
+                      {scene.status === "done" ? "Done" : scene.status === "generating" ? "Generating..." : scene.status === "failed" ? "Failed" : "Waiting"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-gray-500 text-xs text-center">Each scene takes 1-3 minutes. Do not close this page.</p>
+            </div>
+          )}
+
+          {/* STEP 4 — Done */}
+          {s2vStep === "done" && (
+            <div className="space-y-4">
+              <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-4">
+                <p className="text-green-400 font-bold mb-1">✓ All scenes generated!</p>
+                <p className="text-gray-400 text-xs">Your videos have been saved to the Gallery. Download each scene below.</p>
+              </div>
+              <div className="space-y-4">
+                {s2vScenes.map((scene, i) => (
+                  <div key={i} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+                    <div className="px-4 py-2 border-b border-white/10 flex items-center justify-between">
+                      <span className="text-xs font-bold text-purple-300">Scene {scene.scene_number}</span>
+                      {scene.status === "done" && scene.video_url && (
+                        <button onClick={() => handleDownload(scene.video_url!)} className="text-purple-400 hover:text-white text-xs transition font-semibold">Download</button>
+                      )}
+                      {scene.status === "failed" && <span className="text-red-400 text-xs">Failed</span>}
+                    </div>
+                    {scene.status === "done" && scene.video_url ? (
+                      <video src={scene.video_url} controls playsInline className="w-full" />
+                    ) : (
+                      <div className="p-4 text-center text-gray-500 text-sm">Generation failed for this scene</div>
+                    )}
+                    <div className="px-4 py-2">
+                      <p className="text-gray-500 text-xs italic">"{scene.narration}"</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => { setS2vStep("input"); setS2vScenes([]); setS2vScript(""); }} className="bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition text-sm">New Script</button>
+                <button onClick={resetForm} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition text-sm">Back to Studio</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ---- VIDEO / IMAGE MODULES ---- */}
-      {activeModule && !isPromptModule && !isScriptModule && !loading && !videoUrl && (
+      {activeModule && !isPromptModule && !isScriptModule && !isS2VModule && !loading && !videoUrl && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <button onClick={resetForm} className="text-gray-400 hover:text-white text-sm transition">Back</button>
@@ -715,7 +1002,7 @@ export default function Studio() {
           </div>
           {isImageModule ? <img src={videoUrl} alt="Generated image" className="w-full rounded-xl" /> : <video src={videoUrl} controls playsInline className="w-full rounded-xl" />}
           <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => handleDownload(videoUrl)} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition text-sm">{isImageModule ? "Save Image" : "Save Video"}</button>
+            <button onClick={() => handleDownload(videoUrl, isImageModule)} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition text-sm">{isImageModule ? "Save Image" : "Save Video"}</button>
             <button onClick={resetForm} className="bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition text-sm">Generate Another</button>
           </div>
           <div className="bg-blue-900/20 border border-blue-500/20 rounded-xl p-3">
