@@ -24,11 +24,21 @@ export async function POST(req: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { script, aspect_ratio = "9:16" } = await req.json();
+    const { script, aspect_ratio = "9:16", model_description, scene_styles } = await req.json();
     if (!script) return NextResponse.json({ error: "Script is required" }, { status: 400 });
 
     const claudeKey = await getSetting("claude_api_key");
     if (!claudeKey) return NextResponse.json({ error: "Claude API key not configured." }, { status: 503 });
+
+    // Build model description context
+    const modelContext = model_description
+      ? `The creator/model for ALL scenes is: ${model_description}. Use this exact person description consistently across every scene.`
+      : `Create a consistent character that fits the topic. Use the same person description across all scenes for continuity.`;
+
+    // Build scene style context
+    const styleContext = scene_styles && Object.keys(scene_styles).length > 0
+      ? `Some scenes have specific style overrides that MUST be applied:\n${Object.entries(scene_styles).map(([k, v]) => `Scene ${k}: ${v}`).join("\n")}`
+      : "";
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -40,30 +50,24 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: "claude-haiku-4-5",
         max_tokens: 1500,
-        system: `You are an expert AI video director who creates viral social media content. You break scripts into scenes and write prompts that make AI video models generate videos where a REAL PERSON speaks the dialogue out loud with clear speech audio.
+        system: `You are an expert AI video director creating viral social media content. You break scripts into scenes and write prompts that make AI video models generate videos where a REAL PERSON speaks dialogue out loud with clear speech.
 
-CRITICAL RULES — follow these exactly:
+${modelContext}
 
-1. EVERY scene must feature a PERSON speaking directly to camera. No exceptions. Even if the topic is watermelon, gut health, or hair — a person must be on screen speaking.
+${styleContext}
 
-2. The person must be described specifically: their age, appearance, clothing, setting. Be very specific so the AI generates a consistent character.
+CRITICAL RULES:
+1. EVERY scene must feature a person speaking directly to camera. No exceptions.
+2. The exact dialogue from the script MUST appear in quotes: saying: "[exact words]"
+3. The person can hold/interact with relevant props while speaking.
+4. Camera: close-up to medium shot, authentic UGC style, natural lighting.
+5. Format: ${aspect_ratio} vertical video.
+6. Split into exactly 3-5 scenes based on natural breaks in the script.
+7. If a scene has a style override, apply it to that scene's description.
+8. Keep the person's core appearance consistent across scenes unless overridden.
 
-3. The exact dialogue from the script MUST appear in quotes in the prompt using this format:
-   Person saying: "[exact words from the script for this scene]"
-
-4. The person can hold or interact with relevant props/items while speaking (e.g. holding a watermelon, pointing at their skin, holding a bottle).
-
-5. Camera style: close-up to medium shot, authentic UGC style, shot on phone, natural lighting.
-
-6. Format: ${aspect_ratio} vertical video.
-
-7. Split into exactly 3-5 scenes based on natural breaks in the script.
-
-PROMPT STRUCTURE FOR EACH SCENE:
-"[Specific person description] speaking directly to camera, saying: '[exact dialogue]', [what they are doing/holding/showing], [setting], close-up shot, authentic UGC style, natural lighting, ${aspect_ratio} vertical format, high quality, realistic"
-
-EXAMPLE — for a script about watermelon:
-"Young African woman in casual clothes, speaking directly to camera with enthusiasm, saying: 'Did you know eating watermelon every day can completely transform your body in just 30 days?', holding a slice of watermelon, bright kitchen background, close-up shot, authentic UGC style, natural lighting, 9:16 vertical format"
+PROMPT STRUCTURE:
+"[Person description with any style overrides] speaking directly to camera, saying: '[exact dialogue]', [what they hold/do], [setting], close-up shot, authentic UGC style, natural lighting, ${aspect_ratio} vertical format, high quality, realistic"
 
 Output ONLY valid JSON, no other text:
 {
@@ -71,25 +75,21 @@ Output ONLY valid JSON, no other text:
     {
       "scene_number": 1,
       "narration": "The exact dialogue from the script for this scene",
-      "visual_prompt": "Full detailed prompt following the structure above"
+      "visual_prompt": "Full detailed prompt"
     }
   ]
 }`,
         messages: [
           {
             role: "user",
-            content: `Break this script into 3-5 scenes. Each scene MUST have a person speaking the dialogue out loud:\n\n${script}`,
+            content: `Break this script into 3-5 scenes. Each scene MUST have the person speaking the dialogue:\n\n${script}`,
           },
         ],
       }),
     });
 
     const data = await res.json();
-
-    if (!res.ok) {
-      console.error("Claude error:", data);
-      return NextResponse.json({ error: data.error?.message ?? "Claude request failed" }, { status: 400 });
-    }
+    if (!res.ok) return NextResponse.json({ error: data.error?.message ?? "Claude request failed" }, { status: 400 });
 
     const text = data.content?.[0]?.text?.trim();
     if (!text) return NextResponse.json({ error: "No response from Claude" }, { status: 500 });
@@ -99,7 +99,6 @@ Output ONLY valid JSON, no other text:
       const clean = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       parsed = JSON.parse(clean);
     } catch {
-      console.error("Failed to parse Claude response:", text);
       return NextResponse.json({ error: "Failed to parse scene breakdown. Please try again." }, { status: 500 });
     }
 
@@ -111,7 +110,6 @@ Output ONLY valid JSON, no other text:
 
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Something went wrong";
-    console.error("Script to scenes error:", error);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
