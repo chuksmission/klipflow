@@ -72,6 +72,11 @@ export default function Studio() {
   const [s2vStep, setS2vStep] = useState<"input" | "review" | "generating" | "done">("input");
   const [s2vSplitting, setS2vSplitting] = useState(false);
   const [s2vCurrentScene, setS2vCurrentScene] = useState(0);
+  const [s2vModelPhoto, setS2vModelPhoto] = useState("");
+  const [s2vModelPhotoFile, setS2vModelPhotoFile] = useState<File | null>(null);
+  const [s2vModelDesc, setS2vModelDesc] = useState("");
+  const [s2vSceneStyles, setS2vSceneStyles] = useState<Record<number, string>>({});
+  const s2vPhotoRef = useRef<HTMLInputElement>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tokenCostRef = useRef(10);
@@ -252,7 +257,7 @@ export default function Studio() {
       const res = await fetch("/api/script-to-scenes", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
-        body: JSON.stringify({ script: s2vScript, aspect_ratio: s2vAspectRatio }),
+        body: JSON.stringify({ script: s2vScript, aspect_ratio: s2vAspectRatio, model_description: s2vModelDesc || undefined, scene_styles: s2vSceneStyles }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Failed to split script."); setS2vSplitting(false); return; }
@@ -304,7 +309,8 @@ export default function Studio() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             prompt: updatedScenes[i].visual_prompt,
-            mode: "text_to_video",
+            mode: s2vModelPhoto ? "image_to_video" : "text_to_video",
+            image_url: s2vModelPhoto || undefined,
             duration: "5",
             aspect_ratio: s2vAspectRatio,
             model: s2vModel,
@@ -498,6 +504,7 @@ export default function Studio() {
     setProgress(0); setElapsedTime(0); setSelectedModel("kling-v1-6-pro");
     setExpandedPrompt(""); setGeneratedScript(""); setScriptTopic("");
     setS2vScript(""); setS2vScenes([]); setS2vStep("input"); setS2vCurrentScene(0);
+    setS2vModelPhoto(""); setS2vModelPhotoFile(null); setS2vModelDesc(""); setS2vSceneStyles({});
   };
 
   const currentModel = ALL_MODELS.find((m) => m.id === selectedModel);
@@ -698,6 +705,41 @@ export default function Studio() {
                   <option value="1:1">1:1 Square Feed</option>
                 </select>
               </div>
+              <div className="border border-white/10 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-white text-xs font-bold">Model / Creator Photo</p>
+                    <p className="text-gray-500 text-xs">Optional — upload a photo to use the same person in all scenes</p>
+                  </div>
+                  <span className="text-gray-600 text-xs">Optional</span>
+                </div>
+                <input type="file" accept="image/*" ref={s2vPhotoRef} onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setS2vModelPhotoFile(file);
+                  const uploaded = await uploadImage(file);
+                  if (uploaded) setS2vModelPhoto(uploaded);
+                }} className="hidden" />
+                {s2vModelPhoto ? (
+                  <div className="flex items-center gap-3">
+                    <img src={s2vModelPhoto} alt="Model" className="w-16 h-16 rounded-xl object-cover" />
+                    <div>
+                      <p className="text-green-400 text-xs font-semibold mb-1">Photo uploaded ✓</p>
+                      <button onClick={() => { setS2vModelPhoto(""); setS2vModelPhotoFile(null); }} className="text-gray-500 hover:text-white text-xs transition">Remove</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => s2vPhotoRef.current?.click()} className="w-full border-2 border-dashed border-white/20 hover:border-purple-500/50 rounded-xl p-4 text-center transition">
+                    <p className="text-gray-400 text-xs font-semibold">Click to upload model photo</p>
+                    <p className="text-gray-600 text-xs mt-1">JPG, PNG — face clearly visible</p>
+                  </button>
+                )}
+                <div>
+                  <label className="text-gray-500 text-xs mb-1 block">Describe your model (helps AI stay consistent)</label>
+                  <input type="text" placeholder="e.g. Young African woman, natural hair, warm smile, casual style" value={s2vModelDesc} onChange={(e) => setS2vModelDesc(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-xs" />
+                </div>
+              </div>
+
               {error && <p className="text-red-400 text-sm">{error}</p>}
               <button onClick={handleSplitScenes} disabled={s2vSplitting} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition">
                 {s2vSplitting ? "AI is analyzing your script..." : "Split into Scenes →"}
@@ -732,6 +774,16 @@ export default function Studio() {
                         rows={3}
                         className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500 transition resize-none"
                       />
+                      <div className="mt-2">
+                        <label className="text-gray-500 text-xs mb-1 block">Scene Style Override (optional)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. red dress, braided hair, outdoor garden"
+                          value={s2vSceneStyles[scene.scene_number] || ""}
+                          onChange={(e) => setS2vSceneStyles({ ...s2vSceneStyles, [scene.scene_number]: e.target.value })}
+                          className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-xs"
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -755,6 +807,15 @@ export default function Studio() {
                   </div>
                 </div>
 
+                {s2vModelPhoto && (
+                  <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-3 flex items-center gap-3">
+                    <img src={s2vModelPhoto} alt="Model" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                    <div>
+                      <p className="text-green-400 text-xs font-bold">Model photo active</p>
+                      <p className="text-gray-500 text-xs">Your model will appear in all scenes</p>
+                    </div>
+                  </div>
+                )}
                 <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-3">
                   <p className="text-yellow-400 text-xs font-bold">Total cost: {s2vTotalTokens} tokens</p>
                   <p className="text-gray-500 text-xs">{s2vScenes.length} scenes × {s2vTokensPerScene} tokens each • You have {tokenBalance} tokens</p>
