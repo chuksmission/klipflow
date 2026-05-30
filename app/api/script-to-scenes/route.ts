@@ -30,9 +30,6 @@ export async function POST(req: NextRequest) {
     const claudeKey = await getSetting("claude_api_key");
     if (!claudeKey) return NextResponse.json({ error: "Claude API key not configured." }, { status: 503 });
 
-    const orientation = aspect_ratio === "9:16" ? "vertical 9:16 portrait for TikTok/Reels" :
-      aspect_ratio === "1:1" ? "square 1:1" : "horizontal 16:9 widescreen";
-
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -42,31 +39,46 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5",
-        max_tokens: 1200,
-        system: `You are an expert video director and AI prompt engineer. Your job is to break a video script into 3-5 visual scenes and write a cinematic AI video prompt for each scene.
+        max_tokens: 1500,
+        system: `You are an expert AI video director who creates viral social media content. You break scripts into scenes and write prompts that make AI video models generate videos where a REAL PERSON speaks the dialogue out loud with clear speech audio.
 
-For each scene:
-- Write what should be VISUALLY shown on screen (not the dialogue)
-- Make prompts vivid, specific, and cinematic
-- Each prompt should work as a standalone AI video generation prompt
-- Include: subject, action, environment, lighting, camera angle, mood
-- Optimize for ${orientation} format
-- Each scene should be 5-8 seconds of content
+CRITICAL RULES — follow these exactly:
 
-Output ONLY valid JSON in this exact format, no other text:
+1. EVERY scene must feature a PERSON speaking directly to camera. No exceptions. Even if the topic is watermelon, gut health, or hair — a person must be on screen speaking.
+
+2. The person must be described specifically: their age, appearance, clothing, setting. Be very specific so the AI generates a consistent character.
+
+3. The exact dialogue from the script MUST appear in quotes in the prompt using this format:
+   Person saying: "[exact words from the script for this scene]"
+
+4. The person can hold or interact with relevant props/items while speaking (e.g. holding a watermelon, pointing at their skin, holding a bottle).
+
+5. Camera style: close-up to medium shot, authentic UGC style, shot on phone, natural lighting.
+
+6. Format: ${aspect_ratio} vertical video.
+
+7. Split into exactly 3-5 scenes based on natural breaks in the script.
+
+PROMPT STRUCTURE FOR EACH SCENE:
+"[Specific person description] speaking directly to camera, saying: '[exact dialogue]', [what they are doing/holding/showing], [setting], close-up shot, authentic UGC style, natural lighting, ${aspect_ratio} vertical format, high quality, realistic"
+
+EXAMPLE — for a script about watermelon:
+"Young African woman in casual clothes, speaking directly to camera with enthusiasm, saying: 'Did you know eating watermelon every day can completely transform your body in just 30 days?', holding a slice of watermelon, bright kitchen background, close-up shot, authentic UGC style, natural lighting, 9:16 vertical format"
+
+Output ONLY valid JSON, no other text:
 {
   "scenes": [
     {
       "scene_number": 1,
-      "narration": "The dialogue/text for this scene from the script",
-      "visual_prompt": "Detailed cinematic visual prompt for AI video generation"
+      "narration": "The exact dialogue from the script for this scene",
+      "visual_prompt": "Full detailed prompt following the structure above"
     }
   ]
 }`,
         messages: [
           {
             role: "user",
-            content: `Break this script into 3-5 visual scenes with AI video prompts:\n\n${script}`,
+            content: `Break this script into 3-5 scenes. Each scene MUST have a person speaking the dialogue out loud:\n\n${script}`,
           },
         ],
       }),
@@ -82,10 +94,8 @@ Output ONLY valid JSON in this exact format, no other text:
     const text = data.content?.[0]?.text?.trim();
     if (!text) return NextResponse.json({ error: "No response from Claude" }, { status: 500 });
 
-    // Parse JSON response
     let parsed;
     try {
-      // Strip any markdown code blocks if present
       const clean = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       parsed = JSON.parse(clean);
     } catch {
