@@ -76,6 +76,7 @@ export default function Studio() {
   const [s2vModelPhotoFile, setS2vModelPhotoFile] = useState<File | null>(null);
   const [s2vModelDesc, setS2vModelDesc] = useState("");
   const [s2vSceneStyles, setS2vSceneStyles] = useState<Record<number, string>>({});
+  const [s2vSceneDuration, setS2vSceneDuration] = useState("10");
   const s2vPhotoRef = useRef<HTMLInputElement>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -311,7 +312,7 @@ export default function Studio() {
             prompt: updatedScenes[i].visual_prompt,
             mode: s2vModelPhoto ? "image_to_video" : "text_to_video",
             image_url: s2vModelPhoto || undefined,
-            duration: "5",
+            duration: s2vSceneDuration,
             aspect_ratio: s2vAspectRatio,
             model: s2vModel,
             with_audio: true,
@@ -504,7 +505,7 @@ export default function Studio() {
     setProgress(0); setElapsedTime(0); setSelectedModel("kling-v1-6-pro");
     setExpandedPrompt(""); setGeneratedScript(""); setScriptTopic("");
     setS2vScript(""); setS2vScenes([]); setS2vStep("input"); setS2vCurrentScene(0);
-    setS2vModelPhoto(""); setS2vModelPhotoFile(null); setS2vModelDesc(""); setS2vSceneStyles({});
+    setS2vModelPhoto(""); setS2vModelPhotoFile(null); setS2vModelDesc(""); setS2vSceneStyles({}); setS2vSceneDuration("10");
   };
 
   const currentModel = ALL_MODELS.find((m) => m.id === selectedModel);
@@ -827,6 +828,15 @@ export default function Studio() {
                     </div>
                   </div>
                 )}
+                <div>
+                  <label className="text-gray-400 text-xs mb-2 block">Scene Duration</label>
+                  <select value={s2vSceneDuration} onChange={(e) => setS2vSceneDuration(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm">
+                    <option value="5">5 seconds — short hook</option>
+                    <option value="8">8 seconds — standard</option>
+                    <option value="10">10 seconds — recommended for dialogue</option>
+                    <option value="15">15 seconds — long dialogue (Kling 3.0 only)</option>
+                  </select>
+                </div>
                 <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-3">
                   <p className="text-yellow-400 text-xs font-bold">Total cost: {s2vTotalTokens} tokens</p>
                   <p className="text-gray-500 text-xs">{s2vScenes.length} scenes × {s2vTokensPerScene} tokens each • You have {tokenBalance} tokens</p>
