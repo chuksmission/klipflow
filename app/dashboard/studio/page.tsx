@@ -717,10 +717,21 @@ export default function Studio() {
                   const file = e.target.files?.[0];
                   if (!file) return;
                   setS2vModelPhotoFile(file);
+                  setS2vModelPhoto("uploading");
                   const uploaded = await uploadImage(file);
-                  if (uploaded) setS2vModelPhoto(uploaded);
+                  if (uploaded) {
+                    setS2vModelPhoto(uploaded);
+                  } else {
+                    setS2vModelPhoto("");
+                    setError("Photo upload failed. Please try again.");
+                  }
                 }} className="hidden" />
-                {s2vModelPhoto ? (
+                {s2vModelPhoto === "uploading" ? (
+                  <div className="flex items-center gap-3">
+                    <div className="w-16 h-16 rounded-xl bg-white/10 animate-pulse" />
+                    <p className="text-gray-400 text-xs">Uploading photo...</p>
+                  </div>
+                ) : s2vModelPhoto ? (
                   <div className="flex items-center gap-3">
                     <img src={s2vModelPhoto} alt="Model" className="w-16 h-16 rounded-xl object-cover" />
                     <div>
