@@ -35,7 +35,7 @@ export default function AdminPaymentGateways() {
     setSaving(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
-    await fetch("/api/admin/settings", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token }, body: JSON.stringify({ settings: Object.entries(settings).map(([key, value]) => ({ key, value })) }) });
+    await fetch("/api/admin/settings", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token }, body: JSON.stringify({ settings: Object.entries(settings).map(([key, value]) => ({ key, value, category: "payments" })) }) });
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);

@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       await supabase
         .from("admin_settings")
         .upsert(
-          { key: setting.key, value: setting.value, updated_at: new Date().toISOString() },
+          { key: setting.key, value: setting.value, category: setting.category ?? null, updated_at: new Date().toISOString() },
           { onConflict: "key" }
         );
     }
