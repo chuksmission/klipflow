@@ -26,7 +26,12 @@ export default function AdminPaymentGateways() {
       const map: Record<string, string> = {};
       data.settings?.forEach((s: any) => { map[s.key] = s.value || ""; });
       setSettings(map);
-      setLoading(false);
+        const enabledMap: Record<string, boolean> = {};
+        data.settings?.forEach((s: any) => {
+          if (s.key.endsWith("_enabled")) enabledMap[s.key.replace("_enabled", "")] = s.value === "true";
+        });
+        setEnabled(enabledMap);
+        setLoading(false);
     };
     fetchSettings();
   }, []);
@@ -35,7 +40,11 @@ export default function AdminPaymentGateways() {
     setSaving(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
-    await fetch("/api/admin/settings", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token }, body: JSON.stringify({ settings: Object.entries(settings).map(([key, value]) => ({ key, value, category: "payments" })) }) });
+    const allSettings = [
+        ...Object.entries(settings).map(([key, value]) => ({ key, value, category: "payments" })),
+        ...Object.entries(enabled).map(([key, value]) => ({ key: key + "_enabled", value: String(value), category: "payments" })),
+      ];
+      await fetch("/api/admin/settings", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token }, body: JSON.stringify({ settings: allSettings }) });
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
