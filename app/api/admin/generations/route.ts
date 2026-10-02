@@ -50,21 +50,28 @@ export async function PATCH(req: NextRequest) {
       .single();
     if (!profile?.is_admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    const { id, is_featured, featured_category, featured_title } = await req.json() as {
+    const { id, is_featured, featured_category, featured_title, featured_sort } = await req.json() as {
       id?: number | string;
       is_featured?: boolean;
       featured_category?: string | null;
       featured_title?: string | null;
+      featured_sort?: number;
     };
     if (id === undefined || id === null) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
+    const update: Record<string, unknown> = {
+      is_featured: !!is_featured,
+      featured_category: is_featured ? (featured_category || null) : null,
+      featured_title: is_featured ? (featured_title?.trim() || null) : null,
+    };
+    // Only sent once supabase/showcase_studio.sql has added the column
+    if (featured_sort !== undefined && Number.isFinite(Number(featured_sort))) {
+      update.featured_sort = is_featured ? Math.round(Number(featured_sort)) : 0;
+    }
+
     const { data, error } = await supabase
       .from("generations")
-      .update({
-        is_featured: !!is_featured,
-        featured_category: is_featured ? (featured_category || null) : null,
-        featured_title: is_featured ? (featured_title?.trim() || null) : null,
-      })
+      .update(update)
       .eq("id", id)
       .select("id, is_featured, featured_category, featured_title")
       .single();

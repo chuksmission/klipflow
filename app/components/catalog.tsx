@@ -118,3 +118,48 @@ export function moduleForGenerationType(type: string | null | undefined): Studio
   if (type === "video_translation") return "video_translator";
   return "text_to_video";
 }
+
+// Video generation models (shared by the Studio and admin Showcase Studio).
+// `enabledKey` maps to a toggle in Admin > AI Providers.
+export interface VideoModel {
+  id: string;
+  name: string;
+  desc: string;
+  tokens: number;
+  badge: string;
+  badges?: string[];
+  available: boolean;
+  provider: string;
+  hasSound: boolean;
+  enabledKey: string;
+}
+
+export const VIDEO_MODELS: VideoModel[] = [
+  { id: "kling-v1-6-std",  name: "Kling 1.6 Standard", desc: "Fast, great for drafts",               tokens: 8,   badge: "",                available: true,  provider: "kie", hasSound: false, enabledKey: "kling_v1_6_enabled" },
+  { id: "kling-v1-6-pro",  name: "Kling 1.6 Pro",      desc: "High quality, smooth motion",           tokens: 10,  badge: "Recommended",     available: true,  provider: "kie", hasSound: false, enabledKey: "kling_v1_6_enabled" },
+  { id: "kling-v2-master", name: "Kling 2.1 Master",   desc: "Best realism and motion",               tokens: 20,  badge: "Best Quality",    available: true,  provider: "kie", hasSound: false, enabledKey: "kling_v2_master_enabled" },
+  { id: "kling-v3-std",    name: "Kling 3.0 Standard", desc: "Cinematic quality, audio, up to 15s",   tokens: 15,  badge: "Best Quality",    badges: ["Best Quality", "With Audio"], available: true, provider: "kie", hasSound: true, enabledKey: "kling_v3_enabled" },
+  { id: "kling-v3-pro",    name: "Kling 3.0 Pro",      desc: "1080p cinematic, audio, multi-shot",    tokens: 20,  badge: "Ultra Quality",   badges: ["Ultra Quality", "With Audio"], available: true, provider: "kie", hasSound: true, enabledKey: "kling_v3_enabled" },
+  { id: "veo3-fast",       name: "Veo 3.1 Fast",       desc: "Google AI, native audio, 720p",         tokens: 15,  badge: "With Audio",      available: true,  provider: "kie", hasSound: true,  enabledKey: "veo3_fast_enabled" },
+  { id: "veo3-quality",    name: "Veo 3.1 Quality",    desc: "Google AI, cinematic, 1080p",            tokens: 60,  badge: "Premium",         badges: ["Premium", "With Audio"], available: true, provider: "kie", hasSound: true, enabledKey: "veo3_quality_enabled" },
+  { id: "seedance-2",      name: "Seedance 2.0",       desc: "ByteDance, best quality + audio",        tokens: 30,  badge: "Best Quality",    badges: ["Best Quality", "With Audio"], available: true, provider: "kie", hasSound: true, enabledKey: "seedance2_enabled" },
+  { id: "seedance-2-fast", name: "Seedance 2.0 Fast",  desc: "ByteDance, fast + audio",                tokens: 15,  badge: "With Audio",      available: true,  provider: "kie", hasSound: true,  enabledKey: "seedance2_fast_enabled" },
+  { id: "hailuo-pro",      name: "Hailuo 2.3",         desc: "MiniMax, fast generation",               tokens: 8,   badge: "",                available: true,  provider: "kie", hasSound: false, enabledKey: "hailuo_enabled" },
+  { id: "sora-2",          name: "Sora 2",             desc: "OpenAI, premium realism",                tokens: 10,  badge: "Premium",         available: true,  provider: "kie", hasSound: false, enabledKey: "sora2_enabled" },
+  { id: "wan-2-6",         name: "Wan 2.6",            desc: "Alibaba, fast and affordable",           tokens: 10,  badge: "Cheapest",        available: true,  provider: "kie", hasSound: false, enabledKey: "wan26_enabled" },
+  { id: "grok-imagine",    name: "Grok Imagine",       desc: "xAI, fast and cheap",                    tokens: 5,   badge: "Most Affordable", available: true,  provider: "kie", hasSound: false, enabledKey: "grok_enabled" },
+  { id: "luma-ray-3",      name: "Luma Ray 3",         desc: "Cinematic quality",                      tokens: 15,  badge: "",                available: true,  provider: "kie", hasSound: false, enabledKey: "luma_enabled" },
+  { id: "higgsfield-ugc",  name: "Higgsfield UGC",     desc: "Realistic UGC ad videos",                tokens: 10,  badge: "Best for Ads",    available: true,  provider: "higgsfield", hasSound: false, enabledKey: "higgsfield_enabled" },
+  { id: "runway-gen4",     name: "Runway Gen-4",       desc: "Professional cinematic quality",         tokens: 40,  badge: "Coming Soon",     available: false, provider: "runway", hasSound: false, enabledKey: "" },
+];
+
+// Core models are on unless explicitly disabled; others need an explicit enable.
+const CORE_MODEL_KEYS = ["kling_v1_6_enabled", "kling_v2_master_enabled", "kling_v3_enabled", "higgsfield_enabled"];
+
+export function isModelVisible(m: VideoModel, enabledKeys: Record<string, boolean>): boolean {
+  if (!m.available) return false;
+  if (!m.enabledKey) return false;
+  if (enabledKeys[m.enabledKey] === false) return false;
+  if (enabledKeys[m.enabledKey] === true) return true;
+  return CORE_MODEL_KEYS.includes(m.enabledKey);
+}

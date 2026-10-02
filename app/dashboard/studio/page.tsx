@@ -3,20 +3,9 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Check, CheckCircle2, ChevronLeft, Circle, Coins, X } from "lucide-react";
 import { supabase } from "../../lib/supabase";
-import { getStudioModule, studioHref, takePendingGeneration, type StudioModuleId } from "../../components/catalog";
+import { VIDEO_MODELS, getStudioModule, isModelVisible, studioHref, takePendingGeneration, type StudioModuleId, type VideoModel } from "../../components/catalog";
 
-interface Model {
-  id: string;
-  name: string;
-  desc: string;
-  tokens: number;
-  badge: string;
-  badges?: string[];
-  available: boolean;
-  provider: string;
-  hasSound: boolean;
-  enabledKey: string;
-}
+type Model = VideoModel;
 
 interface Module {
   id: string;
@@ -105,24 +94,7 @@ function Studio() {
   useEffect(() => { selectedModelRef.current = selectedModel; }, [selectedModel]);
   useEffect(() => { activeModuleRef.current = activeModule; }, [activeModule]);
 
-  const ALL_MODELS: Model[] = [
-    { id: "kling-v1-6-std",  name: "Kling 1.6 Standard", desc: "Fast, great for drafts",               tokens: 8,   badge: "",                available: true,  provider: "kie", hasSound: false, enabledKey: "kling_v1_6_enabled" },
-    { id: "kling-v1-6-pro",  name: "Kling 1.6 Pro",      desc: "High quality, smooth motion",           tokens: 10,  badge: "Recommended",     available: true,  provider: "kie", hasSound: false, enabledKey: "kling_v1_6_enabled" },
-    { id: "kling-v2-master", name: "Kling 2.1 Master",   desc: "Best realism and motion",               tokens: 20,  badge: "Best Quality",    available: true,  provider: "kie", hasSound: false, enabledKey: "kling_v2_master_enabled" },
-    { id: "kling-v3-std",    name: "Kling 3.0 Standard", desc: "Cinematic quality, audio, up to 15s",   tokens: 15,  badge: "Best Quality",    badges: ["Best Quality", "With Audio"], available: true, provider: "kie", hasSound: true, enabledKey: "kling_v3_enabled" },
-    { id: "kling-v3-pro",    name: "Kling 3.0 Pro",      desc: "1080p cinematic, audio, multi-shot",    tokens: 20,  badge: "Ultra Quality",   badges: ["Ultra Quality", "With Audio"], available: true, provider: "kie", hasSound: true, enabledKey: "kling_v3_enabled" },
-    { id: "veo3-fast",       name: "Veo 3.1 Fast",       desc: "Google AI, native audio, 720p",         tokens: 15,  badge: "With Audio",      available: true,  provider: "kie", hasSound: true,  enabledKey: "veo3_fast_enabled" },
-    { id: "veo3-quality",    name: "Veo 3.1 Quality",    desc: "Google AI, cinematic, 1080p",            tokens: 60,  badge: "Premium",         badges: ["Premium", "With Audio"], available: true, provider: "kie", hasSound: true, enabledKey: "veo3_quality_enabled" },
-    { id: "seedance-2",      name: "Seedance 2.0",       desc: "ByteDance, best quality + audio",        tokens: 30,  badge: "Best Quality",    badges: ["Best Quality", "With Audio"], available: true, provider: "kie", hasSound: true, enabledKey: "seedance2_enabled" },
-    { id: "seedance-2-fast", name: "Seedance 2.0 Fast",  desc: "ByteDance, fast + audio",                tokens: 15,  badge: "With Audio",      available: true,  provider: "kie", hasSound: true,  enabledKey: "seedance2_fast_enabled" },
-    { id: "hailuo-pro",      name: "Hailuo 2.3",         desc: "MiniMax, fast generation",               tokens: 8,   badge: "",                available: true,  provider: "kie", hasSound: false, enabledKey: "hailuo_enabled" },
-    { id: "sora-2",          name: "Sora 2",             desc: "OpenAI, premium realism",                tokens: 10,  badge: "Premium",         available: true,  provider: "kie", hasSound: false, enabledKey: "sora2_enabled" },
-    { id: "wan-2-6",         name: "Wan 2.6",            desc: "Alibaba, fast and affordable",           tokens: 10,  badge: "Cheapest",        available: true,  provider: "kie", hasSound: false, enabledKey: "wan26_enabled" },
-    { id: "grok-imagine",    name: "Grok Imagine",       desc: "xAI, fast and cheap",                    tokens: 5,   badge: "Most Affordable", available: true,  provider: "kie", hasSound: false, enabledKey: "grok_enabled" },
-    { id: "luma-ray-3",      name: "Luma Ray 3",         desc: "Cinematic quality",                      tokens: 15,  badge: "",                available: true,  provider: "kie", hasSound: false, enabledKey: "luma_enabled" },
-    { id: "higgsfield-ugc",  name: "Higgsfield UGC",     desc: "Realistic UGC ad videos",                tokens: 10,  badge: "Best for Ads",    available: true,  provider: "higgsfield", hasSound: false, enabledKey: "higgsfield_enabled" },
-    { id: "runway-gen4",     name: "Runway Gen-4",       desc: "Professional cinematic quality",         tokens: 40,  badge: "Coming Soon",     available: false, provider: "runway", hasSound: false, enabledKey: "" },
-  ];
+  const ALL_MODELS: Model[] = VIDEO_MODELS;
 
   // Only confirmed audio models for Script to Video
   const AUDIO_MODELS = [
@@ -155,14 +127,7 @@ function Studio() {
   // AI Video Translator only shows once HeyGen is enabled in Admin > AI Providers
   const visibleModules = modules.filter((mod) => mod.id !== "video_translator" || enabledKeys["heygen_enabled"] === true);
 
-  const visibleModels = ALL_MODELS.filter((m) => {
-    if (!m.available) return false;
-    if (!m.enabledKey) return false;
-    const coreModels = ["kling_v1_6_enabled", "kling_v2_master_enabled", "kling_v3_enabled", "higgsfield_enabled"];
-    if (enabledKeys[m.enabledKey] === false) return false;
-    if (enabledKeys[m.enabledKey] === true) return true;
-    return coreModels.includes(m.enabledKey);
-  });
+  const visibleModels = ALL_MODELS.filter((m) => isModelVisible(m, enabledKeys));
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | undefined;

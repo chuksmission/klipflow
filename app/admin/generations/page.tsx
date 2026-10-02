@@ -43,12 +43,14 @@ export default function AdminGenerations() {
   const updateLocal = (id: number | string, patch: Record<string, unknown>) =>
     setGenerations((prev) => prev.map((g) => (g.id === id ? { ...g, ...patch } : g)));
 
-  const saveFeature = async (gen: any, patch: { is_featured: boolean; featured_category?: string | null; featured_title?: string | null }) => {
+  const saveFeature = async (gen: any, patch: { is_featured: boolean; featured_category?: string | null; featured_title?: string | null; featured_sort?: number }) => {
     setSavingId(gen.id); setError("");
     const next = {
       is_featured: patch.is_featured,
       featured_category: patch.featured_category ?? gen.featured_category ?? (gen.output_type === "image" ? "image" : "cinematic"),
       featured_title: patch.featured_title ?? gen.featured_title ?? "",
+      // undefined (and so not sent) until supabase/showcase_studio.sql adds the column
+      featured_sort: patch.featured_sort ?? gen.featured_sort,
     };
     updateLocal(gen.id, next);
     try {
@@ -134,6 +136,16 @@ export default function AdminGenerations() {
                         onBlur={(e) => { if (e.target.value !== (gen.featured_title ?? "")) saveFeature(gen, { is_featured: true, featured_title: e.target.value }); }}
                         className="flex-1 min-w-[160px] bg-canvas border border-line hover:border-line-strong rounded-lg px-2 py-1.5 text-white placeholder:text-ink-subtle text-xs focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
                       />
+                      {"featured_sort" in gen && (
+                        <input
+                          type="number"
+                          title="Sort order (lower shows first)"
+                          aria-label="Sort order"
+                          defaultValue={gen.featured_sort ?? 0}
+                          onBlur={(e) => { const v = parseInt(e.target.value, 10) || 0; if (v !== (gen.featured_sort ?? 0)) saveFeature(gen, { is_featured: true, featured_sort: v }); }}
+                          className="w-20 bg-canvas border border-line hover:border-line-strong rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+                        />
+                      )}
                     </div>
                   )}
                 </div>
