@@ -2,13 +2,15 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
+import { Bell, Menu, Settings, X } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import AppSidebar from "../components/AppSidebar";
+import { hasPendingGeneration } from "../components/catalog";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null);
   const [plan, setPlan] = useState('Trial');
   const [menuOpen, setMenuOpen] = useState(false);
-  const [search, setSearch] = useState('');
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showBell, setShowBell] = useState(false);
   const [readIds, setReadIds] = useState<number[]>([]);
@@ -21,6 +23,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.push('/login'); return; }
       setUser(session.user);
+
+      // Prompt or template picked on the homepage before signing up
+      if (hasPendingGeneration() && window.location.pathname !== '/dashboard/studio') {
+        router.push('/dashboard/studio');
+      }
 
       const { data: profile } = await supabase
         .from('user_profiles')
@@ -91,112 +98,55 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.push('/');
   };
 
-  const navItems = [
-    { href: '/dashboard', icon: '📊', label: 'Dashboard' },
-    { href: '/dashboard/studio', icon: '🎬', label: 'Video Studio' },
-    { href: '/dashboard/ad-spy', icon: '🕵️', label: 'Ad Spy' },
-    { href: '/dashboard/autopilot', icon: '🤖', label: 'Autopilot' },
-    { href: '/dashboard/gallery', icon: '🖼️', label: 'Gallery' },
-    { href: '/dashboard/activity', icon: '⚡', label: 'Activity' },
-    { href: '/dashboard/billing', icon: '💳', label: 'Billing' },
-    { href: '/dashboard/settings', icon: '⚙️', label: 'Settings' },
-  ];
-
-  const filteredNav = navItems.filter(item =>
-    item.label.toLowerCase().includes(search.toLowerCase())
-  );
-
   const getBadgeColor = (color: string) => {
     const map: Record<string, string> = {
-      purple: 'bg-purple-900/40 border-purple-500/30 text-purple-300',
-      blue: 'bg-blue-900/40 border-blue-500/30 text-blue-300',
-      green: 'bg-green-900/40 border-green-500/30 text-green-300',
-      red: 'bg-red-900/40 border-red-500/30 text-red-300',
-      yellow: 'bg-yellow-900/40 border-yellow-500/30 text-yellow-300',
+      purple: 'bg-accent/12 border-accent/25 text-accent-text',
+      blue: 'bg-sky-500/10 border-sky-500/25 text-sky-300',
+      green: 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300',
+      red: 'bg-red-500/10 border-red-500/25 text-red-300',
+      yellow: 'bg-amber-500/10 border-amber-500/25 text-amber-300',
     };
     return map[color] ?? map.purple;
   };
 
+  const section = pathname.split('/').pop() ?? '';
+  const pageTitle = section === 'dashboard' ? 'Overview' : section === 'studio' ? 'Studio' : section.replace(/-/g, ' ');
+
   return (
-    <div className="flex min-h-screen bg-gray-950 text-white">
+    <div className="flex min-h-screen bg-canvas text-ink">
 
       {/* SIDEBAR */}
-      <aside className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-64 bg-gray-950 border-r border-white/10 z-50">
-        <div className="p-6 border-b border-white/10">
-          <Link href="/dashboard" className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-            KlipflowAI
-          </Link>
-        </div>
-
-        <div className="px-4 pt-4">
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">🔍</span>
-            <input
-              type="text"
-              placeholder="Search menu..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-4 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition"
-            />
-          </div>
-        </div>
-
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {filteredNav.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition ${
-                pathname === item.href
-                  ? 'bg-purple-600 text-white'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <span>{item.icon}</span>
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="p-4 border-t border-white/10">
-          <div className="text-gray-500 text-xs mb-1 truncate">{user?.email}</div>
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-2 text-red-400 hover:text-red-300 text-xs transition font-semibold"
-          >
-            <span>🚪</span> Sign Out
-          </button>
-        </div>
+      <aside className="hidden lg:block fixed inset-y-0 left-0 w-64 border-r border-line bg-canvas z-50">
+        <AppSidebar loggedIn email={user?.email} onSignOut={handleSignOut} />
       </aside>
 
       {/* MAIN */}
-      <div className="flex-1 md:ml-64 flex flex-col min-w-0 overflow-x-hidden">
+      <div className="flex-1 lg:ml-64 flex flex-col min-w-0 overflow-x-hidden">
 
         {/* TOP HEADER */}
-        <header className="sticky top-0 z-40 bg-gray-950 border-b border-white/10 px-4 py-3 flex items-center justify-between">
-          <Link href="/dashboard" className="md:hidden text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-            KlipflowAI
-          </Link>
-
-          <div className="hidden md:block text-gray-400 text-sm">
-            Dashboard <span className="text-gray-600 mx-2">›</span>
-            <span className="text-white capitalize">{pathname.split('/').pop()}</span>
+        <header className="sticky top-0 z-40 h-16 bg-canvas/85 backdrop-blur-md border-b border-line px-4 md:px-8 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <button onClick={() => setMenuOpen(true)} aria-label="Open menu" className="lg:hidden grid h-10 w-10 place-items-center rounded-lg text-ink-muted hover:bg-surface hover:text-ink">
+              <Menu size={20} aria-hidden />
+            </button>
+            <h1 className="text-[15px] font-medium text-ink capitalize truncate">{pageTitle}</h1>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="bg-purple-900/40 border border-purple-500/30 text-purple-300 text-xs font-bold px-3 py-1 rounded-full capitalize">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-medium text-accent-text capitalize">
               {plan}
-            </div>
+            </span>
 
             {/* NOTIFICATION BELL */}
             <div className="relative" ref={bellRef}>
               <button
                 onClick={() => setShowBell(!showBell)}
-                className="relative w-9 h-9 bg-white/5 border border-white/10 rounded-full flex items-center justify-center hover:bg-white/10 transition"
+                aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+                className="relative grid h-10 w-10 place-items-center rounded-lg text-ink-muted transition-colors hover:bg-surface hover:text-ink"
               >
-                <span className="text-sm">🔔</span>
+                <Bell size={19} aria-hidden />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-xs flex items-center justify-center font-bold">
+                  <span className="absolute right-1.5 top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
                     {unreadCount}
                   </span>
                 )}
@@ -204,11 +154,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
               {/* DROPDOWN */}
               {showBell && (
-                <div className="absolute right-0 top-11 w-80 bg-gray-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-                    <h3 className="font-bold text-sm">Notifications</h3>
+                <div className="absolute right-0 top-12 w-80 max-w-[calc(100vw-2rem)] bg-surface border border-line rounded-2xl shadow-2xl shadow-black/50 z-50 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-line">
+                    <h3 className="font-medium text-sm">Notifications</h3>
                     {unreadCount > 0 && (
-                      <button onClick={markAllRead} className="text-purple-400 hover:text-white text-xs transition">
+                      <button onClick={markAllRead} className="text-accent-text hover:text-ink text-xs transition-colors">
                         Mark all read
                       </button>
                     )}
@@ -216,26 +166,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
                   <div className="max-h-80 overflow-y-auto">
                     {notifications.length === 0 ? (
-                      <div className="px-4 py-8 text-center text-gray-500 text-sm">
-                        No notifications yet
+                      <div className="px-4 py-8 text-center text-ink-subtle text-sm">
+                        You&apos;re all caught up
                       </div>
                     ) : (
                       notifications.map((n) => (
                         <div
                           key={n.id}
                           onClick={() => markAsRead(n.id)}
-                          className={"px-4 py-3 border-b border-white/5 cursor-pointer hover:bg-white/5 transition " + (!readIds.includes(n.id) ? "bg-white/3" : "")}
+                          className={"px-4 py-3 border-b border-line/60 cursor-pointer hover:bg-white/[0.03] transition-colors " + (!readIds.includes(n.id) ? "bg-white/[0.02]" : "")}
                         >
                           <div className="flex items-start gap-3">
-                            <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${!readIds.includes(n.id) ? 'bg-purple-400' : 'bg-transparent'}`} />
+                            <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${!readIds.includes(n.id) ? 'bg-accent-text' : 'bg-transparent'}`} />
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-0.5">
-                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${getBadgeColor(n.color)}`}>
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${getBadgeColor(n.color)}`}>
                                   {n.title}
                                 </span>
                               </div>
-                              <p className="text-gray-300 text-xs leading-relaxed">{n.message}</p>
-                              <p className="text-gray-600 text-xs mt-1">
+                              <p className="text-ink-muted text-xs leading-relaxed">{n.message}</p>
+                              <p className="text-ink-subtle text-xs mt-1">
                                 {new Date(n.created_at).toLocaleDateString()}
                               </p>
                             </div>
@@ -244,59 +194,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       ))
                     )}
                   </div>
-
-                  {notifications.length > 0 && (
-                    <div className="px-4 py-2 text-center border-t border-white/10">
-                      <p className="text-gray-600 text-xs">{notifications.length} total notifications</p>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
 
-            <Link href="/dashboard/settings" className="w-9 h-9 bg-white/5 border border-white/10 rounded-full flex items-center justify-center hover:bg-white/10 transition">
-              <span className="text-sm">⚙️</span>
+            <Link href="/dashboard/settings" aria-label="Settings" className="grid h-10 w-10 place-items-center rounded-lg text-ink-muted transition-colors hover:bg-surface hover:text-ink">
+              <Settings size={19} aria-hidden />
             </Link>
-
-            <button onClick={() => setMenuOpen(!menuOpen)} className="md:hidden w-9 h-9 bg-white/5 border border-white/10 rounded-full flex items-center justify-center">
-              <span>{menuOpen ? '✕' : '☰'}</span>
-            </button>
           </div>
         </header>
 
         {/* MOBILE MENU */}
         {menuOpen && (
-          <div className="md:hidden fixed inset-0 z-30 bg-gray-950 pt-20 px-4 overflow-y-auto">
-            <div className="relative mb-4">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">🔍</span>
-              <input
-                type="text"
-                placeholder="Search menu..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-4 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-purple-500"
-              />
+          <div className="lg:hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Menu">
+            <div className="absolute inset-0 bg-black/60" onClick={() => setMenuOpen(false)} />
+            <div className="absolute inset-y-0 left-0 w-72 max-w-[85%] border-r border-line bg-canvas">
+              <button onClick={() => setMenuOpen(false)} aria-label="Close menu" className="absolute right-3 top-4 grid h-9 w-9 place-items-center rounded-lg text-ink-muted hover:bg-surface hover:text-ink z-10">
+                <X size={20} aria-hidden />
+              </button>
+              <AppSidebar loggedIn email={user?.email} onSignOut={handleSignOut} onNavigate={() => setMenuOpen(false)} />
             </div>
-            <nav className="space-y-1">
-              {filteredNav.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMenuOpen(false)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                    pathname === item.href
-                      ? 'bg-purple-600 text-white'
-                      : 'text-gray-400 hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  <span>{item.icon}</span>
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
-            <button onClick={handleSignOut} className="mt-6 flex items-center gap-2 text-gray-500 hover:text-white text-sm transition">
-              <span>🚪</span> Sign Out
-            </button>
           </div>
         )}
 

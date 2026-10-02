@@ -1,5 +1,7 @@
-import Link from 'next/link'
 import { Metadata } from 'next'
+import { ArrowRight, AudioLines, Clapperboard, PenLine, Plug, Radar } from 'lucide-react'
+import MarketingShell from '../components/MarketingShell'
+import { ButtonLink } from '../components/ui/Button'
 
 export const metadata: Metadata = {
   title: 'KlipflowAI API Documentation — Developer Access',
@@ -9,46 +11,40 @@ export const metadata: Metadata = {
 
 export default function APIDocs() {
   return (
-    <main className="min-h-screen bg-black text-white">
-      <nav className="flex items-center justify-between px-8 py-5 border-b border-white/10 sticky top-0 z-50 bg-black/90 backdrop-blur-md">
-        <Link href="/" className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-          KlipflowAI
-        </Link>
-        <Link href="/signup" className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold py-2 px-5 rounded-full transition">
-          Sign Up Free
-        </Link>
-      </nav>
-
-      <section className="flex flex-col items-center justify-center text-center px-8 py-32">
-        <div className="text-6xl mb-6">🔌</div>
-        <div className="inline-block bg-purple-900/40 border border-purple-500/30 text-purple-300 text-xs font-semibold px-4 py-1.5 rounded-full mb-6">
-          Coming Soon
-        </div>
-        <h1 className="text-5xl font-extrabold mb-6">KlipflowAI API</h1>
-        <p className="text-gray-400 text-xl max-w-2xl mb-4">
-          Full REST API access to KlipflowAI's AI video generation, ad creation, script writing, and content automation — ready to integrate into your own applications.
+    <MarketingShell>
+      <section className="mx-auto flex max-w-4xl flex-col items-center px-4 py-24 text-center md:px-8">
+        <span className="mb-6 grid h-14 w-14 place-items-center rounded-2xl bg-accent/15 text-accent-text"><Plug size={26} aria-hidden /></span>
+        <p className="mb-5 inline-flex rounded-full border border-line bg-surface px-3 py-1 text-xs text-ink-muted">Coming soon</p>
+        <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">KlipflowAI API</h1>
+        <p className="mt-5 max-w-2xl text-lg text-ink-muted">
+          Full REST API access to KlipflowAI&apos;s AI video generation, ad creation, script writing, and content automation — ready to integrate into your own applications.
         </p>
-        <p className="text-gray-500 text-lg mb-12">Available on Agency plan. Documentation launching soon.</p>
+        <p className="mt-3 text-ink-subtle">Available on the Agency plan. Documentation launching soon.</p>
 
-        <div className="grid md:grid-cols-2 gap-6 max-w-3xl w-full mb-16 text-left">
+        <div className="mt-14 grid w-full gap-4 text-left md:grid-cols-2">
           {[
-            { icon: "🎬", title: "Video Generation API", desc: "Generate AI videos programmatically. Pass a prompt, get back a video URL. Full model selection support." },
-            { icon: "📝", title: "Script Writer API", desc: "Generate video scripts for any niche. Trending hooks, full scripts, and CTAs via a single API call." },
-            { icon: "🎙️", title: "Voice Generation API", desc: "Convert text to natural AI voiceover. Multiple voices, languages, and styles supported." },
-            { icon: "🕵️", title: "Ad Intelligence API", desc: "Query winning Facebook ads by niche and duration. Build your own ad research tools on top of our data." },
-          ].map((e, i) => (
-            <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-6 opacity-60">
-              <div className="text-3xl mb-3">{e.icon}</div>
-              <h3 className="font-bold mb-2">{e.title}</h3>
-              <p className="text-gray-500 text-sm leading-relaxed">{e.desc}</p>
-              <div className="mt-4 text-purple-400 text-xs font-bold">Coming Soon</div>
-            </div>
-          ))}
+            { icon: Clapperboard, title: "Video Generation API", desc: "Generate AI videos programmatically. Pass a prompt, get back a video URL. Full model selection support." },
+            { icon: PenLine, title: "Script Writer API", desc: "Generate video scripts for any niche. Trending hooks, full scripts, and CTAs via a single API call." },
+            { icon: AudioLines, title: "Voice Generation API", desc: "Convert text to natural AI voiceover. Multiple voices, languages, and styles supported." },
+            { icon: Radar, title: "Ad Intelligence API", desc: "Query winning Facebook ads by niche and duration. Build your own ad research tools on top of our data." },
+          ].map((e) => {
+            const Icon = e.icon;
+            return (
+              <div key={e.title} className="rounded-2xl border border-line bg-surface p-6">
+                <div className="flex items-center justify-between">
+                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/[0.05] text-ink-muted"><Icon size={19} aria-hidden /></span>
+                  <span className="rounded-full border border-line px-2 py-0.5 text-xs text-ink-subtle">Coming soon</span>
+                </div>
+                <h3 className="mt-4 font-semibold">{e.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-ink-muted">{e.desc}</p>
+              </div>
+            );
+          })}
         </div>
 
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-8 max-w-2xl w-full mb-12 text-left">
-          <div className="text-purple-400 text-xs font-bold uppercase tracking-widest mb-3">Preview — What the API will look like</div>
-          <pre className="text-gray-300 text-sm leading-relaxed overflow-x-auto">{`POST https://api.klipflowai.com/v1/generate
+        <div className="mt-10 w-full overflow-hidden rounded-2xl border border-line bg-surface text-left">
+          <div className="border-b border-line px-5 py-3 text-xs font-medium text-ink-subtle">Preview: what the API will look like</div>
+          <pre className="overflow-x-auto p-5 font-mono text-[13px] leading-relaxed text-ink">{`POST https://api.klipflowai.com/v1/generate
 
 {
   "model": "kling-3.0",
@@ -65,16 +61,8 @@ export default function APIDocs() {
 }`}</pre>
         </div>
 
-        <Link href="/signup" className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-12 rounded-full text-lg transition">
-          Sign Up for API Early Access →
-        </Link>
+        <ButtonLink href="/signup" variant="primary" size="lg" className="mt-12">Sign up for API early access <ArrowRight size={17} aria-hidden /></ButtonLink>
       </section>
-
-      <footer className="border-t border-white/10 px-8 py-10 text-center text-gray-600 text-sm">
-        <Link href="/" className="text-white font-bold">KlipflowAI</Link> © 2026 ·{" "}
-        <Link href="/privacy-policy" className="hover:text-white transition">Privacy Policy</Link> ·{" "}
-        <Link href="/terms-of-service" className="hover:text-white transition">Terms of Service</Link>
-      </footer>
-    </main>
+    </MarketingShell>
   )
 }

@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
+import { Clapperboard, Download, Image as ImageIcon, Images } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { ButtonLink, EmptyState, PageHeader, Skeleton } from "../../components/ui";
 
 export default function Gallery() {
   const [generations, setGenerations] = useState<any[]>([]);
@@ -54,94 +56,95 @@ export default function Gallery() {
   const isImage = (gen: any) => gen.output_type === "image";
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-extrabold mb-1">Gallery</h1>
-          <p className="text-gray-400 text-sm">{generations.length} total — {videoCount} videos, {imageCount} images</p>
-        </div>
-        <div className="flex gap-2">
-          {[
-            { key: "all", label: "All" },
-            { key: "video", label: "Videos" },
-            { key: "image", label: "Images" },
-          ].map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={"px-4 py-2 rounded-xl text-xs font-bold transition " + (filter === f.key ? "bg-purple-600 text-white" : "bg-white/10 text-gray-400 hover:bg-white/20")}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-      </div>
+    <div className="mx-auto max-w-6xl">
+      <PageHeader
+        title="Gallery"
+        description={`${generations.length} total · ${videoCount} videos, ${imageCount} images`}
+        actions={
+          <div className="inline-flex rounded-xl border border-line bg-surface p-1" role="tablist" aria-label="Filter">
+            {[
+              { key: "all", label: "All" },
+              { key: "video", label: "Videos" },
+              { key: "image", label: "Images" },
+            ].map((f) => (
+              <button
+                key={f.key}
+                role="tab"
+                aria-selected={filter === f.key}
+                onClick={() => setFilter(f.key)}
+                className={"h-8 rounded-lg px-4 text-sm font-medium transition-colors " + (filter === f.key ? "bg-raised text-ink" : "text-ink-muted hover:text-ink")}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        }
+      />
 
       {loading ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-white/5 border border-white/10 rounded-2xl aspect-video animate-pulse" />
+            <div key={i} className="overflow-hidden rounded-2xl border border-line bg-surface">
+              <Skeleton className="aspect-video rounded-none" />
+              <div className="space-y-2 p-3"><Skeleton className="h-3 w-1/3" /><Skeleton className="h-3 w-3/4" /></div>
+            </div>
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-12 text-center">
-          <div className="text-5xl mb-4">{filter === "image" ? "🖼️" : "🎬"}</div>
-          <h3 className="font-bold text-lg mb-2">No {filter === "all" ? "content" : filter + "s"} yet</h3>
-          <p className="text-gray-400 text-sm mb-6">Your generated content will appear here</p>
-          <a href="/dashboard/studio" className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-full transition inline-block text-sm">
-            Generate Now
-          </a>
-        </div>
+        <EmptyState
+          icon={filter === "image" ? ImageIcon : filter === "video" ? Clapperboard : Images}
+          title={filter === "all" ? "Your gallery is empty" : `No ${filter}s yet`}
+          description="Everything you generate in the Studio is saved here automatically."
+          action={<ButtonLink href="/dashboard/studio" variant="primary">Open Studio</ButtonLink>}
+        />
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
           {filtered.map((gen, i) => (
-            <div key={i} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden group">
-              {/* Media preview */}
-              {isImage(gen) ? (
-                <div className="relative w-full aspect-video bg-gray-900">
+            <div key={gen.id ?? i} className="group overflow-hidden rounded-2xl border border-line bg-surface transition-colors hover:border-line-strong">
+              <div className="relative aspect-video bg-black">
+                {isImage(gen) ? (
                   <img
                     src={gen.video_url}
-                    alt={gen.prompt}
-                    className="w-full h-full object-cover"
+                    alt={gen.prompt || "Generated image"}
+                    loading="lazy"
+                    className="h-full w-full object-cover"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                   />
-                </div>
-              ) : gen.video_url ? (
-                <video
-                  src={gen.video_url}
-                  className="w-full aspect-video object-cover"
-                  muted
-                  playsInline
-                  onMouseOver={(e) => (e.target as HTMLVideoElement).play()}
-                  onMouseOut={(e) => { (e.target as HTMLVideoElement).pause(); (e.target as HTMLVideoElement).currentTime = 0; }}
-                  onError={(e) => { (e.target as HTMLVideoElement).style.display = "none"; }}
-                />
-              ) : (
-                <div className="w-full aspect-video bg-gray-900 flex items-center justify-center text-gray-600 text-sm">No preview</div>
-              )}
+                ) : gen.video_url ? (
+                  <video
+                    src={gen.video_url}
+                    className="h-full w-full object-cover"
+                    muted
+                    playsInline
+                    preload="metadata"
+                    onMouseOver={(e) => (e.target as HTMLVideoElement).play()}
+                    onMouseOut={(e) => { (e.target as HTMLVideoElement).pause(); (e.target as HTMLVideoElement).currentTime = 0; }}
+                    onError={(e) => { (e.target as HTMLVideoElement).style.display = "none"; }}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-sm text-ink-subtle">No preview</div>
+                )}
+                {gen.video_url && (
+                  <button
+                    onClick={() => handleDownload(gen.video_url, isImage(gen))}
+                    aria-label="Download"
+                    className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-lg bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80"
+                  >
+                    <Download size={16} aria-hidden />
+                  </button>
+                )}
+              </div>
 
-              {/* Info */}
               <div className="p-3">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-purple-400 text-xs font-bold capitalize">
-                      {gen.output_type === "image" ? "🖼️ Image" : "🎬 " + (gen.type?.replace(/_/g, " ") ?? "Video")}
-                    </span>
-                  </div>
-                  <span className="text-gray-600 text-xs">{gen.tokens_used} tokens</span>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 truncate text-xs font-medium capitalize text-accent-text">
+                    {isImage(gen) ? <ImageIcon size={13} aria-hidden /> : <Clapperboard size={13} aria-hidden />}
+                    {isImage(gen) ? "Image" : (gen.type?.replace(/_/g, " ") ?? "Video")}
+                  </span>
+                  <span className="flex-shrink-0 text-xs tabular-nums text-ink-subtle">{gen.tokens_used} tokens</span>
                 </div>
-                <p className="text-gray-400 text-xs truncate mb-2">{gen.prompt}</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600 text-xs">{new Date(gen.created_at).toLocaleDateString()}</span>
-                  {gen.video_url && (
-                    <button
-                      onClick={() => handleDownload(gen.video_url, isImage(gen))}
-                      className="text-purple-400 hover:text-white text-xs transition font-semibold"
-                    >
-                      Download
-                    </button>
-                  )}
-                </div>
+                <p className="mb-2 truncate text-xs text-ink-muted">{gen.prompt}</p>
+                <span className="text-xs text-ink-subtle">{new Date(gen.created_at).toLocaleDateString()}</span>
               </div>
             </div>
           ))}

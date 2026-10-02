@@ -219,65 +219,65 @@ export default function AdminAIProviders() {
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold mb-1">AI Providers</h1>
-          <p className="text-gray-400 text-sm">Manage API keys and enable AI models</p>
+          <h1 className="text-2xl font-semibold tracking-tight mb-1">AI Providers</h1>
+          <p className="text-ink-muted text-sm">Manage API keys and enable AI models</p>
         </div>
-        <button onClick={handleSave} disabled={saving} className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-2 px-6 rounded-xl transition text-sm">
+        <button onClick={handleSave} disabled={saving} className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-2 px-6 rounded-xl transition text-sm">
           {saving ? "Saving..." : saved ? "Saved!" : "Save Changes"}
         </button>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-2xl p-4">
-          <div className="text-yellow-400 text-xs font-bold uppercase mb-1">Total API Cost</div>
-          <div className="text-2xl font-extrabold">${stats.totalCost.toFixed(3)}</div>
-          <div className="text-gray-500 text-xs">All time estimated</div>
+        <div className="bg-amber-500/10 border border-amber-500/25 rounded-2xl p-4">
+          <div className="text-amber-300 text-xs font-medium mb-1">Total API Cost</div>
+          <div className="text-2xl font-semibold tracking-tight">${stats.totalCost.toFixed(3)}</div>
+          <div className="text-ink-subtle text-xs">All time estimated</div>
         </div>
-        <div className="bg-purple-900/20 border border-purple-500/30 rounded-2xl p-4">
-          <div className="text-purple-400 text-xs font-bold uppercase mb-1">Total Generations</div>
-          <div className="text-2xl font-extrabold">{stats.totalGenerations}</div>
-          <div className="text-gray-500 text-xs">Videos generated</div>
+        <div className="bg-accent/[0.08] border border-accent/25 rounded-2xl p-4">
+          <div className="text-purple-400 text-xs font-medium mb-1">Total Generations</div>
+          <div className="text-2xl font-semibold tracking-tight">{stats.totalGenerations}</div>
+          <div className="text-ink-subtle text-xs">Videos generated</div>
         </div>
-        <div className="bg-blue-900/20 border border-blue-500/30 rounded-2xl p-4">
-          <div className="text-blue-400 text-xs font-bold uppercase mb-1">Avg Cost Per Video</div>
-          <div className="text-2xl font-extrabold">
+        <div className="bg-sky-500/10 border border-sky-500/25 rounded-2xl p-4">
+          <div className="text-sky-300 text-xs font-medium mb-1">Avg Cost Per Video</div>
+          <div className="text-2xl font-semibold tracking-tight">
             ${stats.totalGenerations > 0 ? (stats.totalCost / stats.totalGenerations).toFixed(3) : "0.000"}
           </div>
-          <div className="text-gray-500 text-xs">Per generation</div>
+          <div className="text-ink-subtle text-xs">Per generation</div>
         </div>
       </div>
 
       {Object.keys(stats.byModel).length > 0 && (
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-          <h3 className="font-bold text-sm mb-4">Usage by Model</h3>
+        <div className="bg-surface border border-line rounded-2xl p-5">
+          <h3 className="font-semibold text-sm mb-4">Usage by Model</h3>
           <div className="space-y-3">
             {Object.entries(stats.byModel).map(([model, data]) => (
               <div key={model} className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-semibold">{model}</div>
-                  <div className="text-gray-500 text-xs">{data.count} generations</div>
+                  <div className="text-ink-subtle text-xs">{data.count} generations</div>
                 </div>
-                <div className="text-yellow-400 font-bold text-sm">${data.cost.toFixed(3)}</div>
+                <div className="text-amber-300 font-semibold text-sm">${data.cost.toFixed(3)}</div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {loading ? <p className="text-gray-400">Loading...</p> : (
+      {loading ? <p className="text-ink-muted">Loading...</p> : (
         <div className="space-y-4">
           {providers.map((provider) => (
-            <div key={provider.id} className="bg-white/5 border border-white/10 rounded-2xl p-6">
+            <div key={provider.id} className="bg-surface border border-line rounded-2xl p-6">
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h3 className="font-bold">{provider.name}</h3>
-                  <p className="text-gray-500 text-xs mt-0.5">{provider.desc}</p>
+                  <h3 className="font-semibold">{provider.name}</h3>
+                  <p className="text-ink-subtle text-xs mt-0.5">{provider.desc}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <button onClick={() => window.open(provider.docsUrl, "_blank")} className="text-purple-400 hover:text-white text-xs transition">Docs</button>
                   <button
                     onClick={() => toggleEnabled(provider.enabledKey)}
-                    className={"relative w-12 h-6 rounded-full transition-colors " + (settings[provider.enabledKey] === "true" ? "bg-purple-600" : "bg-white/20")}
+                    className={"relative w-12 h-6 rounded-full transition-colors " + (settings[provider.enabledKey] === "true" ? "bg-purple-600" : "bg-raised-hover")}
                   >
                     <div className={"absolute top-1 w-4 h-4 bg-white rounded-full transition-all " + (settings[provider.enabledKey] === "true" ? "left-7" : "left-1")} />
                   </button>
@@ -287,13 +287,13 @@ export default function AdminAIProviders() {
               <div className="space-y-3 mb-4">
                 {provider.fields.map((field) => (
                   <div key={field.key}>
-                    <label className="text-gray-400 text-xs mb-1 block">{field.label}</label>
+                    <label className="text-ink-muted text-xs mb-1 block">{field.label}</label>
                     <input
                       type={field.secret ? "password" : "text"}
                       value={settings[field.key] || ""}
                       onChange={(e) => setSettings({ ...settings, [field.key]: e.target.value })}
                       placeholder={"Enter " + field.label}
-                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-sm"
+                      className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-2.5 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm"
                     />
                   </div>
                 ))}
@@ -301,10 +301,10 @@ export default function AdminAIProviders() {
 
               {provider.models.length > 0 && (
                 <div>
-                  <p className="text-gray-400 text-xs font-semibold mb-2">Enable Models</p>
+                  <p className="text-ink-muted text-xs font-semibold mb-2">Enable Models</p>
                   <div className="space-y-2">
                     {provider.models.map((model) => (
-                      <div key={model.key} className="bg-black/20 rounded-xl px-4 py-2.5">
+                      <div key={model.key} className="bg-canvas rounded-xl px-4 py-2.5">
                         <div className="flex items-center justify-between">
                           <span className="text-sm">{settings[`model_label_${MODEL_IDS[model.key]?.split(",")[0]}`] || model.label}</span>
                           <div className="flex items-center gap-3">
@@ -329,7 +329,7 @@ export default function AdminAIProviders() {
                             </button>
                             <button
                               onClick={() => toggleEnabled(model.key)}
-                              className={"relative w-10 h-5 rounded-full transition-colors " + (settings[model.key] === "true" ? "bg-purple-600" : "bg-white/20")}
+                              className={"relative w-10 h-5 rounded-full transition-colors " + (settings[model.key] === "true" ? "bg-purple-600" : "bg-raised-hover")}
                             >
                               <div className={"absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all " + (settings[model.key] === "true" ? "left-5" : "left-0.5")} />
                             </button>
@@ -338,37 +338,37 @@ export default function AdminAIProviders() {
                         {editingModel === model.key && (
                           <div className="mt-3 space-y-2">
                             <div>
-                              <label className="text-gray-500 text-xs mb-1 block">Display Name</label>
+                              <label className="text-ink-subtle text-xs mb-1 block">Display Name</label>
                               <input
                                 type="text"
                                 value={modelEdits[model.key]?.label || ""}
                                 onChange={(e) => setModelEdits({ ...modelEdits, [model.key]: { ...modelEdits[model.key], label: e.target.value } })}
-                                className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500"
+                                className="w-full bg-canvas border border-line hover:border-line-strong rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
                               />
                             </div>
                             <div>
-                              <label className="text-gray-500 text-xs mb-1 block">Description</label>
+                              <label className="text-ink-subtle text-xs mb-1 block">Description</label>
                               <input
                                 type="text"
                                 value={modelEdits[model.key]?.desc || ""}
                                 onChange={(e) => setModelEdits({ ...modelEdits, [model.key]: { ...modelEdits[model.key], desc: e.target.value } })}
                                 placeholder="e.g. High quality, smooth motion"
-                                className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500"
+                                className="w-full bg-canvas border border-line hover:border-line-strong rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
                               />
                             </div>
                             <div>
-                              <label className="text-gray-500 text-xs mb-1 block">Badges (comma separated)</label>
+                              <label className="text-ink-subtle text-xs mb-1 block">Badges (comma separated)</label>
                               <input
                                 type="text"
                                 value={modelEdits[model.key]?.badges || ""}
                                 onChange={(e) => setModelEdits({ ...modelEdits, [model.key]: { ...modelEdits[model.key], badges: e.target.value } })}
                                 placeholder="e.g. Recommended, With Audio"
-                                className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500"
+                                className="w-full bg-canvas border border-line hover:border-line-strong rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
                               />
                             </div>
                             <button
                               onClick={() => saveModelEdit(model.key)}
-                              className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-4 py-1.5 rounded-lg transition"
+                              className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold px-4 py-1.5 rounded-lg transition"
                             >
                               Save Changes
                             </button>

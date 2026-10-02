@@ -1,7 +1,10 @@
 'use client';
 import { useState } from "react";
 import Link from "next/link";
+import { MailCheck } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import AuthShell from "../components/AuthShell";
+import { Alert, Button, Field, Input, Spinner } from "../components/ui";
 
 export default function ResetPassword() {
   const [email, setEmail] = useState("");
@@ -39,70 +42,34 @@ export default function ResetPassword() {
 
   if (sent) {
     return (
-      <main className="min-h-screen bg-black text-white flex items-center justify-center px-4">
-        <div className="max-w-md w-full text-center">
-          <div className="text-6xl mb-6">📧</div>
-          <h1 className="text-3xl font-extrabold mb-4">Check Your Email</h1>
-          <p className="text-gray-400 mb-6">
-            We sent a password reset link to <span className="text-purple-400 font-semibold">{email}</span>.
-          </p>
-          <Link href="/login" className="text-purple-400 hover:text-white transition">
-            Back to Sign In →
-          </Link>
+      <AuthShell
+        title="Check your email"
+        subtitle={<>We sent a password reset link to <span className="font-medium text-ink">{email}</span>.</>}
+        footer={<Link href="/login" className="font-medium text-accent-text hover:text-ink">Back to sign in</Link>}
+      >
+        <div className="flex items-start gap-3 rounded-xl border border-line bg-canvas p-4">
+          <MailCheck size={20} className="mt-0.5 flex-shrink-0 text-accent-text" aria-hidden />
+          <p className="text-sm text-ink-muted">Open the link on this device to choose a new password. Check your spam folder if it doesn&apos;t arrive.</p>
         </div>
-      </main>
+      </AuthShell>
     );
   }
 
   return (
-    <main className="min-h-screen bg-black text-white flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
-
-        <div className="text-center mb-8">
-          <Link href="/" className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-            KlipflowAI
-          </Link>
-          <p className="text-gray-400 mt-2 text-sm">Reset your password</p>
-        </div>
-
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-8">
-          <h1 className="text-2xl font-bold mb-2">Forgot Password?</h1>
-          <p className="text-gray-400 text-sm mb-6">Enter your email and we'll send you a reset link.</p>
-
-          <div className="space-y-4">
-            <div>
-              <label className="text-gray-400 text-sm mb-1 block">Email Address</label>
-              <input
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition"
-              />
-            </div>
-
-            {error && (
-              <p className="text-red-400 text-sm">{error}</p>
-            )}
-
-            <button
-              onClick={handleReset}
-              disabled={loading}
-              className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition"
-            >
-              {loading ? 'Sending...' : 'Send Reset Link →'}
-            </button>
-          </div>
-        </div>
-
-        <p className="text-center text-gray-500 text-sm mt-6">
-          Remember your password?{" "}
-          <Link href="/login" className="text-purple-400 hover:text-white transition font-semibold">
-            Sign In
-          </Link>
-        </p>
-
-      </div>
-    </main>
+    <AuthShell
+      title="Reset your password"
+      subtitle="Enter your email and we'll send you a reset link."
+      footer={<>Remember your password? <Link href="/login" className="font-medium text-accent-text hover:text-ink">Sign in</Link></>}
+    >
+      <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleReset(); }}>
+        <Field label="Email">
+          <Input type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="h-11" />
+        </Field>
+        {error && <Alert>{error}</Alert>}
+        <Button type="submit" variant="primary" size="lg" disabled={loading} className="w-full">
+          {loading ? <><Spinner size={17} /> Sending…</> : "Send reset link"}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }

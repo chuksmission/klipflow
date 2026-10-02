@@ -1,6 +1,8 @@
 ﻿"use client";
 import { useState, useEffect } from "react";
+import { Check, CreditCard, X } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { confirmDialog } from "../../components/ui/Toaster";
 
 export default function AdminPlans() {
   const [plans, setPlans] = useState<any[]>([]);
@@ -96,7 +98,7 @@ export default function AdminPlans() {
   };
 
   const deletePlan = async (id: number) => {
-    if (!confirm("Delete this plan?")) return;
+    if (!(await confirmDialog({ title: "Delete this plan?", description: "Existing subscribers keep their plan until it ends. This can't be undone.", confirmLabel: "Delete", destructive: true }))) return;
     await supabase.from("plans").delete().eq("id", id);
     setPlans(plans.filter((p) => p.id !== id));
   };
@@ -111,55 +113,55 @@ export default function AdminPlans() {
   const formFields = (data: any, setData: any) => (
     <div className="grid md:grid-cols-2 gap-4">
       <div>
-        <label className="text-gray-400 text-xs mb-1 block">Plan Name</label>
-        <input type="text" value={data.name} onChange={(e) => setData({ ...data, name: e.target.value })} placeholder="Creator Pro" className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-sm" />
+        <label className="text-ink-muted text-xs mb-1 block">Plan Name</label>
+        <input type="text" value={data.name} onChange={(e) => setData({ ...data, name: e.target.value })} placeholder="Creator Pro" className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-2.5 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm" />
       </div>
       <div>
-        <label className="text-gray-400 text-xs mb-1 block">Description</label>
-        <input type="text" value={data.description} onChange={(e) => setData({ ...data, description: e.target.value })} placeholder="For serious content creators" className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-sm" />
+        <label className="text-ink-muted text-xs mb-1 block">Description</label>
+        <input type="text" value={data.description} onChange={(e) => setData({ ...data, description: e.target.value })} placeholder="For serious content creators" className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-2.5 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm" />
       </div>
       <div>
-        <label className="text-gray-400 text-xs mb-1 block">Monthly Price ($)</label>
-        <input type="number" value={data.price_monthly} onChange={(e) => setData({ ...data, price_monthly: e.target.value })} placeholder="29" className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-sm" />
+        <label className="text-ink-muted text-xs mb-1 block">Monthly Price ($)</label>
+        <input type="number" value={data.price_monthly} onChange={(e) => setData({ ...data, price_monthly: e.target.value })} placeholder="29" className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-2.5 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm" />
       </div>
       <div>
-        <label className="text-gray-400 text-xs mb-1 block">Yearly Price ($)</label>
-        <input type="number" value={data.price_yearly} onChange={(e) => setData({ ...data, price_yearly: e.target.value })} placeholder="23" className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-sm" />
+        <label className="text-ink-muted text-xs mb-1 block">Yearly Price ($)</label>
+        <input type="number" value={data.price_yearly} onChange={(e) => setData({ ...data, price_yearly: e.target.value })} placeholder="23" className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-2.5 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm" />
       </div>
       <div>
-        <label className="text-gray-400 text-xs mb-1 block">Tokens Per Month</label>
-        <input type="number" value={data.tokens_per_month} onChange={(e) => setData({ ...data, tokens_per_month: e.target.value })} placeholder="250" className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-sm" />
+        <label className="text-ink-muted text-xs mb-1 block">Tokens Per Month</label>
+        <input type="number" value={data.tokens_per_month} onChange={(e) => setData({ ...data, tokens_per_month: e.target.value })} placeholder="250" className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-2.5 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm" />
       </div>
       <div className="flex items-center gap-4 pt-4">
         <div className="flex items-center gap-2">
-          <button onClick={() => setData({ ...data, is_popular: !data.is_popular })} className={"relative w-10 h-5 rounded-full transition-colors " + (data.is_popular ? "bg-purple-600" : "bg-white/20")}>
+          <button onClick={() => setData({ ...data, is_popular: !data.is_popular })} className={"relative w-10 h-5 rounded-full transition-colors " + (data.is_popular ? "bg-purple-600" : "bg-raised-hover")}>
             <div className={"absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all " + (data.is_popular ? "left-5" : "left-0.5")} />
           </button>
-          <span className="text-gray-400 text-xs">Mark as Popular</span>
+          <span className="text-ink-muted text-xs">Mark as Popular</span>
         </div>
       </div>
 
       {/* Stripe Price IDs */}
-      <div className="md:col-span-2 border-t border-white/10 pt-4">
+      <div className="md:col-span-2 border-t border-line pt-4">
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-purple-400 text-xs font-bold uppercase tracking-widest">Stripe Price IDs</span>
-          <span className="text-gray-600 text-xs">— from your Stripe dashboard → Product catalog</span>
+          <span className="text-purple-400 text-xs font-medium">Stripe Price IDs</span>
+          <span className="text-ink-subtle text-xs">— from your Stripe dashboard → Product catalog</span>
         </div>
         <div className="grid md:grid-cols-2 gap-4">
           <div>
-            <label className="text-gray-400 text-xs mb-1 block">Monthly Price ID</label>
-            <input type="text" value={data.stripe_price_id_monthly || ""} onChange={(e) => setData({ ...data, stripe_price_id_monthly: e.target.value })} placeholder="price_1abc..." className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-sm font-mono" />
+            <label className="text-ink-muted text-xs mb-1 block">Monthly Price ID</label>
+            <input type="text" value={data.stripe_price_id_monthly || ""} onChange={(e) => setData({ ...data, stripe_price_id_monthly: e.target.value })} placeholder="price_1abc..." className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-2.5 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm font-mono" />
           </div>
           <div>
-            <label className="text-gray-400 text-xs mb-1 block">Yearly Price ID</label>
-            <input type="text" value={data.stripe_price_id_yearly || ""} onChange={(e) => setData({ ...data, stripe_price_id_yearly: e.target.value })} placeholder="price_1xyz..." className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-sm font-mono" />
+            <label className="text-ink-muted text-xs mb-1 block">Yearly Price ID</label>
+            <input type="text" value={data.stripe_price_id_yearly || ""} onChange={(e) => setData({ ...data, stripe_price_id_yearly: e.target.value })} placeholder="price_1xyz..." className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-2.5 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm font-mono" />
           </div>
         </div>
       </div>
 
       <div className="md:col-span-2">
-        <label className="text-gray-400 text-xs mb-1 block">Features (one per line)</label>
-        <textarea value={data.features} onChange={(e) => setData({ ...data, features: e.target.value })} placeholder={"250 tokens/month\nAll AI models\nVideo Studio\nAd Spy"} rows={5} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-sm resize-none" />
+        <label className="text-ink-muted text-xs mb-1 block">Features (one per line)</label>
+        <textarea value={data.features} onChange={(e) => setData({ ...data, features: e.target.value })} placeholder={"250 tokens/month\nAll AI models\nVideo Studio\nAd Spy"} rows={5} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-3 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm resize-none" />
       </div>
     </div>
   );
@@ -168,43 +170,43 @@ export default function AdminPlans() {
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold mb-1">Plans</h1>
-          <p className="text-gray-400 text-sm">Manage subscription plans and pricing</p>
+          <h1 className="text-2xl font-semibold tracking-tight mb-1">Plans</h1>
+          <p className="text-ink-muted text-sm">Manage subscription plans and pricing</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-xl transition text-sm">
+        <button onClick={() => setShowForm(!showForm)} className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-6 rounded-xl transition text-sm">
           + New Plan
         </button>
       </div>
 
       {/* Create Form */}
       {showForm && (
-        <div className="bg-white/5 border border-purple-500/30 rounded-2xl p-6 space-y-4">
-          <h3 className="font-bold text-lg">Create New Plan</h3>
+        <div className="bg-surface border border-line-strong rounded-2xl p-6 space-y-5 shadow-2xl shadow-black/60">
+          <h3 className="font-semibold text-lg">Create New Plan</h3>
           {formFields(form, setForm)}
           <div className="flex gap-3">
-            <button onClick={handleCreate} disabled={saving || !form.name} className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-2 px-6 rounded-xl transition text-sm">
+            <button onClick={handleCreate} disabled={saving || !form.name} className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-2 px-6 rounded-xl transition text-sm">
               {saving ? "Creating..." : "Create Plan"}
             </button>
-            <button onClick={() => setShowForm(false)} className="bg-white/10 hover:bg-white/20 text-white font-bold py-2 px-6 rounded-xl transition text-sm">Cancel</button>
+            <button onClick={() => setShowForm(false)} className="bg-raised hover:bg-raised-hover text-white font-semibold py-2 px-6 rounded-xl transition text-sm">Cancel</button>
           </div>
         </div>
       )}
 
       {/* Edit Modal */}
       {editingPlan && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 overflow-y-auto">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 overflow-y-auto">
           <div className="max-w-3xl mx-auto px-4 py-8">
-            <div className="bg-gray-900 border border-purple-500/30 rounded-2xl p-6 space-y-4">
+            <div className="bg-surface border border-line-strong rounded-2xl p-6 space-y-5 shadow-2xl shadow-black/60">
               <div className="flex items-center justify-between">
-                <h3 className="font-bold text-lg">Edit Plan — {editingPlan.name}</h3>
-                <button onClick={() => setEditingPlan(null)} className="text-gray-400 hover:text-white text-sm">✕ Close</button>
+                <h3 className="font-semibold text-lg">Edit Plan — {editingPlan.name}</h3>
+                <button onClick={() => setEditingPlan(null)} aria-label="Close" className="grid h-9 w-9 place-items-center rounded-lg text-ink-muted transition-colors hover:bg-white/5 hover:text-ink"><X size={18} aria-hidden /></button>
               </div>
               {formFields(editingPlan, setEditingPlan)}
               <div className="flex gap-3">
-                <button onClick={handleUpdate} disabled={updating} className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-2 px-6 rounded-xl transition text-sm">
+                <button onClick={handleUpdate} disabled={updating} className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-2 px-6 rounded-xl transition text-sm">
                   {updating ? "Saving..." : "Save Changes"}
                 </button>
-                <button onClick={() => setEditingPlan(null)} className="bg-white/10 hover:bg-white/20 text-white font-bold py-2 px-6 rounded-xl transition text-sm">Cancel</button>
+                <button onClick={() => setEditingPlan(null)} className="bg-raised hover:bg-raised-hover text-white font-semibold py-2 px-6 rounded-xl transition text-sm">Cancel</button>
               </div>
             </div>
           </div>
@@ -213,58 +215,58 @@ export default function AdminPlans() {
 
       {/* Plans List */}
       {loading ? (
-        <p className="text-gray-400">Loading...</p>
+        <p className="text-ink-muted">Loading...</p>
       ) : plans.length === 0 ? (
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-12 text-center">
-          <div className="text-5xl mb-4">💳</div>
-          <h3 className="font-bold text-lg mb-2">No plans yet</h3>
-          <p className="text-gray-400 text-sm">Create your first plan to start accepting subscriptions.</p>
+        <div className="bg-surface border border-line rounded-2xl p-12 text-center">
+          <span className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-white/[0.05] text-ink-muted"><CreditCard size={22} aria-hidden /></span>
+          <h3 className="font-semibold text-lg mb-2">No plans yet</h3>
+          <p className="text-ink-muted text-sm">Create your first plan to start accepting subscriptions.</p>
         </div>
       ) : (
         <div className="grid md:grid-cols-2 gap-4">
           {plans.map((plan) => (
-            <div key={plan.id} className={"bg-white/5 border rounded-2xl p-6 " + (plan.is_popular ? "border-purple-500/50" : "border-white/10")}>
+            <div key={plan.id} className={"bg-surface border rounded-2xl p-6 " + (plan.is_popular ? "border-accent/50" : "border-line")}>
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold">{plan.name}</h3>
+                    <h3 className="font-semibold">{plan.name}</h3>
                     {plan.is_popular && <span className="bg-purple-600 text-white text-xs px-2 py-0.5 rounded-full">Popular</span>}
-                    <span className={plan.is_active ? "bg-green-900/30 text-green-400 text-xs px-2 py-0.5 rounded-full" : "bg-gray-900/30 text-gray-500 text-xs px-2 py-0.5 rounded-full"}>
+                    <span className={plan.is_active ? "bg-emerald-500/10 text-emerald-300 text-xs px-2 py-0.5 rounded-full" : "bg-gray-900/30 text-ink-subtle text-xs px-2 py-0.5 rounded-full"}>
                       {plan.is_active ? "Active" : "Inactive"}
                     </span>
                   </div>
-                  <p className="text-gray-500 text-xs mt-0.5">{plan.description}</p>
+                  <p className="text-ink-subtle text-xs mt-0.5">{plan.description}</p>
                 </div>
-                <button onClick={() => toggleActive(plan.id, plan.is_active)} className={"relative w-10 h-5 rounded-full transition-colors " + (plan.is_active ? "bg-purple-600" : "bg-white/20")}>
+                <button onClick={() => toggleActive(plan.id, plan.is_active)} className={"relative w-10 h-5 rounded-full transition-colors " + (plan.is_active ? "bg-purple-600" : "bg-raised-hover")}>
                   <div className={"absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all " + (plan.is_active ? "left-5" : "left-0.5")} />
                 </button>
               </div>
               <div className="flex items-center gap-4 mb-3">
                 <div>
-                  <div className="text-xl font-extrabold">${plan.price_monthly}<span className="text-gray-500 text-xs">/mo</span></div>
-                  <div className="text-gray-500 text-xs">${plan.price_yearly}/mo yearly</div>
+                  <div className="text-xl font-semibold tracking-tight">${plan.price_monthly}<span className="text-ink-subtle text-xs">/mo</span></div>
+                  <div className="text-ink-subtle text-xs">${plan.price_yearly}/mo yearly</div>
                 </div>
-                <div className="bg-purple-900/30 border border-purple-500/20 rounded-xl px-3 py-1.5">
-                  <div className="text-purple-400 font-bold text-sm">{plan.tokens_per_month}</div>
-                  <div className="text-gray-500 text-xs">tokens/month</div>
+                <div className="bg-accent/[0.08] border border-accent/25 rounded-xl px-3 py-1.5">
+                  <div className="text-purple-400 font-semibold text-sm">{plan.tokens_per_month}</div>
+                  <div className="text-ink-subtle text-xs">tokens/month</div>
                 </div>
               </div>
 
               {/* Stripe Price IDs status */}
               <div className="flex gap-2 mb-3">
-                <span className={"text-xs px-2 py-0.5 rounded-full " + (plan.stripe_price_id_monthly ? "bg-green-900/30 text-green-400" : "bg-red-900/30 text-red-400")}>
-                  {plan.stripe_price_id_monthly ? "✓ Monthly Stripe" : "✗ No Monthly Stripe ID"}
+                <span className={"text-xs px-2 py-0.5 rounded-full " + (plan.stripe_price_id_monthly ? "bg-emerald-500/10 text-emerald-300" : "bg-red-500/10 text-red-400")}>
+                  {plan.stripe_price_id_monthly ? "Monthly Stripe" : "No monthly Stripe ID"}
                 </span>
-                <span className={"text-xs px-2 py-0.5 rounded-full " + (plan.stripe_price_id_yearly ? "bg-green-900/30 text-green-400" : "bg-red-900/30 text-red-400")}>
-                  {plan.stripe_price_id_yearly ? "✓ Yearly Stripe" : "✗ No Yearly Stripe ID"}
+                <span className={"text-xs px-2 py-0.5 rounded-full " + (plan.stripe_price_id_yearly ? "bg-emerald-500/10 text-emerald-300" : "bg-red-500/10 text-red-400")}>
+                  {plan.stripe_price_id_yearly ? "Yearly Stripe" : "No yearly Stripe ID"}
                 </span>
               </div>
 
               {Array.isArray(plan.features) && plan.features.length > 0 && (
                 <div className="space-y-1 mb-4">
                   {plan.features.map((feature: string, i: number) => (
-                    <div key={i} className="flex items-center gap-2 text-xs text-gray-400">
-                      <span className="text-green-400">✓</span> {feature}
+                    <div key={i} className="flex items-center gap-2 text-xs text-ink-muted">
+                      <Check size={14} className="flex-shrink-0 text-accent-text" aria-hidden /> {feature}
                     </div>
                   ))}
                 </div>

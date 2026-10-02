@@ -50,20 +50,20 @@ export default function AdminEmailTemplates() {
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold mb-1">Email Templates</h1>
-          <p className="text-gray-400 text-sm">Manage transactional email templates</p>
+          <h1 className="text-2xl font-semibold tracking-tight mb-1">Email Templates</h1>
+          <p className="text-ink-muted text-sm">Manage transactional email templates</p>
         </div>
         <button
           onClick={handleSave}
           disabled={saving}
-          className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-2 px-6 rounded-xl transition text-sm"
+          className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-2 px-6 rounded-xl transition text-sm"
         >
-          {saving ? "Saving..." : saved ? "? Saved!" : "Save Template"}
+          {saving ? "Saving..." : saved ? "Saved" : "Save Template"}
         </button>
       </div>
 
       {loading ? (
-        <p className="text-gray-400">Loading...</p>
+        <p className="text-ink-muted">Loading...</p>
       ) : (
         <div className="grid md:grid-cols-3 gap-6">
           <div className="md:col-span-2 space-y-4">
@@ -72,7 +72,7 @@ export default function AdminEmailTemplates() {
                 <button
                   key={i}
                   onClick={() => setActiveTemplate(i)}
-                  className={"px-4 py-2 rounded-xl text-xs font-bold transition " + (activeTemplate === i ? "bg-purple-600 text-white" : "bg-white/10 text-gray-400 hover:bg-white/20")}
+                  className={"px-4 py-2 rounded-xl text-xs font-semibold transition " + (activeTemplate === i ? "bg-purple-600 text-white" : "bg-raised text-ink-muted hover:bg-raised-hover")}
                 >
                   {template.name?.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase())}
                 </button>
@@ -80,22 +80,22 @@ export default function AdminEmailTemplates() {
             </div>
 
             {templates[activeTemplate] && (
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-4">
+              <div className="bg-surface border border-line rounded-2xl p-6 space-y-4">
                 <div>
-                  <label className="text-gray-400 text-xs mb-1 block">Subject Line</label>
+                  <label className="text-ink-muted text-xs mb-1 block">Subject Line</label>
                   <input
                     type="text"
                     value={templates[activeTemplate].subject || ""}
                     onChange={(e) => updateTemplate("subject", e.target.value)}
-                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-sm"
+                    className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-2.5 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm"
                   />
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-gray-400 text-xs">HTML Body</label>
+                    <label className="text-ink-muted text-xs">HTML Body</label>
                     <button
                       onClick={() => updateTemplate("html_body", "")}
-                      className="text-gray-600 hover:text-white text-xs transition"
+                      className="text-ink-subtle hover:text-white text-xs transition"
                     >
                       Reset
                     </button>
@@ -104,7 +104,7 @@ export default function AdminEmailTemplates() {
                     value={templates[activeTemplate].html_body || ""}
                     onChange={(e) => updateTemplate("html_body", e.target.value)}
                     rows={16}
-                    className="w-full bg-black/40 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-xs font-mono resize-none"
+                    className="w-full bg-black/40 border border-line hover:border-line-strong rounded-xl px-4 py-3 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-xs font-mono resize-none"
                   />
                 </div>
               </div>
@@ -112,15 +112,15 @@ export default function AdminEmailTemplates() {
           </div>
 
           <div className="space-y-4">
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-              <h3 className="font-bold text-sm mb-3">Available Variables</h3>
-              <p className="text-gray-500 text-xs mb-3">Click to copy. Variables are replaced with real values when email is sent.</p>
+            <div className="bg-surface border border-line rounded-2xl p-5">
+              <h3 className="font-semibold text-sm mb-3">Available Variables</h3>
+              <p className="text-ink-subtle text-xs mb-3">Click to copy. Variables are replaced with real values when email is sent.</p>
               <div className="space-y-2">
                 {variables.map((variable, i) => (
                   <button
                     key={i}
                     onClick={() => navigator.clipboard.writeText(variable)}
-                    className="w-full text-left bg-black/20 hover:bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-purple-400 text-xs font-mono transition"
+                    className="w-full text-left bg-canvas hover:bg-black/40 border border-line rounded-lg px-3 py-2 text-purple-400 text-xs font-mono transition"
                   >
                     {variable}
                   </button>
@@ -128,9 +128,9 @@ export default function AdminEmailTemplates() {
               </div>
             </div>
 
-            <div className="bg-purple-900/20 border border-purple-500/20 rounded-2xl p-5">
-              <h3 className="font-bold text-sm mb-2">?? How it works</h3>
-              <p className="text-gray-400 text-xs leading-relaxed">Variables like {"{{user_name}}"} are automatically replaced with real values when the email is sent to users.</p>
+            <div className="bg-accent/[0.08] border border-accent/25 rounded-2xl p-5">
+              <h3 className="font-semibold text-sm mb-2">?? How it works</h3>
+              <p className="text-ink-muted text-xs leading-relaxed">Variables like {"{{user_name}}"} are automatically replaced with real values when the email is sent to users.</p>
             </div>
           </div>
         </div>

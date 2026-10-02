@@ -6,6 +6,7 @@ export default function CookieBanner() {
 
   useEffect(() => {
     const consent = localStorage.getItem('cookie_consent');
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reading consent from localStorage after mount
     if (!consent) setVisible(true);
   }, []);
 
@@ -22,24 +23,27 @@ export default function CookieBanner() {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 px-6 py-4 bg-gray-950 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
-      <p className="text-gray-400 text-sm max-w-2xl">
-        We use cookies to improve your experience, analyze site traffic, and personalize content.
-        By clicking "Accept", you consent to our use of cookies. Read our{" "}
-        <a href="/privacy-policy" className="text-purple-400 hover:text-white underline transition">Privacy Policy</a>.
+    <div
+      role="region"
+      aria-label="Cookie consent"
+      className="fixed inset-x-3 bottom-3 z-50 rounded-2xl border border-line-strong bg-surface p-4 shadow-2xl shadow-black/60 sm:inset-x-auto sm:left-4 sm:bottom-4 sm:max-w-sm"
+    >
+      <p className="text-sm leading-relaxed text-ink-muted">
+        We use cookies to improve your experience and understand site traffic. Read our{" "}
+        <a href="/privacy-policy" className="text-accent-text underline-offset-2 hover:underline">privacy policy</a>.
       </p>
-      <div className="flex gap-3 shrink-0">
+      <div className="mt-3 grid grid-cols-2 gap-2">
         <button
           onClick={reject}
-          className="text-gray-400 hover:text-white text-sm font-semibold py-2 px-5 rounded-full border border-white/20 hover:border-white/40 transition"
+          className="h-9 rounded-lg border border-line bg-raised text-sm font-medium text-ink transition-colors hover:border-line-strong"
         >
           Reject
         </button>
         <button
           onClick={accept}
-          className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold py-2 px-5 rounded-full transition"
+          className="h-9 rounded-lg bg-accent text-sm font-medium text-white transition-colors hover:bg-accent-hover"
         >
-          Accept All
+          Accept all
         </button>
       </div>
     </div>

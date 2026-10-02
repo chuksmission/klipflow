@@ -1,3 +1,7 @@
+import Link from "next/link";
+import { BookOpen, ChevronDown, Mail } from "lucide-react";
+import { PageHeader, SectionTitle, cardClass } from "../../components/ui";
+
 export default function Help() {
   const faqs = [
     { q: "How do tokens work?", a: "1 video = 10 tokens, 1 image = 2 tokens, 1 script = 1 token. You start with 25 free tokens. Top up anytime from $5." },
@@ -8,37 +12,39 @@ export default function Help() {
   ];
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-extrabold mb-1">Help & Support</h1>
-        <p className="text-gray-400 text-sm">Get answers and contact our team</p>
-      </div>
+    <div className="mx-auto max-w-2xl">
+      <PageHeader title="Help and support" description="Get answers and contact our team." />
 
       {/* CONTACT */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <a href="mailto:support@klipflowai.com" className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:border-purple-500/50 transition">
-          <div className="text-3xl mb-3">📧</div>
-          <div className="font-bold mb-1">Email Support</div>
-          <div className="text-gray-400 text-sm">support@klipflowai.com</div>
+      <div className="mb-8 grid gap-3 sm:grid-cols-2">
+        <a href="mailto:support@klipflowai.com" className={`${cardClass} group flex items-start gap-4 p-5 transition-colors hover:border-line-strong hover:bg-raised`}>
+          <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl bg-accent/15 text-accent-text"><Mail size={19} aria-hidden /></span>
+          <div>
+            <div className="text-sm font-semibold">Email support</div>
+            <div className="mt-0.5 text-sm text-ink-muted">support@klipflowai.com</div>
+          </div>
         </a>
-        <a href="/blog" className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:border-purple-500/50 transition">
-          <div className="text-3xl mb-3">📚</div>
-          <div className="font-bold mb-1">Documentation</div>
-          <div className="text-gray-400 text-sm">Guides, tutorials and tips</div>
-        </a>
+        <Link href="/blog" className={`${cardClass} group flex items-start gap-4 p-5 transition-colors hover:border-line-strong hover:bg-raised`}>
+          <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl bg-accent/15 text-accent-text"><BookOpen size={19} aria-hidden /></span>
+          <div>
+            <div className="text-sm font-semibold">Guides</div>
+            <div className="mt-0.5 text-sm text-ink-muted">Tutorials and tips</div>
+          </div>
+        </Link>
       </div>
 
       {/* FAQ */}
-      <div>
-        <h2 className="text-lg font-bold mb-4">Frequently Asked Questions</h2>
-        <div className="space-y-3">
-          {faqs.map((item, i) => (
-            <div key={i} className="bg-white/5 border border-white/10 rounded-xl p-5">
-              <h3 className="font-semibold text-sm mb-2">{item.q}</h3>
-              <p className="text-gray-400 text-sm leading-relaxed">{item.a}</p>
-            </div>
-          ))}
-        </div>
+      <SectionTitle>Frequently asked questions</SectionTitle>
+      <div className={`${cardClass} divide-y divide-line`}>
+        {faqs.map((item) => (
+          <details key={item.q} className="group">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-medium text-ink transition-colors hover:bg-white/[0.02] [&::-webkit-details-marker]:hidden">
+              {item.q}
+              <ChevronDown size={17} className="flex-shrink-0 text-ink-muted transition-transform group-open:rotate-180" aria-hidden />
+            </summary>
+            <p className="px-5 pb-4 text-sm leading-relaxed text-ink-muted">{item.a}</p>
+          </details>
+        ))}
       </div>
     </div>
   );

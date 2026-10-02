@@ -1,5 +1,6 @@
 ﻿"use client";
 import { useState, useEffect } from "react";
+import { Film } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
 export default function AdminVideoTemplates() {
@@ -49,62 +50,62 @@ export default function AdminVideoTemplates() {
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold mb-1">Video Templates</h1>
-          <p className="text-gray-400 text-sm">{templates.length} videos  shown to users as inspiration</p>
+          <h1 className="text-2xl font-semibold tracking-tight mb-1">Video Templates</h1>
+          <p className="text-ink-muted text-sm">{templates.length} videos  shown to users as inspiration</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-xl transition text-sm">
+        <button onClick={() => setShowForm(!showForm)} className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-6 rounded-xl transition text-sm">
           + Add Video
         </button>
       </div>
 
       {showForm && (
-        <div className="bg-white/5 border border-purple-500/30 rounded-2xl p-6 space-y-4">
-          <h3 className="font-bold">Add Video Template</h3>
+        <div className="bg-surface border border-accent/25 rounded-2xl p-6 space-y-4">
+          <h3 className="font-semibold">Add Video Template</h3>
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <label className="text-gray-400 text-xs mb-1 block">Title</label>
-              <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Luxury Fashion" className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-sm" />
+              <label className="text-ink-muted text-xs mb-1 block">Title</label>
+              <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Luxury Fashion" className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-2.5 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm" />
             </div>
             <div>
-              <label className="text-gray-400 text-xs mb-1 block">Category</label>
-              <input type="text" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Fashion, Travel, Nature..." className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-sm" />
+              <label className="text-ink-muted text-xs mb-1 block">Category</label>
+              <input type="text" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Fashion, Travel, Nature..." className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-2.5 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm" />
             </div>
             <div className="md:col-span-2">
-              <label className="text-gray-400 text-xs mb-1 block">Video URL</label>
-              <input type="url" value={form.video_url} onChange={(e) => setForm({ ...form, video_url: e.target.value })} placeholder="https://example.com/video.mp4" className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-sm" />
+              <label className="text-ink-muted text-xs mb-1 block">Video URL</label>
+              <input type="url" value={form.video_url} onChange={(e) => setForm({ ...form, video_url: e.target.value })} placeholder="https://example.com/video.mp4" className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-2.5 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm" />
             </div>
             <div className="md:col-span-2">
-              <label className="text-gray-400 text-xs mb-1 block">Thumbnail URL (optional)</label>
-              <input type="url" value={form.thumbnail_url} onChange={(e) => setForm({ ...form, thumbnail_url: e.target.value })} placeholder="https://example.com/thumbnail.jpg" className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-sm" />
+              <label className="text-ink-muted text-xs mb-1 block">Thumbnail URL (optional)</label>
+              <input type="url" value={form.thumbnail_url} onChange={(e) => setForm({ ...form, thumbnail_url: e.target.value })} placeholder="https://example.com/thumbnail.jpg" className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-2.5 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm" />
             </div>
           </div>
           <div className="flex gap-3">
-            <button onClick={handleCreate} disabled={saving || !form.video_url} className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-2 px-6 rounded-xl transition text-sm">
+            <button onClick={handleCreate} disabled={saving || !form.video_url} className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-2 px-6 rounded-xl transition text-sm">
               {saving ? "Adding..." : "Add Video"}
             </button>
-            <button onClick={() => setShowForm(false)} className="bg-white/10 hover:bg-white/20 text-white font-bold py-2 px-6 rounded-xl transition text-sm">Cancel</button>
+            <button onClick={() => setShowForm(false)} className="bg-raised hover:bg-raised-hover text-white font-semibold py-2 px-6 rounded-xl transition text-sm">Cancel</button>
           </div>
         </div>
       )}
 
       {loading ? (
-        <p className="text-gray-400">Loading...</p>
+        <p className="text-ink-muted">Loading...</p>
       ) : templates.length === 0 ? (
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-12 text-center">
-          <div className="text-5xl mb-4">??</div>
-          <h3 className="font-bold text-lg mb-2">No video templates yet</h3>
-          <p className="text-gray-400 text-sm">Add reference videos that users can use as inspiration.</p>
+        <div className="bg-surface border border-line rounded-2xl p-12 text-center">
+          <span className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-white/[0.05] text-ink-muted"><Film size={22} aria-hidden /></span>
+          <h3 className="font-semibold text-lg mb-2">No video templates yet</h3>
+          <p className="text-ink-muted text-sm">Add reference videos that users can use as inspiration.</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {templates.map((template) => (
-            <div key={template.id} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+            <div key={template.id} className="bg-surface border border-line rounded-2xl overflow-hidden">
               <video src={template.video_url} className="w-full aspect-video object-cover" muted playsInline />
               <div className="p-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-bold text-xs">{template.title}</p>
-                    <p className="text-gray-500 text-xs">{template.category}</p>
+                    <p className="font-semibold text-xs">{template.title}</p>
+                    <p className="text-ink-subtle text-xs">{template.category}</p>
                   </div>
                   <button onClick={() => deleteTemplate(template.id)} className="text-red-400 hover:text-red-300 text-xs transition">Delete</button>
                 </div>

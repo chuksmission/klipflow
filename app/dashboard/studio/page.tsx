@@ -1,6 +1,9 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Check, CheckCircle2, ChevronLeft, Circle, Coins, X } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { getStudioModule, studioHref, takePendingGeneration, type StudioModuleId } from "../../components/catalog";
 
 interface Model {
   id: string;
@@ -30,7 +33,10 @@ interface Scene {
   status?: "pending" | "generating" | "done" | "failed";
 }
 
-export default function Studio() {
+function Studio() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlModule = searchParams.get("module");
   const [activeModule, setActiveModule] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState("5");
@@ -51,6 +57,7 @@ export default function Studio() {
   const [modelLabels, setModelLabels] = useState<Record<string, string>>({});
   const [modelDescs, setModelDescs] = useState<Record<string, string>>({});
   const [modelBadges, setModelBadges] = useState<Record<string, string>>({});
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   // Prompt Expander
   const [expandedPrompt, setExpandedPrompt] = useState("");
@@ -192,6 +199,7 @@ export default function Studio() {
       setModelLabels(sData.labels ?? {});
       setModelDescs(sData.descs ?? {});
       setModelBadges(sData.badges ?? {});
+      setSettingsLoaded(true);
       const pRes = await fetch("/api/token-pricing");
       const pData = await pRes.json();
       setTokenPricing(pData.pricing ?? {});
@@ -650,6 +658,42 @@ export default function Studio() {
     setVtFile(null); setVtDuration(0); setVtSourceLang("English"); setVtTargetLang("Spanish"); setVtStep("input"); setVtElapsed(0); setVtVideoUrl(null);
   };
 
+  const goBackToModules = () => { resetForm(); router.replace("/dashboard/studio"); };
+  const isBusy = loading || vtBusy || s2vStep === "generating";
+
+  // Open the module named in the URL (sidebar links) and apply any prompt or
+  // template handed over from the homepage.
+  useEffect(() => {
+    const pending = takePendingGeneration();
+    const target = getStudioModule(pending?.module ?? urlModule)?.id;
+    if (!target) {
+      // Syncing from an external source (the URL), which is what effects are for
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (!urlModule && !isBusy) setActiveModule(null);
+      return;
+    }
+    if (!pending && target === activeModuleRef.current) return;
+    if (isBusy) {
+      // Don't abandon a running generation; keep the URL on the current module
+      router.replace(activeModuleRef.current ? studioHref(activeModuleRef.current as StudioModuleId) : "/dashboard/studio");
+      return;
+    }
+    resetForm();
+    setActiveModule(target);
+    if (pending) {
+      if (pending.prompt) {
+        if (target === "script_to_video") setS2vScript(pending.prompt);
+        else if (target === "script") setScriptTopic(pending.prompt);
+        else setPrompt(pending.prompt);
+      }
+      if (pending.model && ALL_MODELS.some((m) => m.id === pending.model)) setSelectedModel(pending.model);
+      if (pending.aspect_ratio) { setAspectRatio(pending.aspect_ratio); setS2vAspectRatio(pending.aspect_ratio); }
+      if (pending.duration && ["5", "8", "10", "15"].includes(pending.duration)) setDuration(pending.duration);
+      if (target !== urlModule) router.replace(studioHref(target));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlModule]);
+
   const currentModel = ALL_MODELS.find((m) => m.id === selectedModel);
   const durationMultiplier = duration === "5" ? 1 : duration === "8" ? 1.6 : duration === "10" ? 2 : duration === "15" ? 3 : 1;
   const baseTokens = tokenPricing[selectedModel] ?? currentModel?.tokens ?? 10;
@@ -672,29 +716,40 @@ export default function Studio() {
   const s2vTotalTokens = s2vScenes.length * s2vTokensPerScene;
 
   return (
-    <div className="space-y-4 max-w-2xl mx-auto">
-      <div>
-        <h1 className="text-xl font-extrabold mb-0.5">Video Studio</h1>
-        <p className="text-gray-400 text-xs">{visibleModules.length} AI modules — all plans include all features</p>
-      </div>
-
-      <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3 flex items-center justify-between">
+    <div className={"space-y-4 mx-auto " + (activeModule ? "max-w-2xl" : "max-w-5xl")}>
+      {!activeModule && (
         <div>
-          <p className="text-purple-300 font-semibold text-sm">{tokenBalance} tokens remaining</p>
-          <p className="text-gray-500 text-xs">{isVTModule ? `AI Video Translator — ${vtTokensPerMinute} tokens/min` : `${currentModel?.name ?? "Select a module"} — ${tokenCost} tokens`}</p>
+          <h1 className="text-2xl font-semibold tracking-tight">What do you want to create?</h1>
+          <p className="text-ink-muted text-sm mt-1">Every plan includes every tool.</p>
         </div>
-        <a href="/dashboard/billing" className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold py-1.5 px-3 rounded-full transition">Top Up</a>
+      )}
+
+      <div className="bg-surface border border-line rounded-xl p-3 pl-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <Coins size={18} className="text-accent-text flex-shrink-0" aria-hidden />
+          <div className="min-w-0">
+            <p className="text-ink font-medium text-sm">{tokenBalance} tokens</p>
+            {activeModule && <p className="text-ink-subtle text-xs truncate">{isVTModule ? `Video Translator · ${vtTokensPerMinute} tokens per minute` : `${currentModel?.name ?? ""} · ${tokenCost} tokens`}</p>}
+          </div>
+        </div>
+        <a href="/dashboard/billing" className="inline-flex items-center h-9 px-4 rounded-lg bg-accent hover:bg-accent-hover text-white text-sm font-medium transition-colors flex-shrink-0">Top up</a>
       </div>
 
       {!activeModule && (
-        <div className="grid grid-cols-2 gap-3">
-          {visibleModules.map((mod) => (
-            <div key={mod.id} onClick={() => setActiveModule(mod.id)} className="bg-white/5 border border-white/10 rounded-xl p-4 hover:border-purple-500/50 transition cursor-pointer">
-              {mod.badge && <div className="inline-block bg-purple-900/40 text-purple-300 text-xs font-bold px-2 py-0.5 rounded-full mb-2">{mod.badge}</div>}
-              <h3 className="font-bold text-sm mb-1">{mod.title}</h3>
-              <p className="text-gray-500 text-xs leading-relaxed">{mod.desc}</p>
-            </div>
-          ))}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {visibleModules.map((mod) => {
+            const Icon = getStudioModule(mod.id)?.icon;
+            return (
+              <button key={mod.id} onClick={() => router.push(studioHref(mod.id as StudioModuleId))} className="text-left bg-surface border border-line rounded-2xl p-4 hover:border-line-strong hover:bg-raised transition-colors">
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  {Icon && <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent/15 text-accent-text"><Icon size={20} aria-hidden /></span>}
+                  {mod.badge && <span className="bg-white/[0.06] text-ink-muted text-[11px] font-medium px-2 py-0.5 rounded-full">{mod.badge}</span>}
+                </div>
+                <h3 className="font-medium text-[15px] text-ink mb-1">{mod.title}</h3>
+                <p className="text-ink-muted text-xs leading-relaxed">{mod.desc}</p>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -702,40 +757,40 @@ export default function Studio() {
       {isPromptModule && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <button onClick={resetForm} className="text-gray-400 hover:text-white text-sm transition">Back</button>
-            <h2 className="font-bold text-sm">Prompt Expander</h2>
+            <button onClick={goBackToModules} className="inline-flex items-center gap-1 h-9 pl-2 pr-3 rounded-lg border border-line bg-raised text-ink text-sm hover:border-line-strong transition-colors"><ChevronLeft size={16} aria-hidden /> All tools</button>
+            <h2 className="font-semibold text-base">Prompt Expander</h2>
           </div>
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-4">
-            <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3">
-              <p className="text-purple-300 text-xs font-semibold mb-1">Free — no tokens required</p>
-              <p className="text-gray-400 text-xs">Type a simple idea and AI transforms it into a detailed cinematic prompt.</p>
+          <div className="bg-surface border border-line rounded-2xl p-5 space-y-5">
+            <div className="bg-accent/[0.07] border border-accent/25 rounded-xl p-3.5">
+              <p className="text-accent-text text-xs font-semibold mb-1">Free — no tokens required</p>
+              <p className="text-ink-muted text-xs">Type a simple idea and AI transforms it into a detailed cinematic prompt.</p>
             </div>
             <div>
-              <label className="text-gray-400 text-xs mb-1 block">Your simple idea</label>
-              <textarea placeholder="e.g. cat playing piano, sunset over mountains, product showcase..." value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition text-sm resize-none" />
+              <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Your simple idea</label>
+              <textarea placeholder="e.g. cat playing piano, sunset over mountains, product showcase..." value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-3 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm resize-none" />
             </div>
             <div>
-              <label className="text-gray-400 text-xs mb-1 block">Target Format</label>
-              <select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm">
+              <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Target Format</label>
+              <select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
                 <option value="16:9">16:9 YouTube / Widescreen</option>
                 <option value="9:16">9:16 TikTok / Reels / Shorts</option>
                 <option value="1:1">1:1 Square Feed</option>
               </select>
             </div>
             {error && <p className="text-red-400 text-sm">{error}</p>}
-            <button onClick={handleExpandPrompt} disabled={expandLoading} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition">
+            <button onClick={handleExpandPrompt} disabled={expandLoading} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition">
               {expandLoading ? "Expanding..." : "Expand Prompt — Free"}
             </button>
             {expandedPrompt && (
               <div className="space-y-3">
-                <div className="bg-black/30 border border-white/10 rounded-xl p-4">
+                <div className="bg-canvas border border-line rounded-xl p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-green-400 text-xs font-bold">Expanded Prompt</p>
-                    <button onClick={() => navigator.clipboard.writeText(expandedPrompt)} className="text-gray-400 hover:text-white text-xs transition">Copy</button>
+                    <p className="text-emerald-400 text-xs font-semibold">Expanded Prompt</p>
+                    <button onClick={() => navigator.clipboard.writeText(expandedPrompt)} className="text-ink-muted hover:text-white text-xs transition">Copy</button>
                   </div>
-                  <p className="text-gray-200 text-sm leading-relaxed">{expandedPrompt}</p>
+                  <p className="text-ink text-sm leading-relaxed">{expandedPrompt}</p>
                 </div>
-                <button onClick={() => { setPrompt(expandedPrompt); setActiveModule("text_to_video"); setExpandedPrompt(""); }} className="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-2.5 rounded-xl transition text-sm">
+                <button onClick={() => { setPrompt(expandedPrompt); setActiveModule("text_to_video"); setExpandedPrompt(""); router.replace(studioHref("text_to_video")); }} className="w-full bg-raised hover:bg-raised-hover border border-line text-white font-semibold py-2.5 rounded-xl transition text-sm">
                   Use this prompt to generate a video →
                 </button>
               </div>
@@ -748,22 +803,22 @@ export default function Studio() {
       {isScriptModule && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <button onClick={resetForm} className="text-gray-400 hover:text-white text-sm transition">Back</button>
-            <h2 className="font-bold text-sm">Script Writer</h2>
+            <button onClick={goBackToModules} className="inline-flex items-center gap-1 h-9 pl-2 pr-3 rounded-lg border border-line bg-raised text-ink text-sm hover:border-line-strong transition-colors"><ChevronLeft size={16} aria-hidden /> All tools</button>
+            <h2 className="font-semibold text-base">Script Writer</h2>
           </div>
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-4">
-            <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3">
-              <p className="text-purple-300 text-xs font-semibold mb-1">Free — no tokens required</p>
-              <p className="text-gray-400 text-xs">AI writes a complete viral script with hook, body, and call to action.</p>
+          <div className="bg-surface border border-line rounded-2xl p-5 space-y-5">
+            <div className="bg-accent/[0.07] border border-accent/25 rounded-xl p-3.5">
+              <p className="text-accent-text text-xs font-semibold mb-1">Free — no tokens required</p>
+              <p className="text-ink-muted text-xs">AI writes a complete viral script with hook, body, and call to action.</p>
             </div>
             <div>
-              <label className="text-gray-400 text-xs mb-1 block">Video Topic</label>
-              <textarea placeholder="e.g. 5 signs your gut health is ruined, how I made $10k with AI..." value={scriptTopic} onChange={(e) => setScriptTopic(e.target.value)} rows={3} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition text-sm resize-none" />
+              <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Video Topic</label>
+              <textarea placeholder="e.g. 5 signs your gut health is ruined, how I made $10k with AI..." value={scriptTopic} onChange={(e) => setScriptTopic(e.target.value)} rows={3} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-3 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm resize-none" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-gray-400 text-xs mb-1 block">Platform</label>
-                <select value={scriptPlatform} onChange={(e) => setScriptPlatform(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm">
+                <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Platform</label>
+                <select value={scriptPlatform} onChange={(e) => setScriptPlatform(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
                   <option value="tiktok">TikTok</option>
                   <option value="instagram">Instagram Reels</option>
                   <option value="youtube">YouTube Shorts</option>
@@ -771,8 +826,8 @@ export default function Studio() {
                 </select>
               </div>
               <div>
-                <label className="text-gray-400 text-xs mb-1 block">Video Length</label>
-                <select value={scriptDuration} onChange={(e) => setScriptDuration(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm">
+                <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Video Length</label>
+                <select value={scriptDuration} onChange={(e) => setScriptDuration(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
                   <option value="15">15 seconds</option>
                   <option value="30">30 seconds</option>
                   <option value="60">60 seconds</option>
@@ -781,8 +836,8 @@ export default function Studio() {
               </div>
             </div>
             <div>
-              <label className="text-gray-400 text-xs mb-1 block">Script Style</label>
-              <select value={scriptFormat} onChange={(e) => setScriptFormat(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm">
+              <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Script Style</label>
+              <select value={scriptFormat} onChange={(e) => setScriptFormat(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
                 <option value="storytelling">Storytelling</option>
                 <option value="educational">Educational / How-to</option>
                 <option value="listicle">Listicle (Top 5...)</option>
@@ -792,21 +847,21 @@ export default function Studio() {
               </select>
             </div>
             {error && <p className="text-red-400 text-sm">{error}</p>}
-            <button onClick={handleWriteScript} disabled={scriptLoading} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition">
+            <button onClick={handleWriteScript} disabled={scriptLoading} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition">
               {scriptLoading ? "Writing Script..." : "Write Script — Free"}
             </button>
             {generatedScript && (
               <div className="space-y-3">
-                <div className="bg-black/30 border border-white/10 rounded-xl p-4">
+                <div className="bg-canvas border border-line rounded-xl p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-green-400 text-xs font-bold">Your Script</p>
-                    <button onClick={() => navigator.clipboard.writeText(generatedScript)} className="text-gray-400 hover:text-white text-xs transition">Copy</button>
+                    <p className="text-emerald-400 text-xs font-semibold">Your Script</p>
+                    <button onClick={() => navigator.clipboard.writeText(generatedScript)} className="text-ink-muted hover:text-white text-xs transition">Copy</button>
                   </div>
-                  <pre className="text-gray-200 text-xs leading-relaxed whitespace-pre-wrap">{generatedScript}</pre>
+                  <pre className="text-ink text-xs leading-relaxed whitespace-pre-wrap">{generatedScript}</pre>
                 </div>
                 <button
-                  onClick={() => { setS2vScript(generatedScript); setActiveModule("script_to_video"); setGeneratedScript(""); }}
-                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl transition text-sm"
+                  onClick={() => { setS2vScript(generatedScript); setActiveModule("script_to_video"); setGeneratedScript(""); router.replace(studioHref("script_to_video")); }}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 rounded-xl transition text-sm"
                 >
                   Turn this script into a video →
                 </button>
@@ -820,12 +875,12 @@ export default function Studio() {
       {isS2VModule && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <button onClick={resetForm} className="text-gray-400 hover:text-white text-sm transition">Back</button>
-            <h2 className="font-bold text-sm">Script to Video</h2>
+            <button onClick={goBackToModules} className="inline-flex items-center gap-1 h-9 pl-2 pr-3 rounded-lg border border-line bg-raised text-ink text-sm hover:border-line-strong transition-colors"><ChevronLeft size={16} aria-hidden /> All tools</button>
+            <h2 className="font-semibold text-base">Script to Video</h2>
             {s2vStep !== "input" && (
               <div className="ml-auto flex gap-2">
                 {["input", "review", "generating", "done"].map((step, i) => (
-                  <div key={step} className={"w-2 h-2 rounded-full " + (["input", "review", "generating", "done"].indexOf(s2vStep) >= i ? "bg-purple-500" : "bg-white/20")} />
+                  <div key={step} className={"w-2 h-2 rounded-full " + (["input", "review", "generating", "done"].indexOf(s2vStep) >= i ? "bg-purple-500" : "bg-raised-hover")} />
                 ))}
               </div>
             )}
@@ -833,34 +888,34 @@ export default function Studio() {
 
           {/* STEP 1 — Input */}
           {s2vStep === "input" && (
-            <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-4">
-              <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3">
-                <p className="text-purple-300 text-xs font-semibold mb-1">How it works</p>
-                <p className="text-gray-400 text-xs">Paste your script → AI splits it into 3-5 scenes → Review visual prompts → Generate all videos with native audio</p>
+            <div className="bg-surface border border-line rounded-2xl p-5 space-y-5">
+              <div className="bg-accent/[0.07] border border-accent/25 rounded-xl p-3.5">
+                <p className="text-accent-text text-xs font-semibold mb-1">How it works</p>
+                <p className="text-ink-muted text-xs">Paste your script → AI splits it into 3-5 scenes → Review visual prompts → Generate all videos with native audio</p>
               </div>
               <div>
-                <label className="text-gray-400 text-xs mb-1 block">Your Script</label>
+                <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Your Script</label>
                 <textarea
                   placeholder="Paste your script here, or write it directly. AI will split it into scenes automatically..."
                   value={s2vScript} onChange={(e) => setS2vScript(e.target.value)} rows={8}
-                  className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition text-sm resize-none"
+                  className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-3 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm resize-none"
                 />
               </div>
               <div>
-                <label className="text-gray-400 text-xs mb-1 block">Video Format</label>
-                <select value={s2vAspectRatio} onChange={(e) => setS2vAspectRatio(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm">
+                <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Video Format</label>
+                <select value={s2vAspectRatio} onChange={(e) => setS2vAspectRatio(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
                   <option value="9:16">9:16 TikTok / Reels (Recommended)</option>
                   <option value="16:9">16:9 YouTube</option>
                   <option value="1:1">1:1 Square Feed</option>
                 </select>
               </div>
-              <div className="border border-white/10 rounded-xl p-4 space-y-3">
+              <div className="border border-line rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-white text-xs font-bold">Model / Creator Photo</p>
-                    <p className="text-gray-500 text-xs">Optional — upload a photo to use the same person in all scenes</p>
+                    <p className="text-white text-xs font-semibold">Model / Creator Photo</p>
+                    <p className="text-ink-subtle text-xs">Optional — upload a photo to use the same person in all scenes</p>
                   </div>
-                  <span className="text-gray-600 text-xs">Optional</span>
+                  <span className="text-ink-subtle text-xs">Optional</span>
                 </div>
                 <input type="file" accept="image/*" ref={s2vPhotoRef} onChange={async (e) => {
                   const file = e.target.files?.[0];
@@ -877,31 +932,31 @@ export default function Studio() {
                 }} className="hidden" />
                 {s2vModelPhoto === "uploading" ? (
                   <div className="flex items-center gap-3">
-                    <div className="w-16 h-16 rounded-xl bg-white/10 animate-pulse" />
-                    <p className="text-gray-400 text-xs">Uploading photo...</p>
+                    <div className="w-16 h-16 rounded-xl bg-raised animate-pulse" />
+                    <p className="text-ink-muted text-xs">Uploading photo...</p>
                   </div>
                 ) : s2vModelPhoto ? (
                   <div className="flex items-center gap-3">
                     <img src={s2vModelPhoto} alt="Model" className="w-16 h-16 rounded-xl object-cover" />
                     <div>
-                      <p className="text-green-400 text-xs font-semibold mb-1">Photo uploaded ✓</p>
-                      <button onClick={() => { setS2vModelPhoto(""); setS2vModelPhotoFile(null); }} className="text-gray-500 hover:text-white text-xs transition">Remove</button>
+                      <p className="text-emerald-400 text-xs font-semibold mb-1">Photo uploaded</p>
+                      <button onClick={() => { setS2vModelPhoto(""); setS2vModelPhotoFile(null); }} className="text-ink-subtle hover:text-white text-xs transition">Remove</button>
                     </div>
                   </div>
                 ) : (
-                  <button onClick={() => s2vPhotoRef.current?.click()} className="w-full border-2 border-dashed border-white/20 hover:border-purple-500/50 rounded-xl p-4 text-center transition">
-                    <p className="text-gray-400 text-xs font-semibold">Click to upload model photo</p>
-                    <p className="text-gray-600 text-xs mt-1">JPG, PNG — face clearly visible</p>
+                  <button onClick={() => s2vPhotoRef.current?.click()} className="w-full border border-dashed border-line-strong hover:border-accent/60 bg-canvas rounded-xl p-4 text-center transition">
+                    <p className="text-ink-muted text-xs font-semibold">Click to upload model photo</p>
+                    <p className="text-ink-subtle text-xs mt-1">JPG, PNG — face clearly visible</p>
                   </button>
                 )}
                 <div>
-                  <label className="text-gray-500 text-xs mb-1 block">Describe your model (helps AI stay consistent)</label>
-                  <input type="text" placeholder="e.g. Young African woman, natural hair, warm smile, casual style" value={s2vModelDesc} onChange={(e) => setS2vModelDesc(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-xs" />
+                  <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Describe your model (helps AI stay consistent)</label>
+                  <input type="text" placeholder="e.g. Young African woman, natural hair, warm smile, casual style" value={s2vModelDesc} onChange={(e) => setS2vModelDesc(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-xs" />
                 </div>
               </div>
 
               {error && <p className="text-red-400 text-sm">{error}</p>}
-              <button onClick={handleSplitScenes} disabled={s2vSplitting} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition">
+              <button onClick={handleSplitScenes} disabled={s2vSplitting} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition">
                 {s2vSplitting ? "AI is analyzing your script..." : "Split into Scenes →"}
               </button>
             </div>
@@ -910,20 +965,20 @@ export default function Studio() {
           {/* STEP 2 — Review scenes */}
           {s2vStep === "review" && (
             <div className="space-y-4">
-              <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-4">
+              <div className="bg-surface border border-line rounded-2xl p-5 space-y-5">
                 <div>
-                  <p className="text-white font-bold text-sm mb-1">AI found {s2vScenes.length} scenes</p>
-                  <p className="text-gray-400 text-xs">Review and edit the visual prompts before generating. Each scene is 5 seconds.</p>
+                  <p className="text-white font-semibold text-sm mb-1">AI found {s2vScenes.length} scenes</p>
+                  <p className="text-ink-muted text-xs">Review and edit the visual prompts before generating. Each scene is 5 seconds.</p>
                 </div>
                 <div className="space-y-3">
                   {s2vScenes.map((scene, i) => (
-                    <div key={i} className="bg-black/20 border border-white/10 rounded-xl p-4">
+                    <div key={i} className="bg-canvas border border-line rounded-xl p-4">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="bg-purple-600 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center">{scene.scene_number}</span>
-                        <span className="text-gray-400 text-xs font-semibold">Scene {scene.scene_number}</span>
+                        <span className="bg-purple-600 text-white text-xs font-semibold w-6 h-6 rounded-full flex items-center justify-center">{scene.scene_number}</span>
+                        <span className="text-ink-muted text-xs font-semibold">Scene {scene.scene_number}</span>
                       </div>
-                      <p className="text-gray-400 text-xs mb-2 italic">"{scene.narration}"</p>
-                      <label className="text-gray-500 text-xs mb-1 block">Visual Prompt (editable)</label>
+                      <p className="text-ink-muted text-xs mb-2 italic">"{scene.narration}"</p>
+                      <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Visual Prompt (editable)</label>
                       <textarea
                         value={scene.visual_prompt}
                         onChange={(e) => {
@@ -932,16 +987,16 @@ export default function Studio() {
                           setS2vScenes(updated);
                         }}
                         rows={3}
-                        className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500 transition resize-none"
+                        className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition resize-none"
                       />
                       <div className="mt-2">
-                        <label className="text-gray-500 text-xs mb-1 block">Scene Style Override (optional)</label>
+                        <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Scene Style Override (optional)</label>
                         <input
                           type="text"
                           placeholder="e.g. red dress, braided hair, outdoor garden"
                           value={s2vSceneStyles[scene.scene_number] || ""}
                           onChange={(e) => setS2vSceneStyles({ ...s2vSceneStyles, [scene.scene_number]: e.target.value })}
-                          className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-xs"
+                          className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-xs"
                         />
                       </div>
                     </div>
@@ -949,18 +1004,18 @@ export default function Studio() {
                 </div>
 
                 <div>
-                  <label className="text-gray-400 text-xs mb-2 block">AI Model (audio models only)</label>
+                  <label className="text-ink-muted text-[13px] font-medium mb-2 block">AI Model (audio models only)</label>
                   <div className="grid grid-cols-1 gap-2">
                     {AUDIO_MODELS.map((model) => (
                       <button key={model.id} onClick={() => setS2vModel(model.id)}
-                        className={"p-3 rounded-xl border text-left transition " + (s2vModel === model.id ? "border-purple-500 bg-purple-900/30" : "border-white/10 bg-white/5 hover:border-purple-500/50")}
+                        className={"p-3 rounded-xl border text-left transition " + (s2vModel === model.id ? "border-accent bg-accent/10" : "border-line bg-surface hover:border-line-strong")}
                       >
                         <div className="flex items-center justify-between">
                           <div>
-                            <div className="font-bold text-xs">{model.name}</div>
-                            <div className="text-gray-500 text-xs">{model.desc}</div>
+                            <div className="font-semibold text-xs">{model.name}</div>
+                            <div className="text-ink-subtle text-xs">{model.desc}</div>
                           </div>
-                          <div className="text-purple-300 text-xs font-bold">{tokenPricing[model.id] ?? model.tokens} tokens/scene</div>
+                          <div className="text-accent-text text-xs font-semibold">{tokenPricing[model.id] ?? model.tokens} tokens/scene</div>
                         </div>
                       </button>
                     ))}
@@ -968,33 +1023,33 @@ export default function Studio() {
                 </div>
 
                 {s2vModelPhoto && (
-                  <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-3 flex items-center gap-3">
+                  <div className="bg-emerald-500/[0.07] border border-emerald-500/25 rounded-xl p-3 flex items-center gap-3">
                     <img src={s2vModelPhoto} alt="Model" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
                     <div>
-                      <p className="text-green-400 text-xs font-bold">Model photo active</p>
-                      <p className="text-gray-500 text-xs">Your model will appear in all scenes</p>
+                      <p className="text-emerald-400 text-xs font-semibold">Model photo active</p>
+                      <p className="text-ink-subtle text-xs">Your model will appear in all scenes</p>
                     </div>
                   </div>
                 )}
                 <div>
-                  <label className="text-gray-400 text-xs mb-2 block">Scene Duration</label>
-                  <select value={s2vSceneDuration} onChange={(e) => setS2vSceneDuration(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm">
+                  <label className="text-ink-muted text-[13px] font-medium mb-2 block">Scene Duration</label>
+                  <select value={s2vSceneDuration} onChange={(e) => setS2vSceneDuration(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
                     <option value="5">5 seconds — short hook</option>
                     <option value="8">8 seconds — standard</option>
                     <option value="10">10 seconds — recommended for dialogue</option>
                     <option value="15">15 seconds — long dialogue (Kling 3.0 only)</option>
                   </select>
                 </div>
-                <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-3">
-                  <p className="text-yellow-400 text-xs font-bold">Total cost: {s2vTotalTokens} tokens</p>
-                  <p className="text-gray-500 text-xs">{s2vScenes.length} scenes × {s2vTokensPerScene} tokens each • You have {tokenBalance} tokens</p>
+                <div className="bg-amber-500/[0.07] border border-amber-500/25 rounded-xl p-3">
+                  <p className="text-amber-300 text-xs font-semibold">Total cost: {s2vTotalTokens} tokens</p>
+                  <p className="text-ink-subtle text-xs">{s2vScenes.length} scenes × {s2vTokensPerScene} tokens each • You have {tokenBalance} tokens</p>
                 </div>
 
                 {error && <p className="text-red-400 text-sm">{error}</p>}
 
                 <div className="grid grid-cols-2 gap-3">
-                  <button onClick={() => setS2vStep("input")} className="bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition text-sm">← Edit Script</button>
-                  <button onClick={handleGenerateScenes} disabled={tokenBalance < s2vTotalTokens} className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition text-sm">
+                  <button onClick={() => setS2vStep("input")} className="bg-raised hover:bg-raised-hover border border-line text-white font-semibold py-3 rounded-xl transition text-sm">← Edit Script</button>
+                  <button onClick={handleGenerateScenes} disabled={tokenBalance < s2vTotalTokens} className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition text-sm">
                     Generate {s2vScenes.length} Videos →
                   </button>
                 </div>
@@ -1004,49 +1059,49 @@ export default function Studio() {
 
           {/* STEP 3 — Generating */}
           {s2vStep === "generating" && (
-            <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-4">
+            <div className="bg-surface border border-line rounded-2xl p-6 space-y-5">
               <div className="text-center">
-                <h3 className="font-bold mb-1">Generating Your Videos</h3>
-                <p className="text-gray-400 text-sm">Scene {s2vCurrentScene + 1} of {s2vScenes.length} — please keep this page open</p>
+                <h3 className="font-semibold mb-1">Generating Your Videos</h3>
+                <p className="text-ink-muted text-sm">Scene {s2vCurrentScene + 1} of {s2vScenes.length} — please keep this page open</p>
               </div>
               <div className="space-y-3">
                 {s2vScenes.map((scene, i) => (
-                  <div key={i} className="flex items-center gap-3 bg-black/20 rounded-xl px-4 py-3">
-                    <div className={"w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 " +
+                  <div key={i} className="flex items-center gap-3 bg-canvas rounded-xl px-4 py-3">
+                    <div className={"w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 " +
                       (scene.status === "done" ? "bg-green-600 text-white" :
                        scene.status === "generating" ? "bg-purple-600 text-white animate-pulse" :
                        scene.status === "failed" ? "bg-red-600 text-white" :
-                       "bg-white/20 text-gray-400")}>
-                      {scene.status === "done" ? "✓" : scene.status === "failed" ? "✗" : scene.scene_number}
+                       "bg-raised-hover text-ink-muted")}>
+                      {scene.status === "done" ? <Check size={13} aria-hidden /> : scene.status === "failed" ? <X size={13} aria-hidden /> : scene.scene_number}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-gray-300 truncate">{scene.narration}</p>
+                      <p className="text-xs text-ink truncate">{scene.narration}</p>
                     </div>
-                    <span className={"text-xs font-bold " +
-                      (scene.status === "done" ? "text-green-400" :
+                    <span className={"text-xs font-semibold " +
+                      (scene.status === "done" ? "text-emerald-400" :
                        scene.status === "generating" ? "text-purple-400" :
-                       scene.status === "failed" ? "text-red-400" : "text-gray-600")}>
+                       scene.status === "failed" ? "text-red-400" : "text-ink-subtle")}>
                       {scene.status === "done" ? "Done" : scene.status === "generating" ? "Generating..." : scene.status === "failed" ? "Failed" : "Waiting"}
                     </span>
                   </div>
                 ))}
               </div>
-              <p className="text-gray-500 text-xs text-center">Each scene takes 1-3 minutes. Do not close this page.</p>
+              <p className="text-ink-subtle text-xs text-center">Each scene takes 1-3 minutes. Do not close this page.</p>
             </div>
           )}
 
           {/* STEP 4 — Done */}
           {s2vStep === "done" && (
             <div className="space-y-4">
-              <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-4">
-                <p className="text-green-400 font-bold mb-1">✓ All scenes generated!</p>
-                <p className="text-gray-400 text-xs">Your videos have been saved to the Gallery. Download each scene below.</p>
+              <div className="bg-emerald-500/[0.07] border border-emerald-500/25 rounded-xl p-4">
+                <p className="text-emerald-400 font-semibold mb-1">All scenes generated</p>
+                <p className="text-ink-muted text-xs">Your videos have been saved to the Gallery. Download each scene below.</p>
               </div>
               <div className="space-y-4">
                 {s2vScenes.map((scene, i) => (
-                  <div key={i} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-                    <div className="px-4 py-2 border-b border-white/10 flex items-center justify-between">
-                      <span className="text-xs font-bold text-purple-300">Scene {scene.scene_number}</span>
+                  <div key={i} className="bg-surface border border-line rounded-xl overflow-hidden">
+                    <div className="px-4 py-2 border-b border-line flex items-center justify-between">
+                      <span className="text-xs font-semibold text-accent-text">Scene {scene.scene_number}</span>
                       {scene.status === "done" && scene.video_url && (
                         <button onClick={() => handleDownload(scene.video_url!)} className="text-purple-400 hover:text-white text-xs transition font-semibold">Download</button>
                       )}
@@ -1055,17 +1110,17 @@ export default function Studio() {
                     {scene.status === "done" && scene.video_url ? (
                       <video src={scene.video_url} controls playsInline className="w-full" />
                     ) : (
-                      <div className="p-4 text-center text-gray-500 text-sm">Generation failed for this scene</div>
+                      <div className="p-4 text-center text-ink-subtle text-sm">Generation failed for this scene</div>
                     )}
                     <div className="px-4 py-2">
-                      <p className="text-gray-500 text-xs italic">"{scene.narration}"</p>
+                      <p className="text-ink-subtle text-xs italic">"{scene.narration}"</p>
                     </div>
                   </div>
                 ))}
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => { setS2vStep("input"); setS2vScenes([]); setS2vScript(""); }} className="bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition text-sm">New Script</button>
-                <button onClick={resetForm} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition text-sm">Back to Studio</button>
+                <button onClick={() => { setS2vStep("input"); setS2vScenes([]); setS2vScript(""); }} className="bg-raised hover:bg-raised-hover border border-line text-white font-semibold py-3 rounded-xl transition text-sm">New Script</button>
+                <button onClick={goBackToModules} className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-xl transition text-sm">Back to Studio</button>
               </div>
             </div>
           )}
@@ -1076,72 +1131,79 @@ export default function Studio() {
       {isVTModule && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            {!vtBusy && <button onClick={resetForm} className="text-gray-400 hover:text-white text-sm transition">Back</button>}
-            <h2 className="font-bold text-sm">AI Video Translator</h2>
+            {!vtBusy && <button onClick={goBackToModules} className="inline-flex items-center gap-1 h-9 pl-2 pr-3 rounded-lg border border-line bg-raised text-ink text-sm hover:border-line-strong transition-colors"><ChevronLeft size={16} aria-hidden /> All tools</button>}
+            <h2 className="font-semibold text-base">AI Video Translator</h2>
           </div>
 
-          {vtStep === "input" && (
-            <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-4">
-              <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3">
-                <p className="text-purple-300 text-xs font-semibold mb-1">How it works</p>
-                <p className="text-gray-400 text-xs">Upload a video → pick a language → AI translates the speech, clones the voice and lip-syncs the speaker. {vtTokensPerMinute} tokens per minute of video.</p>
+          {settingsLoaded && enabledKeys["heygen_enabled"] !== true && vtStep === "input" && (
+            <div className="bg-surface border border-line rounded-xl p-6 text-center">
+              <p className="text-ink font-medium mb-1">Video Translator isn&apos;t available yet</p>
+              <p className="text-ink-muted text-sm">It&apos;s coming soon. In the meantime, try another tool.</p>
+            </div>
+          )}
+
+          {settingsLoaded && enabledKeys["heygen_enabled"] === true && vtStep === "input" && (
+            <div className="bg-surface border border-line rounded-2xl p-5 space-y-5">
+              <div className="bg-accent/[0.07] border border-accent/25 rounded-xl p-3.5">
+                <p className="text-accent-text text-xs font-semibold mb-1">How it works</p>
+                <p className="text-ink-muted text-xs">Upload a video → pick a language → AI translates the speech, clones the voice and lip-syncs the speaker. {vtTokensPerMinute} tokens per minute of video.</p>
               </div>
               <div>
                 <input type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" ref={vtFileRef} onChange={handleVtFile} className="hidden" />
-                <div onClick={() => vtFileRef.current?.click()} className="border-2 border-dashed border-white/20 hover:border-purple-500/50 rounded-xl p-6 text-center cursor-pointer transition">
+                <div onClick={() => vtFileRef.current?.click()} className="border border-dashed border-line-strong hover:border-accent/60 bg-canvas rounded-xl p-6 text-center cursor-pointer transition">
                   {vtFile ? (
                     <div>
-                      <p className="text-green-400 text-sm font-semibold mb-1 truncate">{vtFile.name}</p>
-                      <p className="text-gray-500 text-xs">{formatTime(Math.round(vtDuration))} • {(vtFile.size / (1024 * 1024)).toFixed(1)}MB • Click to change</p>
+                      <p className="text-emerald-400 text-sm font-semibold mb-1 truncate">{vtFile.name}</p>
+                      <p className="text-ink-subtle text-xs">{formatTime(Math.round(vtDuration))} • {(vtFile.size / (1024 * 1024)).toFixed(1)}MB • Click to change</p>
                     </div>
                   ) : (
                     <div>
-                      <p className="text-gray-400 text-sm font-semibold mb-1">Click to upload video</p>
-                      <p className="text-gray-600 text-xs">MP4, MOV, WebM up to 500MB</p>
+                      <p className="text-ink-muted text-sm font-semibold mb-1">Click to upload video</p>
+                      <p className="text-ink-subtle text-xs">MP4, MOV, WebM up to 500MB</p>
                     </div>
                   )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-gray-400 text-xs mb-1 block">Source Language</label>
-                  <select value={vtSourceLang} onChange={(e) => { const lang = e.target.value; setVtSourceLang(lang); if (lang === vtTargetLang) setVtTargetLang(VT_LANGUAGES.find((l) => l !== lang) ?? ""); }} className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm">
+                  <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Source Language</label>
+                  <select value={vtSourceLang} onChange={(e) => { const lang = e.target.value; setVtSourceLang(lang); if (lang === vtTargetLang) setVtTargetLang(VT_LANGUAGES.find((l) => l !== lang) ?? ""); }} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
                     {VT_LANGUAGES.map((lang) => <option key={lang} value={lang}>{lang}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-gray-400 text-xs mb-1 block">Target Language</label>
-                  <select value={vtTargetLang} onChange={(e) => setVtTargetLang(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm">
+                  <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Target Language</label>
+                  <select value={vtTargetLang} onChange={(e) => setVtTargetLang(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
                     {VT_LANGUAGES.filter((lang) => lang !== vtSourceLang).map((lang) => <option key={lang} value={lang}>{lang}</option>)}
                   </select>
                 </div>
               </div>
               {vtFile && (
-                <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-3">
-                  <p className="text-yellow-400 text-xs font-bold">Total cost: {vtTokenCost} tokens</p>
-                  <p className="text-gray-500 text-xs">{(vtDuration / 60).toFixed(1)} min × {vtTokensPerMinute} tokens/min (minimum {vtTokensPerMinute}) • You have {tokenBalance} tokens</p>
+                <div className="bg-amber-500/[0.07] border border-amber-500/25 rounded-xl p-3">
+                  <p className="text-amber-300 text-xs font-semibold">Total cost: {vtTokenCost} tokens</p>
+                  <p className="text-ink-subtle text-xs">{(vtDuration / 60).toFixed(1)} min × {vtTokensPerMinute} tokens/min (minimum {vtTokensPerMinute}) • You have {tokenBalance} tokens</p>
                 </div>
               )}
               {error && <p className="text-red-400 text-sm">{error}</p>}
-              <button onClick={handleTranslateVideo} disabled={!vtFile || vtSourceLang === vtTargetLang || tokenBalance < vtTokenCost} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition">
+              <button onClick={handleTranslateVideo} disabled={!vtFile || vtSourceLang === vtTargetLang || tokenBalance < vtTokenCost} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition">
                 {vtFile ? `Translate Video — ${vtTokenCost} tokens` : "Translate Video"}
               </button>
             </div>
           )}
 
           {vtBusy && (
-            <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-4">
+            <div className="bg-surface border border-line rounded-2xl p-6 space-y-5">
               <div className="text-center">
-                <h3 className="font-bold mb-1">Translating Your Video</h3>
-                <p className="text-gray-400 text-sm">{vtStep === "uploading" ? "Uploading your video..." : `Translating ${vtSourceLang} → ${vtTargetLang} with lip-sync...`}</p>
+                <h3 className="font-semibold mb-1">Translating Your Video</h3>
+                <p className="text-ink-muted text-sm">{vtStep === "uploading" ? "Uploading your video..." : `Translating ${vtSourceLang} → ${vtTargetLang} with lip-sync...`}</p>
               </div>
               <div>
-                <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+                <div className="flex items-center justify-between text-xs text-ink-subtle mb-2">
                   <span>{Math.round(vtProgress)}% complete</span>
                   <span>{formatTime(vtElapsed)} elapsed</span>
                 </div>
-                <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden">
-                  <div className={"h-full bg-gradient-to-r from-purple-600 to-pink-500 rounded-full transition-all duration-1000" + (vtStep === "uploading" ? " animate-pulse" : "")} style={{ width: vtProgress + "%" }} />
+                <div className="w-full h-2 bg-white/[0.07] rounded-full overflow-hidden">
+                  <div className={"h-full bg-accent rounded-full transition-all duration-1000" + (vtStep === "uploading" ? " animate-pulse" : "")} style={{ width: vtProgress + "%" }} />
                 </div>
               </div>
               <div className="space-y-2">
@@ -1152,26 +1214,26 @@ export default function Studio() {
                   { label: "Lip-syncing and rendering", done: false },
                 ].map((step, i) => (
                   <div key={i} className="flex items-center gap-2 text-xs">
-                    <span className={step.done ? "text-green-400" : "text-gray-600"}>{step.done ? "✓" : "○"}</span>
-                    <span className={step.done ? "text-gray-300" : "text-gray-600"}>{step.label}</span>
+                    <span className={step.done ? "text-emerald-400" : "text-ink-subtle"}>{step.done ? <CheckCircle2 size={15} aria-hidden /> : <Circle size={15} aria-hidden />}</span>
+                    <span className={step.done ? "text-ink" : "text-ink-subtle"}>{step.label}</span>
                   </div>
                 ))}
               </div>
-              <p className="text-gray-500 text-xs text-center">Keep this page open. Translation can take several minutes (up to 10). Tokens are refunded automatically if it fails.</p>
+              <p className="text-ink-subtle text-xs text-center">Keep this page open. Translation can take several minutes (up to 10). Tokens are refunded automatically if it fails.</p>
             </div>
           )}
 
           {vtStep === "done" && vtVideoUrl && (
-            <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-4">
+            <div className="bg-surface border border-line rounded-2xl p-5 space-y-5">
               <div className="flex items-center gap-2">
-                <span className="text-green-400 font-bold">Done!</span>
-                <h3 className="font-bold">Your {vtTargetLang} Video is Ready</h3>
+                <span className="text-emerald-400 font-semibold">Done!</span>
+                <h3 className="font-semibold">Your {vtTargetLang} Video is Ready</h3>
               </div>
               <video src={vtVideoUrl} controls playsInline className="w-full rounded-xl" />
-              <p className="text-gray-500 text-xs">Saved to your Gallery.</p>
+              <p className="text-ink-subtle text-xs">Saved to your Gallery.</p>
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => handleDownload(vtVideoUrl)} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition text-sm">Save Video</button>
-                <button onClick={() => { setVtStep("input"); setVtVideoUrl(null); setVtElapsed(0); }} className="bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition text-sm">Translate Another</button>
+                <button onClick={() => handleDownload(vtVideoUrl)} className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-xl transition text-sm">Save Video</button>
+                <button onClick={() => { setVtStep("input"); setVtVideoUrl(null); setVtElapsed(0); }} className="bg-raised hover:bg-raised-hover border border-line text-white font-semibold py-3 rounded-xl transition text-sm">Translate Another</button>
               </div>
             </div>
           )}
@@ -1182,47 +1244,47 @@ export default function Studio() {
       {activeModule && !isPromptModule && !isScriptModule && !isS2VModule && !isVTModule && !loading && !videoUrl && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <button onClick={resetForm} className="text-gray-400 hover:text-white text-sm transition">Back</button>
-            <h2 className="font-bold text-sm">{modules.find((m) => m.id === activeModule)?.title}</h2>
+            <button onClick={goBackToModules} className="inline-flex items-center gap-1 h-9 pl-2 pr-3 rounded-lg border border-line bg-raised text-ink text-sm hover:border-line-strong transition-colors"><ChevronLeft size={16} aria-hidden /> All tools</button>
+            <h2 className="font-semibold text-base">{modules.find((m) => m.id === activeModule)?.title}</h2>
           </div>
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-4">
+          <div className="bg-surface border border-line rounded-2xl p-5 space-y-5">
             {needsImage && (
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <button onClick={() => setUseUrl(false)} className={"px-3 py-1.5 rounded-full text-xs font-bold transition " + (!useUrl ? "bg-purple-600 text-white" : "bg-white/10 text-gray-400")}>Upload Image</button>
-                  <button onClick={() => setUseUrl(true)} className={"px-3 py-1.5 rounded-full text-xs font-bold transition " + (useUrl ? "bg-purple-600 text-white" : "bg-white/10 text-gray-400")}>Use URL</button>
+                  <button onClick={() => setUseUrl(false)} className={"px-3 py-1.5 rounded-xl text-xs font-semibold transition " + (!useUrl ? "bg-purple-600 text-white" : "bg-raised text-ink-muted")}>Upload Image</button>
+                  <button onClick={() => setUseUrl(true)} className={"px-3 py-1.5 rounded-xl text-xs font-semibold transition " + (useUrl ? "bg-purple-600 text-white" : "bg-raised text-ink-muted")}>Use URL</button>
                 </div>
                 {!useUrl ? (
                   <div>
                     <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageFile} className="hidden" />
-                    <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-white/20 hover:border-purple-500/50 rounded-xl p-6 text-center cursor-pointer transition">
-                      {imagePreview ? <img src={imagePreview} alt="Preview" className="max-h-40 mx-auto rounded-lg object-contain" /> : <div><p className="text-gray-400 text-sm font-semibold mb-1">Click to upload image</p><p className="text-gray-600 text-xs">JPG, PNG, WebP up to 10MB</p></div>}
+                    <div onClick={() => fileInputRef.current?.click()} className="border border-dashed border-line-strong hover:border-accent/60 bg-canvas rounded-xl p-6 text-center cursor-pointer transition">
+                      {imagePreview ? <img src={imagePreview} alt="Preview" className="max-h-40 mx-auto rounded-lg object-contain" /> : <div><p className="text-ink-muted text-sm font-semibold mb-1">Click to upload image</p><p className="text-ink-subtle text-xs">JPG, PNG, WebP up to 10MB</p></div>}
                     </div>
-                    {imageFile && <p className="text-green-400 text-xs">{imageFile.name} ready</p>}
+                    {imageFile && <p className="text-emerald-400 text-xs">{imageFile.name} ready</p>}
                   </div>
                 ) : (
                   <div>
-                    <label className="text-gray-400 text-xs mb-1 block">Image URL</label>
-                    <input type="url" placeholder="https://example.com/image.jpg" value={imageUrlInput} onChange={(e) => setImageUrlInput(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition text-sm" />
+                    <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Image URL</label>
+                    <input type="url" placeholder="https://example.com/image.jpg" value={imageUrlInput} onChange={(e) => setImageUrlInput(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-3 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm" />
                   </div>
                 )}
               </div>
             )}
             {activeModule === "ugc_ad" && (
-              <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3">
-                <p className="text-purple-300 text-xs font-semibold mb-1">UGC Ad Mode</p>
-                <p className="text-gray-400 text-xs">Upload a photo of your avatar for the most realistic AI UGC ads.</p>
+              <div className="bg-accent/[0.07] border border-accent/25 rounded-xl p-3.5">
+                <p className="text-accent-text text-xs font-semibold mb-1">UGC Ad Mode</p>
+                <p className="text-ink-muted text-xs">Upload a photo of your avatar for the most realistic AI UGC ads.</p>
               </div>
             )}
             {isImageModule && (
               <>
-                <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3">
-                  <p className="text-purple-300 text-xs font-semibold mb-1">Reference Image (Optional)</p>
-                  <p className="text-gray-400 text-xs">Upload a reference image to generate variations or repurpose existing visuals.</p>
+                <div className="bg-accent/[0.07] border border-accent/25 rounded-xl p-3.5">
+                  <p className="text-accent-text text-xs font-semibold mb-1">Reference Image (Optional)</p>
+                  <p className="text-ink-muted text-xs">Upload a reference image to generate variations or repurpose existing visuals.</p>
                 </div>
                 <div>
-                  <label className="text-gray-400 text-xs mb-1 block">Aspect Ratio</label>
-                  <select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm">
+                  <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Aspect Ratio</label>
+                  <select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
                     <option value="16:9">16:9 Landscape</option>
                     <option value="9:16">9:16 Portrait / Reels</option>
                     <option value="1:1">1:1 Square</option>
@@ -1231,39 +1293,39 @@ export default function Studio() {
               </>
             )}
             <div>
-              <label className="text-gray-400 text-xs mb-1 block">
+              <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">
                 {activeModule === "ugc_ad" ? "Describe the UGC ad scenario" : activeModule === "text_to_image" ? "Describe the image you want" : "Describe your video"}
               </label>
               <textarea
                 placeholder={activeModule === "ugc_ad" ? "Woman in kitchen holding product, smiling, authentic testimonial style..." : activeModule === "text_to_image" ? "A photorealistic portrait of a woman in golden hour light, cinematic, sharp details..." : "A luxury watch rotating slowly on a marble surface, golden hour lighting, cinematic 4K..."}
                 value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={4}
-                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition text-sm resize-none"
+                className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-3 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm resize-none"
               />
             </div>
             {showModels && (
               <>
                 <div>
-                  <label className="text-gray-400 text-xs mb-2 block">AI Model</label>
+                  <label className="text-ink-muted text-[13px] font-medium mb-2 block">AI Model</label>
                   <div className="grid grid-cols-2 gap-2">
                     {visibleModels.map((model) => (
                       <button key={model.id} onClick={() => model.available && setSelectedModel(model.id)} disabled={!model.available}
-                        className={"p-3 rounded-xl border text-left transition " + (selectedModel === model.id ? "border-purple-500 bg-purple-900/30" : model.available ? "border-white/10 bg-white/5 hover:border-purple-500/50" : "border-white/5 opacity-40 cursor-not-allowed")}
+                        className={"p-3 rounded-xl border text-left transition " + (selectedModel === model.id ? "border-accent bg-accent/10" : model.available ? "border-line bg-surface hover:border-line-strong" : "border-line/60 opacity-40 cursor-not-allowed")}
                       >
                         <div className="flex flex-wrap gap-1 mb-1">
                           {(modelBadges[model.id] ? modelBadges[model.id].split(",").map(b => b.trim()).filter(Boolean) : model.badges ?? (model.badge ? [model.badge] : [])).map((b, bi) => (
-                            <div key={bi} className={"text-xs font-bold px-1.5 py-0.5 rounded-full inline-block " + (model.available ? "bg-purple-900/40 text-purple-300" : "bg-gray-900/40 text-gray-500")}>{b}</div>
+                            <div key={bi} className={"text-xs font-semibold px-1.5 py-0.5 rounded-full inline-block " + (model.available ? "bg-white/[0.06] text-ink-muted" : "bg-white/[0.04] text-ink-subtle")}>{b}</div>
                           ))}
                         </div>
-                        <div className="font-bold text-xs mb-0.5">{modelLabels[model.id] || model.name}</div>
-                        <div className="text-gray-500 text-xs">{tokenPricing[model.id] ?? model.tokens} tokens — {modelDescs[model.id] || model.desc}</div>
+                        <div className="font-semibold text-xs mb-0.5">{modelLabels[model.id] || model.name}</div>
+                        <div className="text-ink-subtle text-xs">{tokenPricing[model.id] ?? model.tokens} tokens — {modelDescs[model.id] || model.desc}</div>
                       </button>
                     ))}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-gray-400 text-xs mb-1 block">Duration</label>
-                    <select value={duration} onChange={(e) => setDuration(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm">
+                    <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Duration</label>
+                    <select value={duration} onChange={(e) => setDuration(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
                       <option value="5">5 seconds</option>
                       <option value="8">8 seconds</option>
                       <option value="10">10 seconds</option>
@@ -1271,8 +1333,8 @@ export default function Studio() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-gray-400 text-xs mb-1 block">Aspect Ratio</label>
-                    <select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm">
+                    <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Aspect Ratio</label>
+                    <select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
                       <option value="16:9">16:9 YouTube</option>
                       <option value="9:16">9:16 TikTok / Reels</option>
                       <option value="1:1">1:1 Feed</option>
@@ -1280,15 +1342,15 @@ export default function Studio() {
                   </div>
                 </div>
                 {currentModel?.hasSound && (
-                  <div className="bg-green-900/20 border border-green-500/20 rounded-xl px-4 py-3">
-                    <p className="text-green-400 text-xs font-semibold">Native audio included with {currentModel.name}</p>
-                    <p className="text-gray-500 text-xs">Sound, dialogue and ambient audio generated automatically</p>
+                  <div className="bg-emerald-500/[0.07] border border-emerald-500/25 rounded-xl px-4 py-3">
+                    <p className="text-emerald-400 text-xs font-semibold">Native audio included with {currentModel.name}</p>
+                    <p className="text-ink-subtle text-xs">Sound, dialogue and ambient audio generated automatically</p>
                   </div>
                 )}
               </>
             )}
             {error && <p className="text-red-400 text-sm">{error}</p>}
-            <button onClick={handleGenerate} disabled={loading} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition">
+            <button onClick={handleGenerate} disabled={loading} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition">
               {isImageModule ? `Generate Image — ${tokenPricing["text_to_image"] ?? 2} tokens` : `Generate — ${tokenCost} tokens`}
             </button>
           </div>
@@ -1296,18 +1358,18 @@ export default function Studio() {
       )}
 
       {loading && (
-        <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-4">
+        <div className="bg-surface border border-line rounded-2xl p-6 space-y-5">
           <div className="text-center">
-            <h3 className="font-bold mb-1">{isImageModule ? "Generating Your Image" : "Generating Your Video"}</h3>
-            <p className="text-gray-400 text-sm">{getStatusMsg(elapsedTime)}</p>
+            <h3 className="font-semibold mb-1">{isImageModule ? "Generating Your Image" : "Generating Your Video"}</h3>
+            <p className="text-ink-muted text-sm">{getStatusMsg(elapsedTime)}</p>
           </div>
           <div>
-            <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+            <div className="flex items-center justify-between text-xs text-ink-subtle mb-2">
               <span>{Math.round(progress)}% complete</span>
               <span>{formatTime(elapsedTime)} elapsed</span>
             </div>
-            <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-purple-600 to-pink-500 rounded-full transition-all duration-1000" style={{ width: progress + "%" }} />
+            <div className="w-full h-2 bg-white/[0.07] rounded-full overflow-hidden">
+              <div className="h-full bg-accent rounded-full transition-all duration-1000" style={{ width: progress + "%" }} />
             </div>
           </div>
           <div className="space-y-2">
@@ -1319,34 +1381,42 @@ export default function Studio() {
               { label: isImageModule ? "Image finalized" : "Video finalized", done: !!videoUrl },
             ].map((step, i) => (
               <div key={i} className="flex items-center gap-2 text-xs">
-                <span className={step.done ? "text-green-400" : "text-gray-600"}>{step.done ? "✓" : "○"}</span>
-                <span className={step.done ? "text-gray-300" : "text-gray-600"}>{step.label}</span>
+                <span className={step.done ? "text-emerald-400" : "text-ink-subtle"}>{step.done ? <CheckCircle2 size={15} aria-hidden /> : <Circle size={15} aria-hidden />}</span>
+                <span className={step.done ? "text-ink" : "text-ink-subtle"}>{step.label}</span>
               </div>
             ))}
           </div>
-          <p className="text-gray-500 text-xs text-center">
+          <p className="text-ink-subtle text-xs text-center">
             {isImageModule ? "Keep this page open. Image generation may take several minutes." : "Keep this page open. Average: 1-3 minutes."}
           </p>
         </div>
       )}
 
       {videoUrl && (
-        <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-4">
+        <div className="bg-surface border border-line rounded-2xl p-5 space-y-5">
           <div className="flex items-center gap-2">
-            <span className="text-green-400 font-bold">Done!</span>
-            <h3 className="font-bold">{isImageModule ? "Your Image is Ready" : "Your Video is Ready"}</h3>
+            <span className="text-emerald-400 font-semibold">Done!</span>
+            <h3 className="font-semibold">{isImageModule ? "Your Image is Ready" : "Your Video is Ready"}</h3>
           </div>
           {isImageModule ? <img src={videoUrl} alt="Generated image" className="w-full rounded-xl" /> : <video src={videoUrl} controls playsInline className="w-full rounded-xl" />}
           <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => handleDownload(videoUrl, isImageModule)} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition text-sm">{isImageModule ? "Save Image" : "Save Video"}</button>
-            <button onClick={resetForm} className="bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition text-sm">Generate Another</button>
+            <button onClick={() => handleDownload(videoUrl, isImageModule)} className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-xl transition text-sm">{isImageModule ? "Save Image" : "Save Video"}</button>
+            <button onClick={goBackToModules} className="bg-raised hover:bg-raised-hover border border-line text-white font-semibold py-3 rounded-xl transition text-sm">Generate Another</button>
           </div>
-          <div className="bg-blue-900/20 border border-blue-500/20 rounded-xl p-3">
-            <p className="text-blue-300 text-xs font-semibold mb-1">iPhone users</p>
-            <p className="text-gray-400 text-xs">Tap and hold the {isImageModule ? "image" : "video"}, then select Save to Photos.</p>
+          <div className="bg-raised border border-line rounded-xl p-3.5">
+            <p className="text-ink text-xs font-semibold mb-1">iPhone users</p>
+            <p className="text-ink-muted text-xs">Tap and hold the {isImageModule ? "image" : "video"}, then select Save to Photos.</p>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+export default function StudioPage() {
+  return (
+    <Suspense fallback={null}>
+      <Studio />
+    </Suspense>
   );
 }

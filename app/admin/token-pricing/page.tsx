@@ -1,5 +1,6 @@
 ﻿"use client";
 import { useState, useEffect } from "react";
+import { Coins } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
 export default function AdminTokenPricing() {
@@ -40,33 +41,33 @@ export default function AdminTokenPricing() {
     <div className="space-y-6 max-w-2xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold mb-1">Token Pricing</h1>
-          <p className="text-gray-400 text-sm">Set credit cost for each action</p>
+          <h1 className="text-2xl font-semibold tracking-tight mb-1">Token Pricing</h1>
+          <p className="text-ink-muted text-sm">Set credit cost for each action</p>
         </div>
         <button
           onClick={handleSave}
           disabled={saving}
-          className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-2 px-6 rounded-xl transition text-sm"
+          className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-2 px-6 rounded-xl transition text-sm"
         >
-          {saving ? "Saving..." : saved ? "? Saved!" : "Save Changes"}
+          {saving ? "Saving..." : saved ? "Saved" : "Save Changes"}
         </button>
       </div>
 
       {loading ? (
-        <p className="text-gray-400">Loading...</p>
+        <p className="text-ink-muted">Loading...</p>
       ) : (
-        <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+        <div className="bg-surface border border-line rounded-2xl overflow-hidden">
           {pricing.map((item, i) => (
-            <div key={i} className="flex items-center justify-between p-4 border-b border-white/5 last:border-0">
+            <div key={i} className="flex items-center justify-between p-4 border-b border-line/60 last:border-0">
               <div className="flex items-center gap-3">
-                <span className="text-2xl">{item.icon}</span>
+                <span className="grid h-9 w-9 place-items-center rounded-lg bg-accent/15 text-accent-text"><Coins size={17} aria-hidden /></span>
                 <div>
                   <div className="font-semibold text-sm">{item.description}</div>
-                  <div className="text-gray-500 text-xs">{item.action}</div>
+                  <div className="text-ink-subtle text-xs">{item.action}</div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-yellow-400">??</span>
+                <span className="text-xs text-ink-subtle">tokens</span>
                 <input
                   type="number"
                   value={item.tokens}
@@ -75,7 +76,7 @@ export default function AdminTokenPricing() {
                     updated[i] = { ...item, tokens: parseInt(e.target.value) || 0 };
                     setPricing(updated);
                   }}
-                  className="w-16 bg-white/10 border border-white/20 rounded-lg px-2 py-1.5 text-white text-center focus:outline-none focus:border-purple-500 transition text-sm"
+                  className="w-16 bg-canvas border border-line hover:border-line-strong rounded-lg px-2 py-1.5 text-white text-center focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm"
                 />
               </div>
             </div>

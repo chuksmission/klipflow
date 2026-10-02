@@ -48,24 +48,24 @@ export default function AdminEmailSettings() {
   return (
     <div className="space-y-6 max-w-2xl">
       <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-extrabold mb-1">Email Settings</h1><p className="text-gray-400 text-sm">Configure SMTP for transactional emails</p></div>
-        <button onClick={handleSave} disabled={saving} className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-2 px-6 rounded-xl transition text-sm">{saving ? "Saving..." : saved ? "Saved!" : "Save Configuration"}</button>
+        <div><h1 className="text-2xl font-semibold tracking-tight mb-1">Email Settings</h1><p className="text-ink-muted text-sm">Configure SMTP for transactional emails</p></div>
+        <button onClick={handleSave} disabled={saving} className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-2 px-6 rounded-xl transition text-sm">{saving ? "Saving..." : saved ? "Saved!" : "Save Configuration"}</button>
       </div>
-      {loading ? <p className="text-gray-400">Loading...</p> : (
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-4">
+      {loading ? <p className="text-ink-muted">Loading...</p> : (
+        <div className="bg-surface border border-line rounded-2xl p-6 space-y-4">
           {fields.map((field) => (
             <div key={field.key}>
-              <label className="text-gray-400 text-xs mb-1 block">{field.label}</label>
-              <input type={field.secret ? "password" : "text"} value={settings[field.key] || ""} onChange={(e) => setSettings({ ...settings, [field.key]: e.target.value })} placeholder={field.placeholder} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-sm" />
+              <label className="text-ink-muted text-xs mb-1 block">{field.label}</label>
+              <input type={field.secret ? "password" : "text"} value={settings[field.key] || ""} onChange={(e) => setSettings({ ...settings, [field.key]: e.target.value })} placeholder={field.placeholder} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-2.5 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm" />
             </div>
           ))}
-          <div className="pt-4 border-t border-white/10">
-            <label className="text-gray-400 text-xs mb-1 block">Send Test Email</label>
+          <div className="pt-4 border-t border-line">
+            <label className="text-ink-muted text-xs mb-1 block">Send Test Email</label>
             <div className="flex gap-2">
-              <input type="email" value={testEmail} onChange={(e) => setTestEmail(e.target.value)} placeholder="you@example.com" className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-sm" />
-              <button onClick={() => { setTesting(true); setTimeout(() => { setTestResult("Test sent!"); setTesting(false); setTimeout(() => setTestResult(""), 3000); }, 2000); }} disabled={testing || !testEmail} className="bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white font-bold py-2 px-4 rounded-xl transition text-sm">{testing ? "Sending..." : "Send"}</button>
+              <input type="email" value={testEmail} onChange={(e) => setTestEmail(e.target.value)} placeholder="you@example.com" className="flex-1 bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-2.5 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm" />
+              <button onClick={() => { setTesting(true); setTimeout(() => { setTestResult("Test sent!"); setTesting(false); setTimeout(() => setTestResult(""), 3000); }, 2000); }} disabled={testing || !testEmail} className="bg-raised hover:bg-raised-hover disabled:opacity-50 text-white font-semibold py-2 px-4 rounded-xl transition text-sm">{testing ? "Sending..." : "Send"}</button>
             </div>
-            {testResult && <p className="text-green-400 text-xs mt-2">{testResult}</p>}
+            {testResult && <p className="text-emerald-300 text-xs mt-2">{testResult}</p>}
           </div>
         </div>
       )}

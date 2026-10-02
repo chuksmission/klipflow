@@ -1,5 +1,7 @@
-import Link from 'next/link'
 import { Metadata } from 'next'
+import { ArrowRight, Globe2, Repeat, Target, TrendingUp } from 'lucide-react'
+import MarketingShell from '../components/MarketingShell'
+import { ButtonLink } from '../components/ui/Button'
 
 export const metadata: Metadata = {
   title: 'About KlipflowAI — Our Mission & Story',
@@ -9,86 +11,70 @@ export const metadata: Metadata = {
 
 export default function About() {
   return (
-    <main className="min-h-screen bg-black text-white">
-      <nav className="flex items-center justify-between px-8 py-5 border-b border-white/10 sticky top-0 z-50 bg-black/90 backdrop-blur-md">
-        <Link href="/" className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-          KlipflowAI
-        </Link>
-        <Link href="/signup" className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold py-2 px-5 rounded-full transition">
-          Sign Up Free
-        </Link>
-      </nav>
-
-      <section className="max-w-4xl mx-auto px-8 py-24">
-        <div className="inline-block bg-purple-900/40 border border-purple-500/30 text-purple-300 text-xs font-semibold px-4 py-1.5 rounded-full mb-6">
-          🚀 Our Story
-        </div>
-        <h1 className="text-5xl font-extrabold mb-6">
-          Built for the New Era of
-          <span className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent"> AI-Powered Creation</span>
-        </h1>
-        <p className="text-gray-400 text-xl leading-relaxed mb-16">
+    <MarketingShell>
+      <section className="mx-auto max-w-4xl px-4 py-20 md:px-8">
+        <p className="mb-5 inline-flex rounded-full border border-line bg-surface px-3 py-1 text-xs text-ink-muted">Our story</p>
+        <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">Built for the new era of AI-powered creation</h1>
+        <p className="mt-6 text-lg leading-relaxed text-ink-muted md:text-xl">
           KlipflowAI was built with one mission — to give every creator, brand, and entrepreneur the power of a full creative and advertising team, powered entirely by AI.
         </p>
 
-        <div className="grid md:grid-cols-3 gap-8 mb-20">
+        <div className="mt-14 grid gap-4 sm:grid-cols-3">
           {[
             { stat: "9", label: "AI Modules" },
             { stat: "5", label: "Platforms Supported" },
             { stat: "$0", label: "To Get Started" },
-          ].map((s, i) => (
-            <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
-              <div className="text-5xl font-extrabold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent mb-2">{s.stat}</div>
-              <div className="text-gray-400 text-sm">{s.label}</div>
+          ].map((s) => (
+            <div key={s.label} className="rounded-2xl border border-line bg-surface p-6">
+              <div className="text-4xl font-semibold tracking-tight">{s.stat}</div>
+              <div className="mt-1 text-sm text-ink-muted">{s.label}</div>
             </div>
           ))}
         </div>
 
-        <div className="space-y-12 mb-20">
+        <div className="mt-16 space-y-14">
           <div>
-            <h2 className="text-2xl font-bold mb-4">Why We Built KlipflowAI</h2>
-            <p className="text-gray-400 leading-relaxed">Creating content and running ads used to require expensive agencies, video editors, copywriters, and media buyers. The barrier to entry was high — and only big brands could afford to compete at scale.</p>
-            <p className="text-gray-400 leading-relaxed mt-4">We built KlipflowAI to level the playing field. Every feature is designed to replace a task that used to cost hundreds or thousands of dollars — and deliver it in seconds, for anyone.</p>
+            <h2 className="text-2xl font-semibold tracking-tight">Why we built KlipflowAI</h2>
+            <p className="mt-4 leading-relaxed text-ink-muted">Creating content and running ads used to require expensive agencies, video editors, copywriters, and media buyers. The barrier to entry was high — and only big brands could afford to compete at scale.</p>
+            <p className="mt-4 leading-relaxed text-ink-muted">We built KlipflowAI to level the playing field. Every feature is designed to replace a task that used to cost hundreds or thousands of dollars — and deliver it in seconds, for anyone.</p>
           </div>
 
           <div>
-            <h2 className="text-2xl font-bold mb-4">What We Believe</h2>
-            <div className="grid md:grid-cols-2 gap-6">
+            <h2 className="text-2xl font-semibold tracking-tight">What we believe</h2>
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
               {[
-                { icon: "🎯", title: "Speed wins", desc: "The creator or brand that moves fastest wins. We obsess over cutting every second out of the workflow." },
-                { icon: "💰", title: "Revenue over vanity", desc: "We don't build features for demos. Every tool in KlipflowAI is designed to make you money." },
-                { icon: "🔄", title: "Closed loops beat open ends", desc: "From research to creation to distribution — we close the loop so nothing falls through the cracks." },
-                { icon: "🌍", title: "Anyone can compete", desc: "You don't need a team, a budget, or technical skills. Just an idea and an internet connection." },
-              ].map((v, i) => (
-                <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-6">
-                  <div className="text-3xl mb-3">{v.icon}</div>
-                  <h3 className="font-bold mb-2">{v.title}</h3>
-                  <p className="text-gray-400 text-sm leading-relaxed">{v.desc}</p>
-                </div>
-              ))}
+                { icon: Target, title: "Speed wins", desc: "The creator or brand that moves fastest wins. We obsess over cutting every second out of the workflow." },
+                { icon: TrendingUp, title: "Revenue over vanity", desc: "We don't build features for demos. Every tool in KlipflowAI is designed to make you money." },
+                { icon: Repeat, title: "Closed loops beat open ends", desc: "From research to creation to distribution — we close the loop so nothing falls through the cracks." },
+                { icon: Globe2, title: "Anyone can compete", desc: "You don't need a team, a budget, or technical skills. Just an idea and an internet connection." },
+              ].map((v) => {
+                const Icon = v.icon;
+                return (
+                  <div key={v.title} className="rounded-2xl border border-line bg-surface p-6">
+                    <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent/15 text-accent-text"><Icon size={19} aria-hidden /></span>
+                    <h3 className="mt-4 font-semibold">{v.title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-ink-muted">{v.desc}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
           <div>
-            <h2 className="text-2xl font-bold mb-4">Our Platform</h2>
-            <p className="text-gray-400 leading-relaxed">KlipflowAI combines Facebook Ad Spy, AI video generation, UGC creation, AI actors, voice synthesis, script writing, and automated social posting — all in one closed-loop platform. No switching between tools. No lost time. Just results.</p>
+            <h2 className="text-2xl font-semibold tracking-tight">Our platform</h2>
+            <p className="mt-4 leading-relaxed text-ink-muted">KlipflowAI combines Facebook Ad Spy, AI video generation, UGC creation, AI actors, voice synthesis, script writing, and automated social posting — all in one closed-loop platform. No switching between tools. No lost time. Just results.</p>
           </div>
         </div>
 
-        <div className="bg-purple-900/20 border border-purple-500/30 rounded-2xl p-10 text-center">
-          <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
-          <p className="text-gray-400 mb-8">Join creators and brands already using KlipflowAI. 25 free tokens, no credit card required.</p>
-          <Link href="/signup" className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-12 rounded-full text-lg transition inline-block">
-            Sign Up Free →
-          </Link>
+        <div className="relative mt-16 overflow-hidden rounded-3xl border border-line bg-surface px-6 py-12 text-center">
+          <div aria-hidden className="pointer-events-none absolute inset-0 opacity-60" style={{ background: "radial-gradient(60% 80% at 50% 0%, rgba(109,74,255,0.35), transparent 70%)" }} />
+          <div className="relative">
+            <h2 className="text-3xl font-semibold tracking-tight">Ready to get started?</h2>
+            <p className="mx-auto mt-3 max-w-md text-ink-muted">25 free tokens, no credit card required.</p>
+            <ButtonLink href="/signup" variant="primary" size="lg" className="mt-8">Sign up free <ArrowRight size={17} aria-hidden /></ButtonLink>
+          </div>
         </div>
       </section>
-
-      <footer className="border-t border-white/10 px-8 py-10 text-center text-gray-600 text-sm">
-        <Link href="/" className="text-white font-bold">KlipflowAI</Link> © 2026 ·{" "}
-        <Link href="/privacy-policy" className="hover:text-white transition">Privacy Policy</Link> ·{" "}
-        <Link href="/terms-of-service" className="hover:text-white transition">Terms of Service</Link>
-      </footer>
-    </main>
+    </MarketingShell>
   )
 }

@@ -1,26 +1,56 @@
 'use client';
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getDeviceFingerprint } from "./lib/fingerprint";
+import {
+  ArrowRight, Bot, Check, ChevronDown, Film, FileVideo, ImagePlay, Languages, Megaphone, Menu,
+  Newspaper, Radar, ShoppingBag, Sparkles, UserRound, X, type LucideIcon,
+} from "lucide-react";
 import { supabase } from "./lib/supabase";
+import AppSidebar from "./components/AppSidebar";
+import PromptComposer from "./components/PromptComposer";
+import ShowcaseGrid, { type ShowcaseItem } from "./components/ShowcaseGrid";
+import { ButtonLink, buttonClass } from "./components/ui/Button";
+import { moduleForGenerationType, savePendingGeneration, studioHref, type StudioModuleId } from "./components/catalog";
+
+interface QuickStart {
+  title: string;
+  desc: string;
+  module: StudioModuleId;
+  category?: string;
+  prompt?: string;
+  aspect_ratio?: string;
+  icon: LucideIcon;
+  badge?: string;
+}
+
+const QUICK_STARTS: QuickStart[] = [
+  { title: "UGC ad",           desc: "Creator-style testimonial",    module: "ugc_ad",           category: "ugc",         icon: Megaphone,   badge: "Popular", aspect_ratio: "9:16", prompt: "Woman in her kitchen holding the product, talking to camera, authentic testimonial style" },
+  { title: "Product ad",       desc: "Studio-quality product shots", module: "text_to_video",    category: "product",     icon: ShoppingBag, aspect_ratio: "16:9", prompt: "Product rotating slowly on a marble pedestal, soft studio lighting, cinematic 4K" },
+  { title: "Faceless reel",    desc: "Script to scenes with audio",  module: "script_to_video",  category: "faceless",    icon: FileVideo },
+  { title: "Translate a video", desc: "New language, same voice",    module: "video_translator", category: "translation", icon: Languages,   badge: "New" },
+  { title: "Cinematic shot",   desc: "Film-grade text to video",     module: "text_to_video",    category: "cinematic",   icon: Film,        aspect_ratio: "16:9", prompt: "Slow drone shot over misty mountains at sunrise, epic cinematic lighting" },
+  { title: "Animate a photo",  desc: "Bring any image to life",      module: "image_to_video",                            icon: ImagePlay },
+  { title: "AI presenter",     desc: "Photorealistic spokesperson",  module: "ai_actor",                                  icon: UserRound },
+  { title: "Image ad",         desc: "Scroll-stopping static ads",   module: "image_ad",         category: "image",       icon: Newspaper },
+];
+
+const MODELS = ["Kling 3.0", "Veo 3.1", "Sora 2", "Seedance 2.0", "Hailuo 2.3", "Wan 2.6", "Luma Ray 3"];
 
 export default function HomeClient() {
-  const [email, setEmail] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [pricingTab, setPricingTab] = useState('creators');
   const [creatorBilling, setCreatorBilling] = useState('monthly');
   const [ecomBilling, setEcomBilling] = useState('monthly');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [prompt, setPrompt] = useState("");
-  const [expandedPrompt, setExpandedPrompt] = useState("");
-  const [promptLoading, setPromptLoading] = useState(false);
-  const [activeNiche, setActiveNiche] = useState(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [creatorPlans, setCreatorPlans] = useState<any[]>([]);
   const [ecomPlansDb, setEcomPlansDb] = useState<any[]>([]);
+  const [showcase, setShowcase] = useState<ShowcaseItem[]>([]);
+  const [prompt, setPrompt] = useState("");
+  const [mode, setMode] = useState<StudioModuleId>("text_to_video");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showBar, setShowBar] = useState(false);
+  const heroRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -35,51 +65,54 @@ export default function HomeClient() {
       setCreatorPlans(all.filter((p) => p.name.toLowerCase().includes("creator")));
       setEcomPlansDb(all.filter((p) => !p.name.toLowerCase().includes("creator")));
     };
+    const fetchShowcase = async () => {
+      try {
+        const res = await fetch("/api/showcase");
+        const data = await res.json();
+        setShowcase(data.items ?? []);
+      } catch { /* showcase is optional */ }
+    };
     checkSession();
     fetchPlans();
+    fetchShowcase();
   }, []);
 
-  const handleSubmit = async () => {
-    if (!email) return;
-    setLoading(true);
-    setError("");
-    try {
-      const fingerprint = await getDeviceFingerprint();
-      const res = await fetch('/api/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, fingerprint })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Something went wrong.');
-      } else {
-        setSubmitted(true);
-      }
-    } catch (err) {
-      setError('Something went wrong. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+  // Floating prompt bar appears once the hero composer scrolls out of view
+  useEffect(() => {
+    const el = heroRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(([entry]) => setShowBar(!entry.isIntersecting), { rootMargin: "-80px 0px 0px 0px" });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [menuOpen]);
+
+  const startCreating = (p: { module: StudioModuleId; prompt?: string; model?: string; aspect_ratio?: string; duration?: string }) => {
+    savePendingGeneration(p);
+    router.push(isLoggedIn ? studioHref(p.module) : "/signup");
   };
 
-  const handlePromptExpand = async () => {
-    if (!prompt) return;
-    setPromptLoading(true);
-    setExpandedPrompt("");
-    await new Promise(r => setTimeout(r, 1500));
-    setExpandedPrompt(`Cinematic 4K shot. ${prompt}. Volumetric golden hour lighting, anamorphic 35mm lens, f/1.8 aperture. Slow orbital camera movement at 60fps. Ray-traced shadows with atmospheric depth. Professional color grade, film grain overlay. Ultra-realistic textures with shallow depth of field. Generated by KlipflowAI Director Engine.`);
-    setPromptLoading(false);
-  };
+  const handlePromptSubmit = () => startCreating({ module: mode, prompt: prompt.trim() || undefined });
 
-  const niches = [
-    { name: "😱 Scary Stories", script: "In a small town with no name, the lights went out every night at exactly 3am. No one talked about it. Until she moved in...", views: "847K views" },
-    { name: "💰 Finance & Wealth", script: "The #1 mistake people make with their first $10,000. I wish someone told me this at 22. Here's what the wealthy actually do differently...", views: "1.2M views" },
-    { name: "🏋️ Fitness", script: "I lost 30 pounds in 90 days without going to the gym once. Here's the exact system I used — and it takes 10 minutes a day...", views: "623K views" },
-    { name: "🌟 Motivation", script: "The most successful people in the world all share one habit. It's not waking up at 5am. It's not cold showers. It's something much simpler...", views: "2.1M views" },
-    { name: "💎 Luxury", script: "Inside the $50 million penthouse that nobody talks about. The rooftop. The private elevator. The view that changes everything...", views: "934K views" },
-    { name: "🤖 AI & Tech", script: "This AI tool just made 10 professions completely obsolete. And nobody is talking about the one job it can't replace...", views: "1.8M views" }
-  ];
+  const useTemplate = (item: ShowcaseItem) => startCreating({
+    module: moduleForGenerationType(item.type),
+    prompt: item.prompt ?? undefined,
+    model: item.model ?? undefined,
+    aspect_ratio: item.aspect_ratio ?? undefined,
+    duration: item.duration ?? undefined,
+  });
+
+  // Give each Quick Start tile a distinct showcase clip from its category, if one exists
+  const usedIds = new Set<ShowcaseItem["id"]>();
+  const tileMedia = QUICK_STARTS.map((qs) => {
+    const match = showcase.find((s) => !usedIds.has(s.id) && qs.category && s.featured_category === qs.category);
+    if (match) usedIds.add(match.id);
+    return match;
+  });
 
   const ecomSavings: Record<string, string> = {
     monthly: '', sixmonths: 'Save 14%', yearly: 'Save 20%'
@@ -100,694 +133,327 @@ export default function HomeClient() {
     { q: "Is KlipflowAI suitable for beginners?", a: "Yes. If you can pick a niche and type a sentence, you can use KlipflowAI. No video editing, no design skills, no technical knowledge required whatsoever." }
   ];
 
-  return (
-    <main className="min-h-screen bg-black text-white">
-
-      {/* NAV */}
-      <nav className="flex items-center justify-between px-8 py-5 border-b border-white/10 sticky top-0 z-50 bg-black/90 backdrop-blur-md">
-        <span className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-          KlipflowAI
-        </span>
-        <div className="hidden md:flex gap-8 text-gray-400 text-sm">
-          <a href="#creator" className="hover:text-white transition">For Creators</a>
-          <a href="#ecom" className="hover:text-white transition">For Brands</a>
-          <a href="#features" className="hover:text-white transition">Features</a>
-          <a href="#pricing" className="hover:text-white transition">Pricing</a>
-          <a href="#faq" className="hover:text-white transition">FAQ</a>
-        </div>
-        <div className="flex items-center gap-3">
-          {isLoggedIn ? (
-            <Link href="/dashboard" className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold py-2 px-5 rounded-full transition">
-              Go to Dashboard →
-            </Link>
-          ) : (
-            <>
-              <Link href="/login" className="text-gray-400 hover:text-white text-sm font-semibold py-2 px-5 rounded-full border border-white/20 hover:border-white/40 transition">
-                Sign In
-              </Link>
-              <Link href="/signup" className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold py-2 px-5 rounded-full transition">
-                Sign Up Free
-              </Link>
-            </>
-          )}
-        </div>
-      </nav>
-
-      {/* HERO */}
-      <section className="flex flex-col items-center justify-center text-center px-4 py-28">
-        <div className="inline-block bg-purple-900/40 border border-purple-500/30 text-purple-300 text-xs font-semibold px-4 py-1.5 rounded-full mb-6">
-          🚀 The Only Platform That Spies, Creates & Launches — All in One
-        </div>
-        <h1 className="text-5xl md:text-7xl font-extrabold mb-6 leading-tight">
-          Spy. Generate. <br />
-          <span className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-            Dominate.
-          </span>
-        </h1>
-        <div className="flex flex-col gap-4 max-w-2xl mb-10 text-center">
-          <p className="text-lg md:text-xl text-gray-400">
-            <span className="text-purple-400 font-semibold">For Brands:</span> Spy on winning Facebook ads, generate better ones, and launch campaigns in minutes.
-          </p>
-          <p className="text-lg md:text-xl text-gray-400">
-            <span className="text-pink-400 font-semibold">For Creators:</span> Pick your niche. Your AI employee writes scripts, generates videos, adds voiceover, and posts to 5 platforms — automatically.
-          </p>
-        </div>
-
-        {!submitted ? (
-          <div className="flex flex-col items-center w-full max-w-md gap-3">
-            <div className="flex flex-col sm:flex-row gap-3 w-full">
-              <input
-                type="email"
-                placeholder="Enter your email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="flex-1 bg-white/10 border border-white/20 rounded-full px-6 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
-              />
-              <button
-                onClick={handleSubmit}
-                disabled={loading}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-full transition disabled:opacity-50"
-              >
-                {loading ? 'Please wait...' : 'Sign Up Free'}
-              </button>
-            </div>
-            {error && <p className="text-red-400 text-sm">{error}</p>}
-          </div>
-        ) : (
-          <div className="bg-purple-900/40 border border-purple-500/30 text-purple-300 px-8 py-4 rounded-full text-lg font-semibold">
-            🎉 Check your email to verify your account and claim your 25 free tokens!
-          </div>
-        )}
-        <p className="text-gray-600 text-xs mt-4">No credit card required · 25 free tokens on signup · Cancel anytime</p>
-
-        <div className="grid grid-cols-3 gap-12 mt-16 max-w-2xl mx-auto">
-          {[
-            { stat: "5", label: "Platforms Auto-Posted To" },
-            { stat: "$0", label: "To Start Today" },
-            { stat: "9", label: "Powerful AI Modules" }
-          ].map((s, i) => (
-            <div key={i} className="text-center">
-              <div className="text-4xl font-extrabold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">{s.stat}</div>
-              <div className="text-gray-500 text-sm mt-1">{s.label}</div>
-            </div>
+  const planCard = (plan: any, price: number | string, billingNote: string | null) => (
+    <div key={plan.id} className={"relative flex flex-col rounded-2xl border p-7 " + (plan.is_popular ? "border-accent bg-accent/[0.07]" : "border-line bg-surface")}>
+      {plan.is_popular && <span className="absolute -top-3 left-7 rounded-full bg-accent px-3 py-1 text-xs font-medium text-white">Most popular</span>}
+      <h3 className="text-lg font-semibold text-ink">{plan.name}</h3>
+      {plan.description && <p className="mt-1 text-sm text-ink-muted">{plan.description}</p>}
+      <div className="mt-5 flex items-baseline gap-1">
+        <span className="text-4xl font-semibold tracking-tight text-ink">${price}</span>
+        <span className="text-ink-muted">/mo</span>
+      </div>
+      {billingNote && <p className="mt-1 text-xs text-ink-subtle">{billingNote}</p>}
+      {plan.tokens_per_month && <p className="mt-3 text-sm font-medium text-accent-text">{plan.tokens_per_month} tokens / month</p>}
+      {Array.isArray(plan.features) && plan.features.length > 0 && (
+        <ul className="mt-5 space-y-2.5">
+          {plan.features.map((f: string, j: number) => (
+            <li key={j} className="flex items-start gap-2.5 text-sm text-ink-muted">
+              <Check size={16} className="mt-0.5 flex-shrink-0 text-accent-text" aria-hidden /> {f}
+            </li>
           ))}
-        </div>
-      </section>
+        </ul>
+      )}
+      <div className="flex-1" />
+      <ButtonLink href="/signup" variant={plan.is_popular ? "primary" : "secondary"} size="lg" className="mt-7 w-full">Get started</ButtonLink>
+    </div>
+  );
 
-      {/* AI EMPLOYEE SECTION - CREATORS */}
-      <section id="creator" className="px-8 py-24 bg-gradient-to-b from-purple-950/30 to-black">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <div className="inline-block bg-purple-900/40 border border-purple-500/30 text-purple-300 text-xs font-semibold px-4 py-1.5 rounded-full mb-4">
-              🤖 For Content Creators
-            </div>
-            <h2 className="text-4xl md:text-5xl font-extrabold mb-6">
-              Your AI Employee.<br />
-              <span className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">You Just Pick the Niche.</span>
-            </h2>
-            <p className="text-gray-400 text-xl max-w-2xl mx-auto">
-              KlipflowAI writes the scripts, generates the visuals, adds the voiceover, and posts to 5 platforms on autopilot. You check in. The page grows.
-            </p>
+  return (
+    <div className="min-h-screen bg-canvas text-ink">
+      {/* SIDEBAR (desktop) */}
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-line bg-canvas lg:block">
+        <AppSidebar loggedIn={isLoggedIn} />
+      </aside>
+
+      {/* SIDEBAR (mobile drawer) */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setMenuOpen(false)} />
+          <div className="absolute inset-y-0 left-0 w-72 max-w-[85%] border-r border-line bg-canvas">
+            <button onClick={() => setMenuOpen(false)} aria-label="Close menu" className="absolute right-3 top-4 grid h-9 w-9 place-items-center rounded-lg text-ink-muted hover:bg-white/5 hover:text-ink">
+              <X size={20} aria-hidden />
+            </button>
+            <AppSidebar loggedIn={isLoggedIn} onNavigate={() => setMenuOpen(false)} />
           </div>
+        </div>
+      )}
 
-          <div className="grid md:grid-cols-5 gap-4 mb-20">
-            {[
-              { step: "1", icon: "🎯", title: "Pick Niche", desc: "Choose your content niche once" },
-              { step: "2", icon: "✍️", title: "AI Writes Script", desc: "Trending hooks & stories auto-generated" },
-              { step: "3", icon: "🎬", title: "AI Generates Video", desc: "Cinematic visuals created automatically" },
-              { step: "4", icon: "🎙️", title: "AI Adds Voice", desc: "Natural voiceover synced perfectly" },
-              { step: "5", icon: "📡", title: "Auto-Posted", desc: "Live on 5 platforms on schedule" }
-            ].map((s, i) => (
-              <div key={i} className="relative">
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-5 text-center hover:border-purple-500/50 transition h-full">
-                  <div className="text-3xl mb-2">{s.icon}</div>
-                  <div className="text-purple-400 text-xs font-bold mb-1">Step {s.step}</div>
-                  <div className="font-bold text-sm mb-1">{s.title}</div>
-                  <div className="text-gray-500 text-xs">{s.desc}</div>
+      <div className="lg:pl-64">
+        {/* TOP BAR */}
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-line/60 bg-canvas/80 px-4 backdrop-blur-md md:px-8">
+          <div className="flex items-center gap-2 lg:hidden">
+            <button onClick={() => setMenuOpen(true)} aria-label="Open menu" className="grid h-10 w-10 place-items-center rounded-lg text-ink-muted hover:bg-white/5 hover:text-ink">
+              <Menu size={20} aria-hidden />
+            </button>
+            <Link href="/" className="text-[17px] font-semibold tracking-tight">KlipflowAI</Link>
+          </div>
+          <nav className="hidden items-center gap-1 lg:flex" aria-label="Page sections">
+            <a href="#templates" className={buttonClass("ghost", "sm")}>Templates</a>
+            <a href="#pricing" className={buttonClass("ghost", "sm")}>Pricing</a>
+            <a href="#faq" className={buttonClass("ghost", "sm")}>FAQ</a>
+          </nav>
+          <div className="flex items-center gap-2">
+            {isLoggedIn ? (
+              <ButtonLink href="/dashboard" variant="primary" size="md">Go to dashboard <ArrowRight size={16} aria-hidden /></ButtonLink>
+            ) : (
+              <>
+                <ButtonLink href="/login" variant="secondary" size="md">Sign in</ButtonLink>
+                <ButtonLink href="/signup" variant="primary" size="md" className="hidden sm:inline-flex">Start for free</ButtonLink>
+              </>
+            )}
+          </div>
+        </header>
+
+        <main>
+          {/* HERO */}
+          <section className="relative overflow-hidden px-4 pb-16 pt-14 md:px-8 md:pt-20">
+            <div aria-hidden className="pointer-events-none absolute left-1/2 top-24 h-[420px] w-[900px] max-w-[140%] -translate-x-1/2 rounded-full opacity-40 blur-3xl"
+              style={{ background: "radial-gradient(closest-side, rgba(109,74,255,0.55), rgba(34,211,238,0.12) 60%, transparent)" }} />
+            <div className="relative mx-auto max-w-3xl text-center">
+              <p className="mx-auto mb-5 inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-xs text-ink-muted">
+                <Sparkles size={13} className="text-signal" aria-hidden /> Kling, Veo, Sora and Seedance in one place
+              </p>
+              <h1 className="text-4xl font-semibold tracking-tight text-ink md:text-6xl">Make videos that sell</h1>
+              <p className="mx-auto mt-4 max-w-xl text-base text-ink-muted md:text-lg">
+                Describe it and KlipflowAI generates UGC ads, product videos and faceless content with the world&apos;s best AI models.
+              </p>
+            </div>
+            <div ref={heroRef} className="relative mx-auto mt-10 max-w-3xl">
+              <PromptComposer value={prompt} onChange={setPrompt} mode={mode} onModeChange={setMode} onSubmit={handlePromptSubmit} />
+              <p className="mt-4 text-center text-xs text-ink-subtle">25 free tokens on signup · No credit card required</p>
+            </div>
+            <div className="relative mx-auto mt-12 flex max-w-4xl flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-ink-subtle">
+              {MODELS.map((m) => <span key={m}>{m}</span>)}
+            </div>
+          </section>
+
+          {/* QUICK STARTS */}
+          <section id="templates" className="scroll-mt-20 px-4 pb-20 md:px-8">
+            <div className="mx-auto max-w-6xl">
+              <div className="mb-6 flex items-end justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">Quick starts</h2>
+                  <p className="mt-1 text-sm text-ink-muted">Pick a format and we&apos;ll set up the Studio for you.</p>
                 </div>
-                {i < 4 && (
-                  <div className="hidden md:block absolute top-1/2 -right-3 text-purple-500 text-lg z-10">→</div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+                {QUICK_STARTS.map((qs, i) => {
+                  const Icon = qs.icon;
+                  const media = tileMedia[i];
+                  return (
+                    <button
+                      key={qs.title}
+                      onClick={() => startCreating({ module: qs.module, prompt: qs.prompt, aspect_ratio: qs.aspect_ratio })}
+                      className="group relative aspect-[4/3] overflow-hidden rounded-2xl border border-line bg-surface text-left transition-colors hover:border-line-strong"
+                    >
+                      {media ? (
+                        media.output_type === "image"
+                          ? <img src={media.video_url} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                          : <video src={media.video_url + "#t=0.1"} muted playsInline preload="metadata" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      ) : (
+                        <div aria-hidden className="absolute inset-0" style={{ background: `radial-gradient(120% 90% at ${i % 2 ? "100%" : "0%"} 0%, rgba(109,74,255,0.28), transparent 60%)` }}>
+                          <Icon size={56} strokeWidth={1.25} className="absolute right-4 top-4 text-white/15 transition-colors group-hover:text-white/25" />
+                        </div>
+                      )}
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent p-3.5 pt-10">
+                        <div className="flex items-center gap-2">
+                          <Icon size={16} className="text-white" aria-hidden />
+                          <span className="text-[15px] font-medium text-white">{qs.title}</span>
+                        </div>
+                        <p className="mt-0.5 text-xs text-white/65">{qs.desc}</p>
+                      </div>
+                      {qs.badge && (
+                        <span className={"absolute left-3 top-3 rounded-full px-2 py-0.5 text-[11px] font-medium " + (qs.badge === "New" ? "bg-signal text-black" : "bg-white text-black")}>{qs.badge}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+
+          {/* SHOWCASE */}
+          {showcase.length > 0 && (
+            <section id="showcase" className="scroll-mt-20 px-4 pb-24 md:px-8">
+              <div className="mx-auto max-w-6xl">
+                <div className="mb-6">
+                  <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">Made with KlipflowAI</h2>
+                  <p className="mt-1 text-sm text-ink-muted">Every example is a template. Click &quot;Use this&quot; to start from the same prompt and model.</p>
+                </div>
+                <ShowcaseGrid items={showcase} onUse={useTemplate} />
+              </div>
+            </section>
+          )}
+
+          {/* BEYOND GENERATION */}
+          <section className="px-4 pb-24 md:px-8">
+            <div className="mx-auto max-w-6xl">
+              <div className="mb-8 max-w-2xl">
+                <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">From idea to results</h2>
+                <p className="mt-2 text-ink-muted">Find what&apos;s already working, make a better version, and get it in front of people.</p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                {[
+                  { icon: Radar, title: "Ad Spy", desc: "Browse Facebook ads that have been running profitably, then remix the winning formula into your own creative.", href: "/dashboard/ad-spy" },
+                  { icon: Sparkles, title: "Studio", desc: "Text, image and script to video, UGC ads, AI presenters, translations and image ads from one prompt box.", href: studioHref("text_to_video") },
+                  { icon: Bot, title: "Autopilot", desc: "Set your niche and schedule once. Scripts, visuals and voiceover are created and posted for you.", href: "/dashboard/autopilot" },
+                ].map((f) => {
+                  const Icon = f.icon;
+                  return (
+                    <Link key={f.title} href={isLoggedIn ? f.href : "/signup"} className="group rounded-2xl border border-line bg-surface p-6 transition-colors hover:border-line-strong">
+                      <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent/15 text-accent-text"><Icon size={20} aria-hidden /></span>
+                      <h3 className="mt-5 text-lg font-semibold">{f.title}</h3>
+                      <p className="mt-2 text-sm leading-relaxed text-ink-muted">{f.desc}</p>
+                      <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-accent-text">
+                        Open {f.title} <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" aria-hidden />
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+
+          {/* PRICING */}
+          <section id="pricing" className="scroll-mt-20 border-t border-line px-4 py-24 md:px-8">
+            <div className="mx-auto max-w-5xl">
+              <div className="text-center">
+                <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">Simple, transparent pricing</h2>
+                <p className="mt-3 text-ink-muted">Every plan includes every feature. Only the volume changes.</p>
+              </div>
+
+              <div className="mt-10 flex justify-center">
+                <div className="inline-flex rounded-xl border border-line bg-surface p-1" role="tablist">
+                  {[{ key: 'creators', label: 'For creators' }, { key: 'ecom', label: 'For e-commerce' }].map((t) => (
+                    <button key={t.key} role="tab" aria-selected={pricingTab === t.key} onClick={() => setPricingTab(t.key)}
+                      className={"h-9 rounded-lg px-5 text-sm font-medium transition-colors " + (pricingTab === t.key ? "bg-raised text-ink shadow-sm" : "text-ink-muted hover:text-ink")}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-center">
+                {pricingTab === 'creators' ? (
+                  <div className="inline-flex rounded-xl border border-line p-1" role="tablist" aria-label="Billing period">
+                    {[{ key: 'monthly', label: 'Monthly' }, { key: 'yearly', label: 'Yearly', note: 'Save up to 24%' }].map((o) => (
+                      <button key={o.key} role="tab" aria-selected={creatorBilling === o.key} onClick={() => setCreatorBilling(o.key)}
+                        className={"h-8 rounded-lg px-4 text-[13px] transition-colors " + (creatorBilling === o.key ? "bg-white/10 text-ink" : "text-ink-muted hover:text-ink")}>
+                        {o.label}{o.note && <span className="ml-1.5 text-accent-text">{o.note}</span>}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="inline-flex rounded-xl border border-line p-1" role="tablist" aria-label="Billing period">
+                    {[{ key: 'monthly', label: 'Monthly' }, { key: 'sixmonths', label: '6 months' }, { key: 'yearly', label: 'Yearly' }].map((o) => (
+                      <button key={o.key} role="tab" aria-selected={ecomBilling === o.key} onClick={() => setEcomBilling(o.key)}
+                        className={"h-8 rounded-lg px-4 text-[13px] transition-colors " + (ecomBilling === o.key ? "bg-white/10 text-ink" : "text-ink-muted hover:text-ink")}>
+                        {o.label}{ecomSavings[o.key] && <span className="ml-1.5 text-accent-text">{ecomSavings[o.key]}</span>}
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
-            ))}
-          </div>
 
-          <div className="bg-black border border-white/10 rounded-3xl p-8 mb-12">
-            <div className="text-center mb-8">
-              <h3 className="text-2xl font-bold mb-2">Pick a Niche. Watch the Magic.</h3>
-              <p className="text-gray-400 text-sm">See what your AI employee would create for each niche</p>
-            </div>
-            <div className="flex flex-wrap gap-3 justify-center mb-8">
-              {niches.map((niche, i) => (
-                <button
-                  key={i}
-                  onClick={() => setActiveNiche(i)}
-                  className={`px-4 py-2 rounded-full text-sm font-semibold transition ${activeNiche === i ? 'bg-purple-600 text-white' : 'bg-white/10 text-gray-400 hover:text-white'}`}
-                >
-                  {niche.name}
-                </button>
-              ))}
-            </div>
-            <div className="bg-white/5 border border-purple-500/20 rounded-2xl p-6 max-w-2xl mx-auto">
-              <div className="flex items-center justify-between mb-4">
-                <div className="text-purple-400 text-xs font-bold uppercase tracking-widest">AI Generated Script Hook</div>
-                <div className="bg-green-900/40 border border-green-500/30 text-green-400 text-xs font-bold px-3 py-1 rounded-full">{niches[activeNiche].views}</div>
-              </div>
-              <p className="text-white text-sm leading-relaxed italic">"{niches[activeNiche].script}"</p>
-              <div className="mt-4 flex items-center gap-2 text-gray-500 text-xs">
-                <span>⚡ Generated in seconds</span>
-                <span>·</span>
-                <span>🎬 Video auto-created</span>
-                <span>·</span>
-                <span>📡 Posted to 5 platforms</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-center">
-            <h3 className="text-2xl font-bold mb-3">Posted to 5 Platforms. Automatically.</h3>
-            <p className="text-gray-400 text-sm mb-8">Your content goes everywhere while you sleep.</p>
-            <div className="flex justify-center gap-6 flex-wrap">
-              {[
-                { name: "TikTok", icon: "🎵", color: "from-pink-500 to-red-500" },
-                { name: "Instagram", icon: "📸", color: "from-purple-500 to-pink-500" },
-                { name: "YouTube", icon: "▶️", color: "from-red-600 to-red-400" },
-                { name: "Facebook", icon: "👥", color: "from-blue-600 to-blue-400" },
-                { name: "X", icon: "𝕏", color: "from-gray-600 to-gray-400" }
-              ].map((p, i) => (
-                <div key={i} className="flex flex-col items-center gap-2">
-                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${p.color} flex items-center justify-center text-2xl shadow-lg`}>
-                    {p.icon}
-                  </div>
-                  <span className="text-gray-400 text-xs font-semibold">{p.name}</span>
+              {pricingTab === 'creators' ? (
+                <div className="mx-auto mt-10 grid max-w-3xl gap-5 md:grid-cols-2">
+                  {creatorPlans.length === 0
+                    ? <p className="col-span-full py-8 text-center text-sm text-ink-muted">Loading plans…</p>
+                    : creatorPlans.map((plan) => planCard(plan, creatorBilling === 'monthly' ? plan.price_monthly : plan.price_yearly, creatorBilling === 'yearly' ? 'Billed annually' : null))}
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* STAR YOURSELF SECTION */}
-      <section className="px-8 py-24 bg-gradient-to-b from-black to-purple-950/20">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <div className="inline-block bg-pink-900/40 border border-pink-500/30 text-pink-300 text-xs font-semibold px-4 py-1.5 rounded-full mb-4">
-              📸 Star Yourself in Any Scene
-            </div>
-            <h2 className="text-4xl md:text-5xl font-extrabold mb-6">
-              Put Yourself in <br />
-              <span className="bg-gradient-to-r from-pink-400 to-purple-500 bg-clip-text text-transparent">
-                Any Scene on Earth.
-              </span>
-            </h2>
-            <p className="text-gray-400 text-xl max-w-2xl mx-auto">
-              Upload your photo. Appear anywhere in the world. Change your outfit, your look, your entire environment — all AI generated. No filming. No travel. No limits.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-4 gap-4 mb-16">
-            {[
-              { scene: "🏖️", title: "Maldives Beach", desc: "Crystal water, white sand, golden sun" },
-              { scene: "🏙️", title: "NYC Penthouse", desc: "Manhattan skyline, luxury interior" },
-              { scene: "🎬", title: "Film Studio", desc: "Professional lighting, cinematic setup" },
-              { scene: "🌌", title: "Space Station", desc: "Zero gravity, Earth in the background" },
-              { scene: "🏔️", title: "Mountain Peak", desc: "Snow-capped summit, dramatic clouds" },
-              { scene: "🎭", title: "Red Carpet", desc: "Hollywood premiere, paparazzi lights" },
-              { scene: "🏰", title: "Royal Palace", desc: "Grand architecture, regal atmosphere" },
-              { scene: "🌆", title: "Tokyo Streets", desc: "Neon lights, futuristic cityscape" }
-            ].map((s, i) => (
-              <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-5 text-center hover:border-pink-500/50 transition">
-                <div className="text-4xl mb-2">{s.scene}</div>
-                <div className="font-bold text-sm mb-1">{s.title}</div>
-                <div className="text-gray-500 text-xs">{s.desc}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8 mb-16">
-            {[
-              { icon: "📸", title: "Upload Your Photo — Star in Any Scene", desc: "Upload a single photo of yourself or your talent. Our AI places you in any environment you can imagine — beach, penthouse, studio, outer space. Photorealistic results every time. No green screen. No studio. No travel budget.", badge: "Most Popular Feature" },
-              { icon: "🌍", title: "Any Environment You Can Imagine", desc: "From the streets of Tokyo to the surface of Mars. Describe any environment and our AI generates it with you inside. Every scene is unique, cinematic, and completely owned by you.", badge: "Unlimited Scenes" },
-              { icon: "👥", title: "Multiple People in One Scene", desc: "Need a group shot? A brand team photo? A crowd scene? Generate videos and images with multiple AI-generated people alongside you. Perfect for brand campaigns, testimonials, and social content.", badge: "New Feature" },
-              { icon: "👗", title: "Change Your Outfit & Look Instantly", desc: "Try any outfit without owning it. Business suit, streetwear, formal gown, branded merchandise — our AI dresses you in any style. Change your hair, age, accessories, and entire aesthetic with one prompt.", badge: "Outfit Customization" }
-            ].map((f, i) => (
-              <div key={i} className="bg-black border border-white/10 rounded-2xl p-8 hover:border-pink-500/30 transition">
-                <div className="flex items-start gap-4">
-                  <div className="text-4xl">{f.icon}</div>
-                  <div>
-                    <div className="inline-block bg-purple-900/40 border border-purple-500/20 text-purple-300 text-xs font-bold px-3 py-1 rounded-full mb-3">{f.badge}</div>
-                    <h3 className="text-xl font-bold mb-3">{f.title}</h3>
-                    <p className="text-gray-400 text-sm leading-relaxed">{f.desc}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="bg-white/5 border border-white/10 rounded-3xl p-10">
-            <h3 className="text-2xl font-bold text-center mb-8">How It Works</h3>
-            <div className="grid md:grid-cols-4 gap-6">
-              {[
-                { step: "1", icon: "📸", title: "Upload Your Photo", desc: "Any clear photo of yourself or your talent" },
-                { step: "2", icon: "🌍", title: "Describe Your Scene", desc: "Any environment, any outfit, any number of people" },
-                { step: "3", icon: "✨", title: "AI Generates It", desc: "Photorealistic video or image in minutes" },
-                { step: "4", icon: "⬇️", title: "Download & Use", desc: "For ads, social media, or any campaign" }
-              ].map((s, i) => (
-                <div key={i} className="text-center">
-                  <div className="w-12 h-12 rounded-full bg-purple-600 flex items-center justify-center text-lg font-bold mx-auto mb-3">{s.step}</div>
-                  <div className="text-2xl mb-2">{s.icon}</div>
-                  <div className="font-bold text-sm mb-1">{s.title}</div>
-                  <div className="text-gray-500 text-xs">{s.desc}</div>
-                </div>
-              ))}
-            </div>
-            <div className="text-center mt-8">
-              <Link href="/signup" className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-12 rounded-full text-lg transition inline-block">
-                Try It Free — 25 Tokens →
-              </Link>
-              <p className="text-gray-600 text-xs mt-3">No credit card required</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* LIVE DEMO */}
-      <section className="px-8 py-20 bg-white/5">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-4xl font-bold text-center mb-4">Try Our Prompt Engine — Free</h2>
-          <p className="text-gray-400 text-center mb-12">Type a simple idea. Watch our AI Director transform it into a cinematic prompt instantly.</p>
-          <div className="grid md:grid-cols-2 gap-8">
-            <div className="bg-black border border-white/10 rounded-2xl p-6">
-              <div className="text-purple-400 text-xs font-bold uppercase tracking-widest mb-3">Your Simple Idea</div>
-              <textarea
-                placeholder='e.g. "Luxury watch on a rocky mountain at sunset"'
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 resize-none h-32 text-sm"
-              />
-              <button
-                onClick={handlePromptExpand}
-                disabled={promptLoading || !prompt}
-                className="mt-4 w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-40 text-white font-bold py-3 rounded-full transition"
-              >
-                {promptLoading ? '✨ Expanding...' : '✨ Expand with AI Director'}
-              </button>
-            </div>
-            <div className="bg-black border border-white/10 rounded-2xl p-6">
-              <div className="text-pink-400 text-xs font-bold uppercase tracking-widest mb-3">Cinematic Prompt Output</div>
-              {expandedPrompt ? (
-                <p className="text-gray-300 text-sm leading-relaxed">{expandedPrompt}</p>
               ) : (
-                <div className="h-32 flex items-center justify-center text-gray-600 text-sm">
-                  Your cinematic prompt will appear here...
-                </div>
-              )}
-              {expandedPrompt && (
-                <div className="mt-4 bg-purple-900/30 border border-purple-500/30 rounded-xl p-3 text-xs text-purple-300">
-                  ⚡ Sign up free to use this prompt to generate a full AI video
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ECOM SECTION */}
-      <section id="ecom" className="px-8 py-24 bg-gradient-to-b from-black to-pink-950/20">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <div className="inline-block bg-pink-900/40 border border-pink-500/30 text-pink-300 text-xs font-semibold px-4 py-1.5 rounded-full mb-4">
-              🛍️ For E-Commerce Brands
-            </div>
-            <h2 className="text-4xl md:text-5xl font-extrabold mb-6">
-              Spy. Create. Launch.<br />
-              <span className="bg-gradient-to-r from-pink-400 to-purple-500 bg-clip-text text-transparent">In Under 5 Minutes.</span>
-            </h2>
-            <p className="text-gray-400 text-xl max-w-2xl mx-auto">
-              Find what's already working in your market. Generate a better version. Launch it to Facebook Ads automatically. No agency. No editor. No waiting.
-            </p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { icon: "🕵️", title: "Spy on Winners", desc: "Find Facebook ads that have been running profitably for 7+ days. Filter by niche, format, and market. One click to remix any winning ad into your own.", badge: "Legal & Official" },
-              { icon: "🎨", title: "Generate Better Ads", desc: "Our AI generates video ads, image ads, and UGC testimonials — all inspired by winning formulas but completely unique to your brand.", badge: "Video + Image + UGC" },
-              { icon: "🚀", title: "Launch in One Click", desc: "Answer 5 quick questions about your audience and budget. KlipflowAI picks the best creative and launches your Facebook campaign automatically.", badge: "No Ad Manager Needed" }
-            ].map((f, i) => (
-              <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-8 hover:border-pink-500/50 transition">
-                <div className="text-4xl mb-4">{f.icon}</div>
-                <div className="inline-block bg-pink-900/30 border border-pink-500/20 text-pink-300 text-xs font-bold px-3 py-1 rounded-full mb-3">{f.badge}</div>
-                <h3 className="text-xl font-bold mb-3">{f.title}</h3>
-                <p className="text-gray-400 text-sm leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* WHY KLIPFLOWAI */}
-      <section className="px-8 py-24 max-w-6xl mx-auto">
-        <h2 className="text-4xl font-bold text-center mb-4">Why Choose KlipflowAI</h2>
-        <p className="text-gray-400 text-center mb-16">The most complete AI content and advertising platform ever built.</p>
-        <div className="grid md:grid-cols-3 gap-8">
-          {[
-            { icon: "💰", title: "Built for Revenue", desc: "Every feature is designed to help you make money — whether you're running ads, growing a faceless channel, or selling products. This isn't just a video tool, it's a revenue engine." },
-            { icon: "⚡", title: "From Idea to Live in Minutes", desc: "Spy a winning ad, generate a better version, and launch your campaign — all in under 5 minutes. No agencies, no editors, no waiting. Just results." },
-            { icon: "🔄", title: "Fully Closed Loop", desc: "Unlike other tools that do one thing, KlipflowAI handles the entire workflow: research → create → distribute → analyze. Set it once and let it run." }
-          ].map((f, i) => (
-            <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center hover:border-purple-500/50 transition">
-              <div className="text-5xl mb-4">{f.icon}</div>
-              <h3 className="text-xl font-bold mb-3">{f.title}</h3>
-              <p className="text-gray-400 text-sm leading-relaxed">{f.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* HOW IT WORKS */}
-      <section className="px-8 py-24 bg-white/5">
-        <div className="max-w-5xl mx-auto">
-          <h2 className="text-4xl font-bold text-center mb-4">How It Works</h2>
-          <p className="text-gray-400 text-center mb-16">Three steps to dominate your market.</p>
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { step: "01", icon: "🕵️", title: "Spy & Discover", desc: "Find winning Facebook ads running 7+ days. One click to remix any winning formula into your own campaign.", color: "from-purple-600 to-purple-400" },
-              { step: "02", icon: "🎬", title: "Generate & Create", desc: "AI writes your script, generates cinematic video or image ads, and adds professional voiceover — automatically.", color: "from-pink-600 to-purple-500" },
-              { step: "03", icon: "🚀", title: "Launch & Automate", desc: "Brands launch Facebook campaigns in one click. Creators set autopilot and content posts to 5 platforms daily.", color: "from-pink-500 to-pink-400" }
-            ].map((s, i) => (
-              <div key={i} className="bg-black border border-white/10 rounded-2xl p-8 hover:border-purple-500/50 transition">
-                <div className={`text-5xl font-extrabold bg-gradient-to-r ${s.color} bg-clip-text text-transparent mb-4`}>{s.step}</div>
-                <div className="text-3xl mb-3">{s.icon}</div>
-                <h3 className="text-xl font-bold mb-3">{s.title}</h3>
-                <p className="text-gray-400 text-sm leading-relaxed">{s.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* FEATURES GRID */}
-      <section id="features" className="px-8 py-24 max-w-6xl mx-auto">
-        <h2 className="text-4xl font-bold text-center mb-4">9 Powerful Modules. One Platform.</h2>
-        <p className="text-gray-400 text-center mb-16">Every tool you need. Every plan includes everything.</p>
-        <div className="grid md:grid-cols-3 gap-8">
-          {[
-            { icon: "🕵️", title: "Facebook Ad Spy Radar", desc: "Monitor winning Facebook ads in real time. Filter by niche, duration, and format. See what's scaling before you spend a dollar." },
-            { icon: "✍️", title: "AI Script Writer", desc: "Our AI writes trending hooks, full scripts, and CTAs based on your niche. Updated daily with what's going viral right now." },
-            { icon: "🎬", title: "Text to Video", desc: "Type any idea and our cinematic prompt engine produces a professional AI video. Choose from Kling, Veo 3, or Sora." },
-            { icon: "🖼️", title: "Image to Video", desc: "Animate any still image into a stunning video. Perfect for product shots and lifestyle images. Control motion and speed." },
-            { icon: "🧑‍🎤", title: "AI Actor Generator", desc: "Describe your ideal spokesperson and our AI generates a photorealistic human avatar. Save and reuse across unlimited videos." },
-            { icon: "📸", title: "Upload Your Own Actor", desc: "Use your own talent. Upload a photo and generate AI videos using their likeness. Comes with consent verification." },
-            { icon: "🎙️", title: "AI Voice Generation", desc: "Generate natural voiceovers synced to your avatar or video. Multiple voice styles, accents, and tones." },
-            { icon: "🤖", title: "Content Autopilot", desc: "Set daily posting rules once. KlipflowAI posts to TikTok, Instagram, YouTube, Facebook, and X automatically every day." },
-            { icon: "🚀", title: "One-Click Ad Launcher", desc: "Answer 5 questions about your audience and budget. AI selects the best creative and launches your Facebook campaign automatically." }
-          ].map((f, i) => (
-            <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-8 hover:border-purple-500/50 transition">
-              <div className="text-4xl mb-4">{f.icon}</div>
-              <h3 className="text-xl font-bold mb-3">{f.title}</h3>
-              <p className="text-gray-400 text-sm leading-relaxed">{f.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* WATERMARK NOTICE */}
-      <section className="px-8 py-6 max-w-4xl mx-auto">
-        <div className="bg-purple-900/20 border border-purple-500/20 rounded-2xl p-6 flex flex-col md:flex-row items-center gap-4 text-center md:text-left">
-          <div className="text-4xl">🎁</div>
-          <div>
-            <h3 className="font-bold text-white mb-1">Try Before You Subscribe</h3>
-            <p className="text-gray-400 text-sm">Your 25 free tokens generate watermarked videos so you can see the full quality before committing. The watermark disappears automatically the moment you subscribe to any paid plan.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* COMPARISON TABLE */}
-      <section className="px-8 py-24 max-w-5xl mx-auto">
-        <h2 className="text-4xl font-bold text-center mb-4">KlipflowAI vs The Rest</h2>
-        <p className="text-gray-400 text-center mb-16">No other platform comes close to this feature set.</p>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-white/10">
-                <th className="text-left py-4 px-4 text-gray-400 font-semibold">Feature</th>
-                <th className="py-4 px-4 text-purple-400 font-bold text-center">KlipflowAI</th>
-                <th className="py-4 px-4 text-gray-500 font-semibold text-center">Other Tools</th>
-                <th className="py-4 px-4 text-gray-500 font-semibold text-center">Ad Spy Tools</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                ["AI Script Writer", true, true, false],
-                ["AI Video Generation", true, true, false],
-                ["Image to Video", true, true, false],
-                ["AI Actor Generator", true, false, false],
-                ["Upload Own Actor", true, false, false],
-                ["AI Voice Generation", true, true, false],
-                ["UGC Avatar Videos", true, false, false],
-                ["Facebook Ad Spy", true, false, true],
-                ["AI Image Ad Generator", true, false, false],
-                ["One-Click Ad Launcher", true, false, false],
-                ["Auto-Post to 5 Platforms", true, false, false],
-                ["TikTok Auto-Posting", true, true, false],
-                ["Token Top-Up from $5", true, false, false],
-              ].map(([feature, us, content, adspy], i) => (
-                <tr key={i} className="border-b border-white/5 hover:bg-white/3 transition">
-                  <td className="py-4 px-4 text-gray-300">{feature as string}</td>
-                  <td className="py-4 px-4 text-center">{us ? <span className="text-purple-400 font-bold text-lg">✓</span> : <span className="text-gray-600">✗</span>}</td>
-                  <td className="py-4 px-4 text-center">{content ? <span className="text-green-400 font-bold text-lg">✓</span> : <span className="text-gray-600">✗</span>}</td>
-                  <td className="py-4 px-4 text-center">{adspy ? <span className="text-green-400 font-bold text-lg">✓</span> : <span className="text-gray-600">✗</span>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* SOCIAL PROOF */}
-      <section className="px-8 py-24 bg-white/5">
-        <h2 className="text-4xl font-bold text-center mb-4">Loved by Creators & Brands</h2>
-        <p className="text-gray-400 text-center mb-16">Join thousands of marketers already using KlipflowAI.</p>
-        <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
-          {[
-            { name: "Sarah K.", handle: "@sarahkreates", avatar: "SK", text: "I went from spending $3,000/month on video editors to generating 30 videos a week with KlipflowAI. The autopilot posts to all 5 platforms while I sleep. Insane.", role: "Faceless Channel Creator" },
-            { name: "Marcus T.", handle: "@marcustrades", avatar: "MT", text: "The Ad Spy tool found me a winning product in 20 minutes. I generated the ad, launched it, and made $4,200 in my first week. This platform is a cheat code.", role: "E-Commerce Brand Owner" },
-            { name: "Priya M.", handle: "@priyamedia", avatar: "PM", text: "Managing 8 client accounts used to take my whole team. KlipflowAI handles content across all platforms and my team focuses on strategy. Complete game changer.", role: "Digital Marketing Agency" }
-          ].map((t, i) => (
-            <div key={i} className="bg-black border border-white/10 rounded-2xl p-6 hover:border-purple-500/30 transition">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center text-sm font-bold">{t.avatar}</div>
-                <div>
-                  <div className="font-semibold text-sm">{t.name}</div>
-                  <div className="text-gray-500 text-xs">{t.handle}</div>
-                </div>
-              </div>
-              <p className="text-gray-300 text-sm leading-relaxed mb-4">"{t.text}"</p>
-              <div className="text-purple-400 text-xs font-semibold">{t.role}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* PRICING */}
-      <section id="pricing" className="px-8 py-24">
-        <h2 className="text-4xl font-bold text-center mb-4">Simple, Transparent Pricing</h2>
-        <p className="text-gray-400 text-center mb-10">All features included on every plan. Only volume changes.</p>
-
-        <div className="flex justify-center mb-12">
-          <div className="bg-white/10 rounded-full p-1 flex gap-1">
-            <button onClick={() => setPricingTab('creators')} className={`px-8 py-2.5 rounded-full font-semibold text-sm transition ${pricingTab === 'creators' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}>
-              For Creators
-            </button>
-            <button onClick={() => setPricingTab('ecom')} className={`px-8 py-2.5 rounded-full font-semibold text-sm transition ${pricingTab === 'ecom' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}>
-              For E-Commerce
-            </button>
-          </div>
-        </div>
-
-        {pricingTab === 'creators' && (
-          <div className="max-w-5xl mx-auto">
-            <div className="flex justify-center items-center gap-4 mb-12">
-              <span className={`text-sm font-semibold ${creatorBilling === 'monthly' ? 'text-white' : 'text-gray-500'}`}>Monthly</span>
-              <button onClick={() => setCreatorBilling(creatorBilling === 'monthly' ? 'yearly' : 'monthly')} className="relative w-12 h-6 bg-purple-600 rounded-full transition">
-                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${creatorBilling === 'yearly' ? 'left-7' : 'left-1'}`} />
-              </button>
-              <span className={`text-sm font-semibold ${creatorBilling === 'yearly' ? 'text-white' : 'text-gray-500'}`}>
-                Yearly <span className="text-purple-400 text-xs">(Save up to 24%)</span>
-              </span>
-            </div>
-
-            <div className="bg-purple-900/20 border border-purple-500/30 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
-              <div>
-                <h3 className="text-lg font-bold text-purple-300 mb-1">🎁 Free Trial — No Credit Card Required</h3>
-                <p className="text-gray-400 text-sm">Sign up and get 25 free tokens instantly. Generate your first 2 watermarked videos completely free.</p>
-              </div>
-              <Link href="/signup" className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-full transition whitespace-nowrap">
-                Sign Up Free
-              </Link>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
-              {creatorPlans.length === 0 ? (
-                <div className="col-span-2 text-center text-gray-400 py-8">Loading plans...</div>
-              ) : creatorPlans.map((plan) => (
-                <div key={plan.id} className={`rounded-2xl p-8 border ${plan.is_popular ? "border-purple-500 bg-purple-900/20" : "border-white/10 bg-white/5"}`}>
-                  {plan.is_popular && <div className="text-xs font-bold text-purple-400 mb-3 uppercase tracking-widest">Most Popular</div>}
-                  <h3 className="text-2xl font-bold mb-1">{plan.name}</h3>
-                  <p className="text-gray-400 text-sm mb-4">{plan.description}</p>
-                  <div className="text-5xl font-extrabold mb-1">
-                    ${creatorBilling === 'monthly' ? plan.price_monthly : plan.price_yearly}
-                    <span className="text-lg text-gray-400">/mo</span>
-                  </div>
-                  {creatorBilling === 'yearly' && <p className="text-purple-400 text-xs mb-4">Billed annually</p>}
-                  <p className="text-purple-300 text-sm font-semibold mb-6">{plan.tokens_per_month} tokens/month</p>
-                  {Array.isArray(plan.features) && plan.features.length > 0 && (
-                    <ul className="space-y-3 mb-8">
-                      {plan.features.map((f: string, j: number) => (
-                        <li key={j} className="flex items-center gap-2 text-sm text-gray-300">
-                          <span className="text-purple-400">✓</span> {f}
-                        </li>
+                <div className="mt-10 grid gap-5 md:grid-cols-3">
+                  {ecomPlansDb.length === 0
+                    ? <p className="col-span-full py-8 text-center text-sm text-ink-muted">Loading plans…</p>
+                    : ecomPlansDb.map((plan) => planCard(
+                        plan,
+                        ecomBilling === 'monthly' ? plan.price_monthly : ecomBilling === 'sixmonths' ? Math.round(plan.price_monthly * 0.86) : plan.price_yearly,
+                        ecomBilling === 'sixmonths' ? 'Billed every 6 months' : ecomBilling === 'yearly' ? 'Billed annually' : null,
                       ))}
-                    </ul>
-                  )}
-                  <Link href="/signup" className={`block w-full py-3 rounded-full font-bold transition text-center ${plan.is_popular ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-white/10 hover:bg-white/20 text-white"}`}>
-                    Get Started
-                  </Link>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              )}
 
-        {pricingTab === 'ecom' && (
-          <div className="max-w-6xl mx-auto">
-            <div className="flex justify-center mb-12">
-              <div className="bg-white/10 rounded-full p-1 flex gap-1">
-                {[{ key: 'monthly', label: 'Monthly' }, { key: 'sixmonths', label: '6 Months' }, { key: 'yearly', label: 'Yearly' }].map((option) => (
-                  <button key={option.key} onClick={() => setEcomBilling(option.key)} className={`px-6 py-2.5 rounded-full font-semibold text-sm transition ${ecomBilling === option.key ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}>
-                    {option.label}
-                    {option.key !== 'monthly' && <span className="ml-1.5 text-xs text-purple-300">{ecomSavings[option.key]}</span>}
-                  </button>
+              <div className="mx-auto mt-8 flex max-w-3xl flex-col items-center justify-between gap-4 rounded-2xl border border-line bg-surface p-5 sm:flex-row">
+                <div>
+                  <p className="font-medium text-ink">Try it free first</p>
+                  <p className="text-sm text-ink-muted">25 free tokens, enough for 2 watermarked videos. No credit card.</p>
+                </div>
+                <ButtonLink href="/signup" variant="secondary" size="md">Start for free</ButtonLink>
+              </div>
+            </div>
+          </section>
+
+          {/* FAQ */}
+          <section id="faq" className="scroll-mt-20 border-t border-line px-4 py-24 md:px-8">
+            <div className="mx-auto max-w-3xl">
+              <h2 className="text-center text-3xl font-semibold tracking-tight md:text-4xl">Frequently asked questions</h2>
+              <p className="mt-3 text-center text-ink-muted">More questions? Email <a href="mailto:support@klipflowai.com" className="text-accent-text hover:underline">support@klipflowai.com</a></p>
+              <div className="mt-10 divide-y divide-line rounded-2xl border border-line bg-surface">
+                {faqs.map((item, i) => (
+                  <div key={i}>
+                    <button onClick={() => setOpenFaq(openFaq === i ? null : i)} aria-expanded={openFaq === i}
+                      className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left text-[15px] font-medium text-ink transition-colors hover:bg-white/[0.02]">
+                      {item.q}
+                      <ChevronDown size={18} aria-hidden className={"flex-shrink-0 text-ink-muted transition-transform " + (openFaq === i ? "rotate-180" : "")} />
+                    </button>
+                    {openFaq === i && <p className="px-5 pb-5 text-sm leading-relaxed text-ink-muted">{item.a}</p>}
+                  </div>
                 ))}
               </div>
             </div>
-            <div className="grid md:grid-cols-3 gap-8">
-              {ecomPlansDb.length === 0 ? (
-                <div className="col-span-3 text-center text-gray-400 py-8">Loading plans...</div>
-              ) : ecomPlansDb.map((plan) => (
-                <div key={plan.id} className={`rounded-2xl p-8 border ${plan.is_popular ? "border-purple-500 bg-purple-900/20" : "border-white/10 bg-white/5"}`}>
-                  {plan.is_popular && <div className="text-xs font-bold text-purple-400 mb-3 uppercase tracking-widest">Most Popular</div>}
-                  <h3 className="text-2xl font-bold mb-1">{plan.name}</h3>
-                  <p className="text-gray-400 text-sm mb-4">{plan.description}</p>
-                  <div className="text-5xl font-extrabold mb-1">
-                    ${ecomBilling === 'monthly' ? plan.price_monthly : ecomBilling === 'sixmonths' ? Math.round(plan.price_monthly * 0.86) : plan.price_yearly}
-                    <span className="text-lg text-gray-400">/mo</span>
-                  </div>
-                  {ecomBilling !== 'monthly' && (
-                    <p className="text-purple-400 text-xs mb-6">{ecomBilling === 'sixmonths' ? 'Billed every 6 months' : 'Billed annually'}</p>
-                  )}
-                  {Array.isArray(plan.features) && plan.features.length > 0 && (
-                    <ul className="space-y-3 mb-8 mt-4">
-                      {plan.features.map((f: string, j: number) => (
-                        <li key={j} className="flex items-center gap-2 text-sm text-gray-300">
-                          <span className="text-purple-400">✓</span> {f}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <Link href="/signup" className={`block w-full py-3 rounded-full font-bold transition text-center ${plan.is_popular ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-white/10 hover:bg-white/20 text-white"}`}>
-                    Get Started
-                  </Link>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </section>
+          </section>
 
-      {/* FAQ */}
-      <section id="faq" className="px-8 py-24 bg-white/5">
-        <div className="max-w-3xl mx-auto">
-          <h2 className="text-4xl font-bold text-center mb-4">Frequently Asked Questions</h2>
-          <p className="text-gray-400 text-center mb-16">Have more questions? Contact us at support@klipflowai.com</p>
-          <div className="space-y-3">
-            {faqs.map((item, i) => (
-              <div key={i} className="border border-white/10 rounded-xl overflow-hidden">
-                <button
-                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-white/5 transition"
-                >
-                  <span className="font-semibold text-sm">{item.q}</span>
-                  <span className="text-purple-400 text-lg ml-4">{openFaq === i ? '−' : '+'}</span>
-                </button>
-                {openFaq === i && (
-                  <div className="px-6 pb-4 text-gray-400 text-sm leading-relaxed border-t border-white/5 pt-3">
-                    {item.a}
-                  </div>
-                )}
+          {/* FINAL CTA */}
+          <section className="px-4 pb-24 md:px-8">
+            <div className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl border border-line bg-surface px-6 py-16 text-center">
+              <div aria-hidden className="pointer-events-none absolute inset-0 opacity-60" style={{ background: "radial-gradient(60% 80% at 50% 0%, rgba(109,74,255,0.35), transparent 70%)" }} />
+              <div className="relative">
+                <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">Your next ad is one prompt away</h2>
+                <p className="mx-auto mt-3 max-w-lg text-ink-muted">Start with 25 free tokens. No credit card, cancel anytime.</p>
+                <div className="mt-8 flex flex-wrap justify-center gap-3">
+                  <ButtonLink href="/signup" variant="primary" size="lg">Start for free <ArrowRight size={17} aria-hidden /></ButtonLink>
+                  <a href="#pricing" className={buttonClass("secondary", "lg")}>See pricing</a>
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+
+        {/* FOOTER */}
+        <footer className="border-t border-line px-4 py-14 md:px-8">
+          <div className="mx-auto grid max-w-6xl gap-10 md:grid-cols-4">
+            <div>
+              <span className="text-[17px] font-semibold tracking-tight">KlipflowAI</span>
+              <p className="mt-3 text-sm leading-relaxed text-ink-subtle">Spy on what works, create better ads, and launch them, all in one place.</p>
+            </div>
+            {[
+              { title: "Product", links: [{ href: "#templates", label: "Templates" }, { href: "#pricing", label: "Pricing" }, { href: "/api-docs", label: "API docs" }] },
+              { title: "Resources", links: [{ href: "/blog", label: "Blog" }, { href: "/academy", label: "Academy" }, { href: "#faq", label: "FAQ" }] },
+              { title: "Company", links: [{ href: "/about", label: "About" }, { href: "/contact", label: "Contact" }, { href: "/privacy-policy", label: "Privacy policy" }, { href: "/terms-of-service", label: "Terms of service" }, { href: "/refund-policy", label: "Refund policy" }] },
+            ].map((col) => (
+              <div key={col.title}>
+                <h3 className="mb-4 text-sm font-medium text-ink">{col.title}</h3>
+                <ul className="space-y-2.5 text-sm text-ink-subtle">
+                  {col.links.map((l) => (
+                    <li key={l.label}>
+                      {l.href.startsWith("#") ? <a href={l.href} className="transition-colors hover:text-ink">{l.label}</a> : <Link href={l.href} className="transition-colors hover:text-ink">{l.label}</Link>}
+                    </li>
+                  ))}
+                </ul>
               </div>
             ))}
           </div>
-        </div>
-      </section>
+          <div className="mx-auto mt-12 max-w-6xl border-t border-line pt-6 text-sm text-ink-subtle">© 2026 KlipflowAI. All rights reserved.</div>
+        </footer>
+      </div>
 
-      {/* FINAL CTA */}
-      <section className="px-8 py-32 text-center">
-        <div className="max-w-3xl mx-auto">
-          <h2 className="text-5xl font-extrabold mb-6">
-            Your AI Employee is <span className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">Ready to Work.</span>
-          </h2>
-          <p className="text-gray-400 text-xl mb-10">25 free tokens. No credit card. No commitment. Pick your niche and let KlipflowAI do the rest.</p>
-          <Link href="/signup" className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-12 rounded-full text-lg transition inline-block">
-            Sign Up Free →
-          </Link>
-          <p className="text-gray-600 text-sm mt-4">Join creators and brands already using KlipflowAI</p>
-        </div>
-      </section>
-
-      {/* FOOTER */}
-      <footer className="border-t border-white/10 px-8 py-16">
-        <div className="max-w-6xl mx-auto grid md:grid-cols-4 gap-12">
-          <div>
-            <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">KlipflowAI</span>
-            <p className="text-gray-500 text-sm mt-3 leading-relaxed">The only platform that spies, creates, and launches — all in one.</p>
-            <div className="flex gap-3 mt-4">
-              {["TikTok", "IG", "YT", "FB", "𝕏"].map((p, i) => (
-                <div key={i} className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-xs text-gray-400 hover:bg-purple-600 hover:text-white transition cursor-pointer">{p}</div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <h4 className="font-semibold text-sm mb-4">Product</h4>
-            <ul className="space-y-2 text-gray-500 text-sm">
-              <li><a href="#features" className="hover:text-white transition">Features</a></li>
-              <li><a href="#pricing" className="hover:text-white transition">Pricing</a></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold text-sm mb-4">Resources</h4>
-            <ul className="space-y-2 text-gray-500 text-sm">
-              <li><Link href="/blog" className="hover:text-white transition">Blog</Link></li>
-              <li><Link href="/academy" className="hover:text-white transition">Academy</Link></li>
-              <li><Link href="/api-docs" className="hover:text-white transition">API Docs</Link></li>
-              <li><a href="#faq" className="hover:text-white transition">FAQ</a></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold text-sm mb-4">Company</h4>
-            <ul className="space-y-2 text-gray-500 text-sm">
-              <li><Link href="/about" className="hover:text-white transition">About</Link></li>
-              <li><Link href="/contact" className="hover:text-white transition">Contact</Link></li>
-              <li><Link href="/privacy-policy" className="hover:text-white transition">Privacy Policy</Link></li>
-              <li><Link href="/terms-of-service" className="hover:text-white transition">Terms of Service</Link></li>
-              <li><Link href="/refund-policy" className="hover:text-white transition">Refund Policy</Link></li>
-            </ul>
-          </div>
-        </div>
-        <div className="max-w-6xl mx-auto mt-12 pt-8 border-t border-white/10 text-center text-gray-600 text-sm">
-          © 2026 KlipflowAI · All rights reserved
-        </div>
-      </footer>
-
-    </main>
+      {/* FLOATING PROMPT BAR */}
+      <div
+        inert={!showBar}
+        className={"fixed bottom-5 left-1/2 z-30 w-[min(640px,calc(100%-2rem))] -translate-x-1/2 transition-all duration-300 lg:ml-32 " + (showBar ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-6 opacity-0")}
+      >
+        <PromptComposer variant="bar" value={prompt} onChange={setPrompt} mode={mode} onSubmit={handlePromptSubmit} />
+      </div>
+    </div>
   );
 }

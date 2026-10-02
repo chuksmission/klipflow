@@ -1,14 +1,16 @@
 'use client';
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { AlertTriangle } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import AuthShell, { PasswordInput } from "../components/AuthShell";
+import { Alert, Button, Field, Spinner } from "../components/ui";
 
 export default function UpdatePassword() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [ready, setReady] = useState(false);
   const router = useRouter();
 
@@ -74,97 +76,36 @@ export default function UpdatePassword() {
   };
 
   return (
-    <main className="min-h-screen bg-black text-white flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <span className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-            KlipflowAI
-          </span>
-          <p className="text-gray-400 mt-2 text-sm">Set your new password</p>
+    <AuthShell title="Choose a new password" subtitle="Use at least 8 characters.">
+      {!ready && !error && (
+        <div className="flex flex-col items-center py-8 text-center">
+          <Spinner size={24} className="text-accent-text" />
+          <p className="mt-3 text-sm text-ink-muted">Verifying your reset link…</p>
         </div>
+      )}
 
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-8">
-          <h1 className="text-2xl font-bold mb-6">Update Password</h1>
-
-          {!ready && !error && (
-            <div className="text-center py-8">
-              <div className="text-4xl mb-3 animate-pulse">🔐</div>
-              <p className="text-gray-400 text-sm">Verifying reset link...</p>
-            </div>
-          )}
-
-          {error && !ready && (
-            <div className="text-center py-8">
-              <div className="text-4xl mb-3">⚠️</div>
-              <p className="text-red-400 text-sm mb-4">{error}</p>
-              <button
-                onClick={() => router.push('/reset-password')}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-xl transition text-sm"
-              >
-                Request New Link
-              </button>
-            </div>
-          )}
-
-          {ready && (
-            <div className="space-y-4">
-              <div>
-                <label className="text-gray-400 text-sm mb-1 block">New Password</label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Min. 8 characters"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 pr-12 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition"
-                  >
-                    {showPassword ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                        <line x1="1" y1="1" x2="23" y2="23"/>
-                      </svg>
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                        <circle cx="12" cy="12" r="3"/>
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-gray-400 text-sm mb-1 block">Confirm New Password</label>
-                <input
-                  type="password"
-                  placeholder="Repeat new password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition"
-                />
-              </div>
-
-              {error && (
-                <p className="text-red-400 text-sm">{error}</p>
-              )}
-
-              <button
-                onClick={handleUpdate}
-                disabled={loading}
-                className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition"
-              >
-                {loading ? "Updating..." : "Update Password"}
-              </button>
-            </div>
-          )}
+      {error && !ready && (
+        <div className="flex flex-col items-center py-4 text-center">
+          <span className="mb-3 grid h-11 w-11 place-items-center rounded-2xl bg-red-500/10 text-red-400"><AlertTriangle size={20} aria-hidden /></span>
+          <p className="mb-5 text-sm text-ink-muted">{error}</p>
+          <Button variant="primary" onClick={() => router.push('/reset-password')}>Request a new link</Button>
         </div>
-      </div>
-    </main>
+      )}
+
+      {ready && (
+        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleUpdate(); }}>
+          <Field label="New password">
+            <PasswordInput autoComplete="new-password" placeholder="At least 8 characters" value={password} onChange={(e) => setPassword(e.target.value)} />
+          </Field>
+          <Field label="Confirm new password">
+            <PasswordInput autoComplete="new-password" placeholder="Repeat new password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+          </Field>
+          {error && <Alert>{error}</Alert>}
+          <Button type="submit" variant="primary" size="lg" disabled={loading} className="w-full">
+            {loading ? <><Spinner size={17} /> Updating…</> : "Update password"}
+          </Button>
+        </form>
+      )}
+    </AuthShell>
   );
 }

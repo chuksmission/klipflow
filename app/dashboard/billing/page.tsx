@@ -1,7 +1,9 @@
 "use client";
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { Check, Coins, CreditCard, Lock } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { Alert, Badge, Button, EmptyState, PageHeader, Skeleton, Spinner, Toggle, cardClass } from "../../components/ui";
 
 const TOKEN_PACKS = [
   { tokens: 50, price: 5 },
@@ -143,143 +145,106 @@ function BillingContent() {
     }
   };
 
-  const messageBg = messageType === "success"
-    ? "bg-green-900/20 border-green-500/30 text-green-400"
-    : messageType === "warning"
-    ? "bg-yellow-900/20 border-yellow-500/30 text-yellow-400"
-    : "bg-red-900/20 border-red-500/30 text-red-400";
+  const alertTone = messageType === "success" ? "success" : messageType === "warning" ? "warning" : "danger";
+
+  const openTopUp = () => {
+    if (!isSubscriber) {
+      showMessage("Token top-up is available for subscribers only. Please subscribe to a plan first.", "warning");
+      setTab("plans");
+      return;
+    }
+    setTab("topup");
+  };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-extrabold mb-1">Billing & Credits</h1>
-        <p className="text-gray-400 text-sm">Manage your plan and top up your tokens</p>
-      </div>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <PageHeader title="Billing and credits" description="Manage your plan and top up your tokens." />
 
-      {message && (
-        <div className={"border rounded-xl px-4 py-3 " + messageBg}>
-          <p className="text-sm">{message}</p>
-        </div>
-      )}
+      {message && <Alert tone={alertTone}>{message}</Alert>}
 
-      {/* Current Plan & Token Balance */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <div className="text-gray-400 text-xs mb-1">Current Plan</div>
-            <div className="text-xl font-bold capitalize">{currentPlan}</div>
-          </div>
-          <div className="bg-purple-900/40 border border-purple-500/30 text-purple-300 text-xs font-bold px-3 py-1 rounded-full capitalize">
-            {currentPlan === "Free Trial" ? "Trial" : "Active"}
+      {/* Current plan and token balance */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className={`${cardClass} p-5`}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[13px] text-ink-muted">Current plan</p>
+              <p className="mt-1 text-xl font-semibold capitalize tracking-tight">{currentPlan}</p>
+            </div>
+            <Badge tone={currentPlan === "Free Trial" ? "neutral" : "accent"}>{currentPlan === "Free Trial" ? "Trial" : "Active"}</Badge>
           </div>
         </div>
-        <div className="flex items-center justify-between bg-black/20 rounded-xl px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="text-yellow-400">Token Balance</span>
-            <span className="text-white font-bold text-xl">{tokenBalance}</span>
-            <span className="text-gray-400 text-sm">tokens</span>
+        <div className={`${cardClass} flex items-center justify-between gap-3 p-5`}>
+          <div className="flex items-center gap-3">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent/15 text-accent-text"><Coins size={19} aria-hidden /></span>
+            <div>
+              <p className="text-[13px] text-ink-muted">Token balance</p>
+              <p className="text-xl font-semibold tabular-nums tracking-tight">{tokenBalance}</p>
+            </div>
           </div>
-          <button
-            onClick={() => {
-              if (!isSubscriber) {
-                showMessage("Token top-up is available for subscribers only. Please subscribe to a plan first.", "warning");
-                return;
-              }
-              setTab("topup");
-            }}
-            className="text-purple-400 hover:text-white text-xs font-semibold transition"
-          >
-            Top Up →
-          </button>
+          <Button variant="secondary" size="sm" onClick={openTopUp}>Top up</Button>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => setTab("plans")}
-          className={"px-6 py-2 rounded-xl text-sm font-bold transition " + (tab === "plans" ? "bg-purple-600 text-white" : "bg-white/10 text-gray-400 hover:bg-white/20")}
-        >
-          Upgrade Plan
+      <div className="inline-flex rounded-xl border border-line bg-surface p-1" role="tablist">
+        <button role="tab" aria-selected={tab === "plans"} onClick={() => setTab("plans")}
+          className={"h-9 rounded-lg px-4 text-sm font-medium transition-colors " + (tab === "plans" ? "bg-raised text-ink" : "text-ink-muted hover:text-ink")}>
+          Plans
         </button>
-        <button
-          onClick={() => {
-            if (!isSubscriber) {
-              showMessage("Token top-up is available for subscribers only. Please subscribe to a plan first.", "warning");
-              setTab("plans");
-              return;
-            }
-            setTab("topup");
-          }}
-          className={"px-6 py-2 rounded-xl text-sm font-bold transition " + (tab === "topup" ? "bg-purple-600 text-white" : "bg-white/10 text-gray-400 hover:bg-white/20")}
-        >
-          Top Up Tokens {!isSubscriber && "🔒"}
+        <button role="tab" aria-selected={tab === "topup"} onClick={openTopUp}
+          className={"inline-flex h-9 items-center gap-1.5 rounded-lg px-4 text-sm font-medium transition-colors " + (tab === "topup" ? "bg-raised text-ink" : "text-ink-muted hover:text-ink")}>
+          Top up tokens {!isSubscriber && <Lock size={13} aria-label="Subscribers only" />}
         </button>
       </div>
 
-      {/* Plans Tab */}
+      {/* Plans tab */}
       {tab === "plans" && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-center gap-3">
-            <span className={"text-sm font-semibold " + (billing === "monthly" ? "text-white" : "text-gray-500")}>Monthly</span>
-            <button
-              onClick={() => setBilling(billing === "monthly" ? "yearly" : "monthly")}
-              className={"relative w-12 h-6 rounded-full transition-colors " + (billing === "yearly" ? "bg-purple-600" : "bg-white/20")}
-            >
-              <div className={"absolute top-1 w-4 h-4 bg-white rounded-full transition-all " + (billing === "yearly" ? "left-7" : "left-1")} />
-            </button>
-            <span className={"text-sm font-semibold " + (billing === "yearly" ? "text-white" : "text-gray-500")}>
-              Yearly <span className="text-green-400 text-xs">Save 20%</span>
-            </span>
+        <div className="space-y-6">
+          <div className="flex items-center gap-3">
+            <Toggle checked={billing === "yearly"} onChange={() => setBilling(billing === "monthly" ? "yearly" : "monthly")} label="Bill yearly" />
+            <span className="text-sm text-ink">Bill yearly</span>
+            <Badge tone="success">Save 20%</Badge>
           </div>
 
           {plansLoading ? (
-            <div className="text-center py-12 text-gray-400">Loading plans...</div>
+            <div className="grid gap-4 md:grid-cols-3">
+              {[0, 1, 2].map((i) => <Skeleton key={i} className="h-80 rounded-2xl" />)}
+            </div>
           ) : plans.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">No plans available yet.</div>
+            <EmptyState icon={CreditCard} title="No plans available yet" description="Check back soon." />
           ) : (
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid gap-4 md:grid-cols-3">
               {plans.map((plan) => (
-                <div
-                  key={plan.id}
-                  className={"border rounded-2xl p-6 relative " + (plan.is_popular ? "border-purple-500 bg-purple-900/10" : "border-white/10 bg-white/5")}
-                >
+                <div key={plan.id} className={"relative flex flex-col rounded-2xl border p-6 " + (plan.is_popular ? "border-accent bg-accent/[0.07]" : "border-line bg-surface")}>
                   {plan.is_popular && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-purple-600 text-white text-xs font-bold px-3 py-0.5 rounded-full">
-                      Popular
-                    </div>
+                    <span className="absolute -top-3 left-6 rounded-full bg-accent px-3 py-0.5 text-xs font-medium text-white">Popular</span>
                   )}
-                  <h3 className="font-bold mb-1">{plan.name}</h3>
-                  <p className="text-gray-500 text-xs mb-4">{plan.description}</p>
-                  <div className="mb-4">
-                    <span className="text-3xl font-extrabold">
-                      ${billing === "monthly" ? plan.price_monthly : plan.price_yearly}
-                    </span>
-                    <span className="text-gray-500 text-sm">/mo</span>
-                    {billing === "yearly" && (
-                      <div className="text-green-400 text-xs mt-1">Billed annually</div>
-                    )}
+                  <h3 className="font-semibold">{plan.name}</h3>
+                  {plan.description && <p className="mt-1 text-xs text-ink-muted">{plan.description}</p>}
+                  <div className="mt-4 flex items-baseline gap-1">
+                    <span className="text-3xl font-semibold tracking-tight">${billing === "monthly" ? plan.price_monthly : plan.price_yearly}</span>
+                    <span className="text-sm text-ink-muted">/mo</span>
                   </div>
-                  <div className="bg-purple-900/20 border border-purple-500/20 rounded-xl px-3 py-2 mb-4 text-center">
-                    <span className="text-purple-400 font-bold">{plan.tokens_per_month} tokens</span>
-                    <span className="text-gray-500 text-xs"> / month</span>
-                  </div>
+                  {billing === "yearly" && <p className="mt-1 text-xs text-ink-subtle">Billed annually</p>}
+                  <p className="mt-3 text-sm font-medium text-accent-text">{plan.tokens_per_month} tokens / month</p>
                   {Array.isArray(plan.features) && plan.features.length > 0 && (
-                    <div className="space-y-2 mb-6">
+                    <ul className="mt-4 space-y-2">
                       {plan.features.map((feature: string, j: number) => (
-                        <div key={j} className="flex items-center gap-2 text-xs text-gray-400">
-                          <span className="text-green-400">✓</span> {feature}
-                        </div>
+                        <li key={j} className="flex items-start gap-2 text-xs text-ink-muted">
+                          <Check size={14} className="mt-0.5 flex-shrink-0 text-accent-text" aria-hidden /> {feature}
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   )}
-                  <button
+                  <div className="flex-1" />
+                  <Button
                     onClick={() => handleSubscribe(plan)}
                     disabled={checkoutLoading === plan.id}
-                    className={"w-full font-bold py-3 rounded-xl transition text-sm disabled:opacity-50 " + (plan.is_popular ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-white/10 hover:bg-white/20 text-white")}
+                    variant={plan.is_popular ? "primary" : "secondary"}
+                    className="mt-6 w-full"
                   >
-                    {checkoutLoading === plan.id ? "Processing..." : "Get Started"}
-                  </button>
+                    {checkoutLoading === plan.id ? <><Spinner size={16} /> Processing…</> : "Get started"}
+                  </Button>
                 </div>
               ))}
             </div>
@@ -287,39 +252,34 @@ function BillingContent() {
         </div>
       )}
 
-      {/* Top Up Tab */}
+      {/* Top up tab */}
       {tab === "topup" && (
         <div className="space-y-4">
-          <p className="text-gray-400 text-sm">Tokens never expire. Use them anytime for any AI generation.</p>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <p className="text-sm text-ink-muted">Tokens never expire. Use them any time for any AI generation.</p>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5 md:gap-4">
             {TOKEN_PACKS.map((pack, i) => (
-              <div
-                key={i}
-                className={"relative border rounded-2xl p-5 text-center " + ((pack as any).popular ? "border-purple-500 bg-purple-900/20" : "border-white/10 bg-white/5")}
-              >
+              <div key={i} className={"relative flex flex-col rounded-2xl border p-5 text-center " + ((pack as any).popular ? "border-accent bg-accent/[0.07]" : "border-line bg-surface")}>
                 {(pack as any).popular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-purple-600 text-white text-xs font-bold px-3 py-0.5 rounded-full">
-                    Best Value
-                  </div>
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-accent px-3 py-0.5 text-xs font-medium text-white">Best value</span>
                 )}
-                <div className="text-2xl font-extrabold mb-1">${pack.price}</div>
-                <div className="text-purple-400 font-bold text-sm mb-1">{pack.tokens} tokens</div>
-                <div className="text-gray-500 text-xs mb-4">
-                  ${(pack.price / pack.tokens * 10).toFixed(1)} per 10 tokens
-                </div>
-                <button
+                <p className="text-2xl font-semibold tracking-tight">${pack.price}</p>
+                <p className="mt-1 text-sm font-medium text-accent-text">{pack.tokens} tokens</p>
+                <p className="mt-1 text-xs text-ink-subtle">${(pack.price / pack.tokens * 10).toFixed(1)} per 10 tokens</p>
+                <Button
                   onClick={() => handleTopUp(pack)}
                   disabled={checkoutLoading === "pack-" + pack.tokens}
-                  className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-bold py-2 rounded-full transition"
+                  variant={(pack as any).popular ? "primary" : "secondary"}
+                  size="sm"
+                  className="mt-4 w-full"
                 >
-                  {checkoutLoading === "pack-" + pack.tokens ? "Processing..." : "Buy Now"}
-                </button>
+                  {checkoutLoading === "pack-" + pack.tokens ? <Spinner size={14} /> : "Buy now"}
+                </Button>
               </div>
             ))}
           </div>
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-            <h3 className="font-bold text-sm mb-2">Invoice History</h3>
-            <p className="text-gray-500 text-sm">No invoices yet. Your billing history will appear here after your first purchase.</p>
+          <div className={`${cardClass} p-5`}>
+            <h3 className="text-sm font-semibold">Invoice history</h3>
+            <p className="mt-1 text-sm text-ink-muted">No invoices yet. Your billing history will appear here after your first purchase.</p>
           </div>
         </div>
       )}
@@ -329,7 +289,7 @@ function BillingContent() {
 
 export default function Billing() {
   return (
-    <Suspense fallback={<div className="text-gray-400 p-6">Loading billing...</div>}>
+    <Suspense fallback={<div className="mx-auto max-w-5xl space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-28" /></div>}>
       <BillingContent />
     </Suspense>
   );

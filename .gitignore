@@ -1,0 +1,28 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# next.js
+/.next/
+/out/
+/build
+
+# env files (never commit secrets)
+.env
+.env*.local
+.env.production
+
+# typescript
+*.tsbuildinfo
+
+# vercel
+.vercel
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+
+# local tooling
+.claude/

@@ -70,28 +70,28 @@ export default function AdminIntegrations() {
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold mb-1">Platform Integrations</h1>
-          <p className="text-gray-400 text-sm">Configure third-party platform connections</p>
+          <h1 className="text-2xl font-semibold tracking-tight mb-1">Platform Integrations</h1>
+          <p className="text-ink-muted text-sm">Configure third-party platform connections</p>
         </div>
         <button
           onClick={handleSave}
           disabled={saving}
-          className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-2 px-6 rounded-xl transition text-sm"
+          className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-2 px-6 rounded-xl transition text-sm"
         >
           {saving ? "Saving..." : saved ? "Saved!" : "Save Changes"}
         </button>
       </div>
 
       {loading ? (
-        <p className="text-gray-400">Loading...</p>
+        <p className="text-ink-muted">Loading...</p>
       ) : (
         <div className="space-y-4">
           {integrations.map((integration, i) => (
-            <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-6">
+            <div key={i} className="bg-surface border border-line rounded-2xl p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="font-bold">{integration.name}</h3>
-                  <p className="text-gray-500 text-xs">{integration.desc}</p>
+                  <h3 className="font-semibold">{integration.name}</h3>
+                  <p className="text-ink-subtle text-xs">{integration.desc}</p>
                 </div>
                 <button
                   onClick={() => window.open(integration.docs, "_blank")}
@@ -103,13 +103,13 @@ export default function AdminIntegrations() {
               <div className="space-y-3">
                 {integration.fields.map((field) => (
                   <div key={field.key}>
-                    <label className="text-gray-400 text-xs mb-1 block">{field.label}</label>
+                    <label className="text-ink-muted text-xs mb-1 block">{field.label}</label>
                     <input
                       type={field.secret ? "password" : "text"}
                       value={settings[field.key] || ""}
                       onChange={(e) => setSettings({ ...settings, [field.key]: e.target.value })}
                       placeholder={"Enter " + field.label}
-                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition text-sm"
+                      className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-2.5 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm"
                     />
                   </div>
                 ))}

@@ -1,25 +1,27 @@
 'use client';
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { Activity, ArrowRight, Bot, Clapperboard, Coins, CreditCard, Image as ImageIcon, Images, Radar, Send, Sparkles, type LucideIcon } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { Badge, ButtonLink, EmptyState, PageHeader, SectionTitle, StatCard, cardClass } from "../components/ui";
 
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
   const [tokens, setTokens] = useState(25);
-  const [stats, setStats] = useState([
-    { icon: "🎬", label: "Videos Generated", value: 0, sub: "0 completed", color: "text-purple-400" },
-    { icon: "🖼️", label: "Images Generated", value: 0, sub: "0 completed", color: "text-pink-400" },
-    { icon: "📡", label: "Posts Published", value: 0, sub: "0 this week", color: "text-blue-400" },
-    { icon: "🕵️", label: "Ads Spied", value: 0, sub: "0 saved", color: "text-green-400" },
+  const [stats, setStats] = useState<{ icon: LucideIcon; label: string; value: number; sub: string }[]>([
+    { icon: Clapperboard, label: "Videos generated", value: 0, sub: "0 completed" },
+    { icon: ImageIcon, label: "Images generated", value: 0, sub: "0 completed" },
+    { icon: Send, label: "Posts published", value: 0, sub: "0 this week" },
+    { icon: Radar, label: "Ads spied", value: 0, sub: "0 saved" },
   ]);
 
-  const quickActions = [
-    { icon: "🎬", title: "Generate Video", desc: "Text to video, image to video, avatar videos", href: "/dashboard/studio", color: "from-purple-600 to-purple-800" },
-    { icon: "🕵️", title: "Spy on Ads", desc: "Find winning Facebook ads in your niche", href: "/dashboard/ad-spy", color: "from-pink-600 to-pink-800" },
-    { icon: "🤖", title: "Set Autopilot", desc: "Auto-post to TikTok, IG, YT, FB, X daily", href: "/dashboard/autopilot", color: "from-blue-600 to-blue-800" },
-    { icon: "💳", title: "Top Up Tokens", desc: "Get more credits from just $5", href: "/dashboard/billing", color: "from-green-600 to-green-800" },
-    { icon: "🖼️", title: "View Gallery", desc: "All your generated videos and images", href: "/dashboard/gallery", color: "from-yellow-600 to-orange-700" },
-    { icon: "⚡", title: "Activity Log", desc: "Full history of all your generations", href: "/dashboard/activity", color: "from-indigo-600 to-purple-700" },
+  const quickActions: { icon: LucideIcon; title: string; desc: string; href: string }[] = [
+    { icon: Sparkles, title: "Open Studio", desc: "Text to video, image to video, UGC ads and more", href: "/dashboard/studio" },
+    { icon: Radar, title: "Spy on ads", desc: "Find winning Facebook ads in your niche", href: "/dashboard/ad-spy" },
+    { icon: Bot, title: "Set up Autopilot", desc: "Auto-post to TikTok, IG, YouTube, Facebook and X", href: "/dashboard/autopilot" },
+    { icon: CreditCard, title: "Top up tokens", desc: "Get more credits from $5", href: "/dashboard/billing" },
+    { icon: Images, title: "Gallery", desc: "All your generated videos and images", href: "/dashboard/gallery" },
+    { icon: Activity, title: "Activity", desc: "Full history of your generations", href: "/dashboard/activity" },
   ];
 
   const taskBreakdown = [
@@ -60,10 +62,10 @@ export default function Dashboard() {
         const images = generations.filter((g: any) => g.type?.includes('image')).length;
 
         setStats([
-          { icon: "🎬", label: "Videos Generated", value: videos, sub: `${videos} completed`, color: "text-purple-400" },
-          { icon: "🖼️", label: "Images Generated", value: images, sub: `${images} completed`, color: "text-pink-400" },
-          { icon: "📡", label: "Posts Published", value: 0, sub: "0 this week", color: "text-blue-400" },
-          { icon: "🕵️", label: "Ads Spied", value: 0, sub: "0 saved", color: "text-green-400" },
+          { icon: Clapperboard, label: "Videos generated", value: videos, sub: `${videos} completed` },
+          { icon: ImageIcon, label: "Images generated", value: images, sub: `${images} completed` },
+          { icon: Send, label: "Posts published", value: 0, sub: "0 this week" },
+          { icon: Radar, label: "Ads spied", value: 0, sub: "0 saved" },
         ]);
       } catch (e) {
         console.error('Generations fetch error:', e);
@@ -73,103 +75,85 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
+      <PageHeader
+        title="Welcome back"
+        description={new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        actions={<ButtonLink href="/dashboard/studio" variant="primary"><Sparkles size={16} aria-hidden /> Create</ButtonLink>}
+      />
 
-      {/* WELCOME */}
-      <div className="bg-gradient-to-r from-purple-900/30 to-pink-900/20 border border-purple-500/20 rounded-2xl p-6">
-        <h1 className="text-2xl font-extrabold mb-1">Welcome Back! 👋</h1>
-        <p className="text-gray-400 text-sm mb-4">
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </p>
-        <div className="flex items-center justify-between bg-black/20 rounded-xl px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="text-yellow-400">🪙</span>
-            <span className="text-white font-bold">{tokens}</span>
-            <span className="text-gray-400 text-sm">tokens remaining</span>
+      {/* TOKENS */}
+      <div className={`${cardClass} flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between`}>
+        <div className="flex items-center gap-4">
+          <span className="grid h-11 w-11 place-items-center rounded-xl bg-accent/15 text-accent-text"><Coins size={20} aria-hidden /></span>
+          <div>
+            <p className="text-2xl font-semibold tracking-tight">{tokens} <span className="text-base font-normal text-ink-muted">tokens</span></p>
+            <p className="text-sm text-ink-subtle">Available balance</p>
           </div>
-          <a href="/dashboard/billing" className="text-purple-400 hover:text-white text-xs font-semibold transition">
-            Top Up →
-          </a>
         </div>
+        <ButtonLink href="/dashboard/billing" variant="secondary">Top up</ButtonLink>
       </div>
 
       {/* FREE TRIAL BANNER */}
       {tokens === 25 && (
-        <div className="bg-purple-900/20 border border-purple-500/30 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-accent/30 bg-accent/[0.08] p-5 md:flex-row md:items-center">
           <div>
-            <h3 className="font-bold text-purple-300 mb-1">🎁 You have 25 free tokens!</h3>
-            <p className="text-gray-400 text-sm">Generate your first 2 AI videos completely free. No credit card needed.</p>
+            <div className="mb-1 flex flex-wrap items-center gap-2"><Badge tone="accent">Free trial</Badge><h3 className="font-semibold">You have 25 free tokens</h3></div>
+            <p className="text-sm text-ink-muted">Generate your first 2 AI videos for free. No credit card needed.</p>
           </div>
-          <Link href="/dashboard/studio" className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-full transition whitespace-nowrap">
-            Generate First Video →
-          </Link>
+          <ButtonLink href="/dashboard/studio" variant="primary">Generate your first video <ArrowRight size={16} aria-hidden /></ButtonLink>
         </div>
       )}
 
       {/* LOW TOKEN WARNING */}
       {tokens <= 10 && tokens < 25 && (
-        <div className="bg-red-900/20 border border-red-500/30 rounded-2xl p-4 flex items-center justify-between">
+        <div className="flex flex-col items-start justify-between gap-3 rounded-2xl border border-red-500/25 bg-red-500/[0.08] p-4 sm:flex-row sm:items-center">
           <div>
-            <p className="text-red-300 font-semibold text-sm">⚠️ Low Token Balance — {tokens} tokens left</p>
-            <p className="text-gray-400 text-xs">Top up from $5 to continue generating.</p>
+            <p className="text-sm font-semibold text-red-300">Low balance: {tokens} tokens left</p>
+            <p className="text-xs text-ink-muted">Top up from $5 to keep generating.</p>
           </div>
-          <Link href="/dashboard/billing" className="bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-2 px-4 rounded-full transition">
-            Top Up Now
-          </Link>
+          <ButtonLink href="/dashboard/billing" variant="primary" size="sm">Top up now</ButtonLink>
         </div>
       )}
 
       {/* STATS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {stats.map((stat, i) => (
-          <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-5">
-            <div className="text-2xl mb-2">{stat.icon}</div>
-            <div className={`text-3xl font-extrabold mb-1 ${stat.color}`}>{stat.value}</div>
-            <div className="text-white text-sm font-semibold mb-0.5">{stat.label}</div>
-            <div className="text-gray-500 text-xs">{stat.sub}</div>
-          </div>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+        {stats.map((stat) => (
+          <StatCard key={stat.label} icon={stat.icon} label={stat.label} value={stat.value} hint={stat.sub} />
         ))}
       </div>
 
       {/* CHARTS ROW */}
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-          <h3 className="font-bold mb-1">Credits Spent (7 days)</h3>
-          <p className="text-gray-500 text-xs mb-6">Successful tasks only</p>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className={`${cardClass} p-5 md:p-6`}>
+          <SectionTitle description="Successful tasks only">Credits spent (7 days)</SectionTitle>
           {weeklyUsage.every(v => v === 0) ? (
-            <div className="h-32 flex items-center justify-center text-gray-600 text-sm">
+            <div className="flex h-32 items-center justify-center rounded-xl border border-dashed border-line text-sm text-ink-subtle">
               No activity yet
             </div>
           ) : (
-            <div className="flex items-end gap-2 h-32">
+            <div className="flex h-32 items-end gap-2">
               {weeklyUsage.map((val, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                  <div
-                    className="w-full bg-purple-600 rounded-t-lg transition-all"
-                    style={{ height: `${(val / maxUsage) * 100}%`, minHeight: val > 0 ? '4px' : '0' }}
-                  />
-                  <span className="text-gray-600 text-xs">{days[i]}</span>
+                <div key={i} className="flex flex-1 flex-col items-center gap-1">
+                  <div className="w-full rounded-t-md bg-accent transition-all" style={{ height: `${(val / maxUsage) * 100}%`, minHeight: val > 0 ? '4px' : '0' }} />
+                  <span className="text-xs text-ink-subtle">{days[i]}</span>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-          <h3 className="font-bold mb-1">Task Breakdown</h3>
-          <p className="text-gray-500 text-xs mb-6">Credits used per feature</p>
-          <div className="space-y-3">
-            {taskBreakdown.map((task, i) => (
-              <div key={i} className="flex items-center justify-between">
-                <span className="text-gray-400 text-sm">{task.label}</span>
+        <div className={`${cardClass} p-5 md:p-6`}>
+          <SectionTitle description="Credits used per feature">Task breakdown</SectionTitle>
+          <div className="space-y-3.5">
+            {taskBreakdown.map((task) => (
+              <div key={task.label} className="flex items-center justify-between gap-3">
+                <span className="text-sm text-ink-muted">{task.label}</span>
                 <div className="flex items-center gap-3">
-                  <div className="w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-purple-500 rounded-full"
-                      style={{ width: task.credits > 0 ? `${(task.credits / 100) * 100}%` : '0%' }}
-                    />
+                  <div className="h-1.5 w-24 overflow-hidden rounded-full bg-white/[0.07]">
+                    <div className="h-full rounded-full bg-accent" style={{ width: task.credits > 0 ? `${(task.credits / 100) * 100}%` : '0%' }} />
                   </div>
-                  <span className="text-gray-500 text-xs w-16 text-right">{task.count} · {task.credits} cr</span>
+                  <span className="w-16 text-right text-xs tabular-nums text-ink-subtle">{task.count} · {task.credits} cr</span>
                 </div>
               </div>
             ))}
@@ -179,41 +163,33 @@ export default function Dashboard() {
 
       {/* QUICK ACTIONS */}
       <div>
-        <h2 className="text-lg font-bold mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {quickActions.map((action, i) => (
-            <Link
-              key={i}
-              href={action.href}
-              className="bg-white/5 border border-white/10 rounded-2xl p-5 hover:border-purple-500/50 transition group"
-            >
-              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${action.color} flex items-center justify-center text-xl mb-3`}>
-                {action.icon}
-              </div>
-              <div className="font-bold text-sm mb-1 group-hover:text-purple-400 transition">{action.title}</div>
-              <div className="text-gray-500 text-xs leading-relaxed">{action.desc}</div>
-            </Link>
-          ))}
+        <SectionTitle>Quick actions</SectionTitle>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 md:gap-4">
+          {quickActions.map((action) => {
+            const Icon = action.icon;
+            return (
+              <Link key={action.href} href={action.href} className={`${cardClass} group flex items-start gap-4 p-5 transition-colors hover:border-line-strong hover:bg-raised`}>
+                <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl bg-accent/15 text-accent-text"><Icon size={19} aria-hidden /></span>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-ink">{action.title}</div>
+                  <div className="mt-0.5 text-xs leading-relaxed text-ink-muted">{action.desc}</div>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </div>
 
       {/* RECENT ACTIVITY */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold">Recent Activity</h2>
-          <Link href="/dashboard/activity" className="text-purple-400 hover:text-white text-sm transition">
-            View all →
-          </Link>
-        </div>
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
-          <div className="text-4xl mb-3">🎬</div>
-          <p className="text-gray-400 text-sm mb-4">No activity yet. Generate your first AI video to get started!</p>
-          <Link href="/dashboard/studio" className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-full transition inline-block text-sm">
-            Start Creating →
-          </Link>
-        </div>
+        <SectionTitle action={<Link href="/dashboard/activity" className="text-sm font-medium text-accent-text hover:text-ink">View all</Link>}>Recent activity</SectionTitle>
+        <EmptyState
+          icon={Clapperboard}
+          title="Nothing here yet"
+          description="Generate your first AI video and it will show up here."
+          action={<ButtonLink href="/dashboard/studio" variant="primary">Start creating</ButtonLink>}
+        />
       </div>
-
     </div>
   );
 }

@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
+import { Activity as ActivityIcon } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { Badge, ButtonLink, EmptyState, PageHeader, Skeleton, tableClass, tableWrapClass, tdClass, thClass, trClass } from "../../components/ui";
 
 export default function Activity() {
   const [generations, setGenerations] = useState<any[]>([]);
@@ -23,37 +25,40 @@ export default function Activity() {
   }, []);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-extrabold mb-1">Activity Log</h1>
-        <p className="text-gray-400 text-sm">Your last 50 generations</p>
-      </div>
+    <div className="mx-auto max-w-5xl">
+      <PageHeader title="Activity" description="Your last 50 generations." />
 
       {loading ? (
-        <p className="text-gray-400">Loading...</p>
+        <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
       ) : generations.length === 0 ? (
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-12 text-center">
-          <div className="text-5xl mb-4">⚡</div>
-          <h3 className="font-bold text-lg mb-2">No activity yet</h3>
-          <p className="text-gray-400 text-sm">Every generation, post, and action will be logged here</p>
-        </div>
+        <EmptyState
+          icon={ActivityIcon}
+          title="No activity yet"
+          description="Every generation, post and action will be logged here."
+          action={<ButtonLink href="/dashboard/studio" variant="primary">Open Studio</ButtonLink>}
+        />
       ) : (
-        <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-          <div className="grid grid-cols-4 text-gray-500 text-xs font-bold uppercase px-4 py-3 border-b border-white/10">
-            <span className="col-span-2">Prompt</span>
-            <span>Type</span>
-            <span>Tokens</span>
-          </div>
-          {generations.map((gen, i) => (
-            <div key={i} className="grid grid-cols-4 items-center px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition">
-              <div className="col-span-2 truncate text-gray-300 text-sm pr-4">{gen.prompt}</div>
-              <div className="capitalize text-purple-400 text-xs">{gen.type?.replace(/_/g, " ")}</div>
-              <div className="flex items-center justify-between">
-                <span className="text-yellow-400 text-xs font-bold">{gen.tokens_used} tokens</span>
-                <span className="text-gray-600 text-xs">{new Date(gen.created_at).toLocaleDateString()}</span>
-              </div>
-            </div>
-          ))}
+        <div className={tableWrapClass}>
+          <table className={tableClass}>
+            <thead>
+              <tr>
+                <th className={thClass}>Prompt</th>
+                <th className={thClass}>Type</th>
+                <th className={`${thClass} text-right`}>Tokens</th>
+                <th className={`${thClass} text-right`}>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {generations.map((gen, i) => (
+                <tr key={gen.id ?? i} className={trClass}>
+                  <td className={`${tdClass} max-w-[320px] truncate text-ink`}>{gen.prompt || "—"}</td>
+                  <td className={tdClass}><Badge className="capitalize">{gen.type?.replace(/_/g, " ") ?? "video"}</Badge></td>
+                  <td className={`${tdClass} text-right tabular-nums`}>{gen.tokens_used}</td>
+                  <td className={`${tdClass} whitespace-nowrap text-right`}>{new Date(gen.created_at).toLocaleDateString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

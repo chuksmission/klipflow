@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect } from "react";
+import { Check, LogOut } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { Badge, Button, Field, Input, PageHeader, SectionTitle, cardClass } from "../../components/ui";
 
 export default function Settings() {
   const [user, setUser] = useState<any>(null);
@@ -25,94 +27,80 @@ export default function Settings() {
   };
 
   const connectedPlatforms = [
-    { name: "TikTok", icon: "🎵", connected: false },
-    { name: "Instagram", icon: "📸", connected: false },
-    { name: "YouTube", icon: "▶️", connected: false },
-    { name: "Facebook", icon: "👥", connected: false },
-    { name: "X (Twitter)", icon: "𝕏", connected: false },
+    { name: "TikTok", mark: "Tk", connected: false },
+    { name: "Instagram", mark: "Ig", connected: false },
+    { name: "YouTube", mark: "Yt", connected: false },
+    { name: "Facebook", mark: "Fb", connected: false },
+    { name: "X (Twitter)", mark: "X", connected: false },
   ];
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-extrabold mb-1">Settings</h1>
-        <p className="text-gray-400 text-sm">Manage your account and connected platforms</p>
-      </div>
+    <div className="mx-auto max-w-2xl">
+      <PageHeader title="Settings" description="Manage your account and connected platforms." />
 
-      {/* PROFILE */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-        <h2 className="font-bold mb-4">Profile</h2>
-        <div className="space-y-4">
-          <div>
-            <label className="text-gray-400 text-sm mb-1 block">Display Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition"
-              placeholder="Your name"
-            />
+      <div className="space-y-4">
+        {/* PROFILE */}
+        <section className={`${cardClass} p-5 md:p-6`}>
+          <SectionTitle>Profile</SectionTitle>
+          <div className="space-y-4">
+            <Field label="Display name">
+              <Input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+            </Field>
+            <Field label="Email" hint="Contact support to change your email address.">
+              <Input type="email" value={user?.email || ""} disabled />
+            </Field>
+            <Button variant="primary" onClick={handleSave}>
+              {saved ? <><Check size={16} aria-hidden /> Saved</> : "Save changes"}
+            </Button>
           </div>
+        </section>
+
+        {/* CONNECTED PLATFORMS */}
+        <section className={`${cardClass} p-5 md:p-6`}>
+          <SectionTitle description="Connect your accounts for Autopilot posting.">Connected social accounts</SectionTitle>
+          <ul className="divide-y divide-line/60">
+            {connectedPlatforms.map((platform) => (
+              <li key={platform.name} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-9 w-9 place-items-center rounded-lg border border-line bg-raised text-xs font-semibold text-ink">{platform.mark}</span>
+                  <span className="text-sm font-medium">{platform.name}</span>
+                </div>
+                {platform.connected
+                  ? <Badge tone="success"><Check size={12} aria-hidden /> Connected</Badge>
+                  : <Badge>Coming soon</Badge>}
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {/* SIGN OUT */}
+        <section className={`${cardClass} flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between md:p-6`}>
           <div>
-            <label className="text-gray-400 text-sm mb-1 block">Email Address</label>
-            <input
-              type="email"
-              value={user?.email || ""}
-              disabled
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-gray-500 cursor-not-allowed"
-            />
+            <h2 className="text-base font-semibold">Sign out</h2>
+            <p className="mt-0.5 text-sm text-ink-muted">Sign out of KlipflowAI on this device.</p>
           </div>
-          <button
-            onClick={handleSave}
-            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-xl transition"
+          <Button
+            variant="secondary"
+            onClick={async () => {
+              const { supabase } = await import('../../lib/supabase');
+              await supabase.auth.signOut();
+              window.location.href = '/';
+            }}
           >
-            {saved ? '✓ Saved!' : 'Save Changes'}
+            <LogOut size={16} aria-hidden /> Sign out
+          </Button>
+        </section>
+
+        {/* DANGER ZONE */}
+        <section className="flex flex-col gap-4 rounded-2xl border border-red-500/25 bg-red-500/[0.05] p-5 sm:flex-row sm:items-center sm:justify-between md:p-6">
+          <div>
+            <h2 className="text-base font-semibold text-red-300">Delete account</h2>
+            <p className="mt-0.5 text-sm text-ink-muted">Permanently delete your account and all data.</p>
+          </div>
+          <button className="h-10 rounded-xl border border-red-500/25 px-4 text-sm font-medium text-red-300 transition-colors hover:bg-red-500/10">
+            Delete account
           </button>
-        </div>
-      </div>
-
-      {/* CONNECTED PLATFORMS */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-        <h2 className="font-bold mb-2">Connected Social Accounts</h2>
-        <p className="text-gray-500 text-xs mb-4">Connect your accounts for Autopilot posting</p>
-        <div className="space-y-3">
-          {connectedPlatforms.map((platform, i) => (
-            <div key={i} className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">{platform.icon}</span>
-                <span className="font-semibold text-sm">{platform.name}</span>
-              </div>
-              <button className={`text-xs font-bold py-1.5 px-4 rounded-full transition ${platform.connected ? 'bg-green-900/40 text-green-400 border border-green-500/30' : 'bg-purple-600 hover:bg-purple-700 text-white'}`}>
-                {platform.connected ? '✓ Connected' : 'Connect — Soon'}
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* SIGN OUT */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-        <h2 className="font-bold mb-2">Sign Out</h2>
-        <p className="text-gray-400 text-sm mb-4">Sign out of your KlipflowAI account on this device.</p>
-        <button
-          onClick={async () => {
-            const { supabase } = await import('../../lib/supabase');
-            await supabase.auth.signOut();
-            window.location.href = '/';
-          }}
-          className="bg-white/10 hover:bg-white/20 text-white font-bold py-2 px-6 rounded-xl transition text-sm"
-        >
-          Sign Out
-        </button>
-      </div>
-
-      {/* DANGER ZONE */}
-      <div className="bg-red-900/10 border border-red-500/20 rounded-2xl p-6">
-        <h2 className="font-bold text-red-400 mb-2">Danger Zone</h2>
-        <p className="text-gray-400 text-sm mb-4">Permanently delete your account and all data.</p>
-        <button className="bg-red-900/40 hover:bg-red-900/60 text-red-400 border border-red-500/30 font-bold py-2 px-6 rounded-xl transition text-sm">
-          Delete Account
-        </button>
+        </section>
       </div>
     </div>
   );
