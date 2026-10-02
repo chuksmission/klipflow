@@ -11,7 +11,7 @@ import { ButtonLink } from "./ui/Button";
 
 const CREATE_GRID: StudioModuleId[] = [
   "text_to_video", "image_to_video", "ugc_ad", "script_to_video",
-  "video_translator", "video_remix", "ai_actor", "text_to_image", "image_ad",
+  "video_translator", "video_remix", "ai_actor_swap", "ai_actor", "text_to_image", "image_ad",
 ];
 const ASSIST_LIST: StudioModuleId[] = ["script", "prompt", "voice"];
 

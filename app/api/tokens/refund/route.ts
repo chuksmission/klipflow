@@ -13,6 +13,8 @@ const supabase = createClient(
 const TIMEOUT_MS = 5 * 60 * 1000;
 // A charge stuck "claimed" (start crashed before a job id came back)
 const STALE_CLAIM_MS = 2 * 60 * 1000;
+// Matches the Actor Swap job time limit (app/api/actor-swap)
+const ACTOR_SWAP_TIMEOUT_MS = 40 * 60 * 1000;
 
 /**
  * Refund the remaining amount of one charge. The amount is never taken from
@@ -41,6 +43,16 @@ export async function POST(req: NextRequest) {
     // Verify the job really didn't deliver before giving tokens back
     if (charge.task_id === "claimed") {
       if (age < STALE_CLAIM_MS) return NextResponse.json({ error: "This generation is still starting." }, { status: 409 });
+    } else if (charge.provider === "actor_swap") {
+      // Actor Swap jobs refund themselves (fully or partly) as they finish.
+      // Only an abandoned job past its time limit can be refunded here.
+      const { data: job } = await supabase.from("actor_swap_jobs").select("id, status")
+        .eq("id", (charge.task_id ?? "").replace(/^job:/, "")).eq("user_id", user.id).maybeSingle();
+      if (job && job.status !== "running" && job.status !== "needs_stitch") {
+        return NextResponse.json({ error: "This job has already been settled." }, { status: 409 });
+      }
+      if (age < ACTOR_SWAP_TIMEOUT_MS) return NextResponse.json({ error: "This job is still processing." }, { status: 409 });
+      if (job) await supabase.from("actor_swap_jobs").update({ status: "failed", error: "Timed out.", updated_at: new Date().toISOString() }).eq("id", job.id);
     } else if (charge.task_id && charge.provider) {
       const status = await getTaskStatus(charge.task_id, charge.provider).catch(() => null);
       if (status?.completed) {

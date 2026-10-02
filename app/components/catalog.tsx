@@ -1,14 +1,14 @@
 import {
   Activity, AudioLines, BookOpen, Bot, CircleHelp, Clapperboard, CreditCard, FileVideo, GraduationCap,
   Image, ImagePlay, Images, Languages, Repeat2, LayoutDashboard, Megaphone, Newspaper, PenLine, Radar,
-  Settings, UserRound, WandSparkles, type LucideIcon,
+  ScanFace, Settings, UserRound, WandSparkles, type LucideIcon,
 } from "lucide-react";
 
 // Single source of truth for Studio modules, shared by the sidebar, the
 // homepage Quick Starts and the Studio itself.
 export type StudioModuleId =
   | "text_to_video" | "image_to_video" | "ugc_ad" | "ai_actor" | "voice" | "text_to_image"
-  | "script_to_video" | "image_ad" | "prompt" | "script" | "video_translator" | "video_remix";
+  | "script_to_video" | "image_ad" | "prompt" | "script" | "video_translator" | "video_remix" | "ai_actor_swap";
 
 export interface StudioModule {
   id: StudioModuleId;
@@ -25,6 +25,7 @@ export const STUDIO_MODULES: StudioModule[] = [
   { id: "script_to_video",  title: "Script to Video",     desc: "Multi-scene videos with native audio",      icon: FileVideo },
   { id: "video_translator", title: "Video Translator",    desc: "Translate any video with lip-sync",         icon: Languages, badge: "New" },
   { id: "video_remix",      title: "Video Remix",         desc: "Restyle, recreate or recast any video",     icon: Repeat2, badge: "New" },
+  { id: "ai_actor_swap",    title: "AI Actor Swap",       desc: "New face, language and voice for any video", icon: ScanFace, badge: "New" },
   { id: "ai_actor",         title: "AI Actor",            desc: "Photorealistic AI presenters",              icon: UserRound },
   { id: "text_to_image",    title: "Text to Image",       desc: "Images from text or a reference photo",     icon: Image },
   { id: "image_ad",         title: "Image Ads",           desc: "Scroll-stopping static ads",                icon: Newspaper },

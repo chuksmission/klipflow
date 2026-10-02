@@ -149,6 +149,26 @@ export default function AdminAIProviders() {
       ],
     },
     {
+      id: "synclabs",
+      name: "Sync Labs",
+      desc: "AI Actor Swap: lip-syncs the video to the new voice (lipsync-2)",
+      docsUrl: "https://docs.sync.so",
+      enabledKey: "synclabs_enabled",
+      fields: [
+        { key: "synclabs_api_key", label: "API Key", secret: true },
+      ],
+      models: [],
+    },
+    {
+      id: "ai_actor_swap",
+      name: "AI Actor Swap",
+      desc: "Studio module. New face needs Runway (+ Kie for new backgrounds); new language and voice needs OpenAI (Whisper), Claude or OpenAI, ElevenLabs and Sync Labs",
+      docsUrl: "https://docs.dev.runwayml.com",
+      enabledKey: "ai_actor_swap_enabled",
+      fields: [],
+      models: [],
+    },
+    {
       id: "anthropic",
       name: "Anthropic Claude",
       desc: "Claude AI for script writing and prompt expansion",
@@ -173,7 +193,7 @@ export default function AdminAIProviders() {
     {
       id: "elevenlabs",
       name: "ElevenLabs",
-      desc: "AI voice generation for video voiceovers",
+      desc: "AI voice generation for voiceovers and AI Actor Swap voices",
       docsUrl: "https://elevenlabs.io",
       enabledKey: "elevenlabs_enabled",
       fields: [
