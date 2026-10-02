@@ -66,6 +66,43 @@ export async function GET(req: NextRequest) {
     }
 
     // ================================================================
+    // HEYGEN video translation status
+    // Endpoint: /v2/video_translate/{video_translate_id}
+    // Status values: pending, running, success (or completed), failed
+    // ================================================================
+    if (provider === "heygen") {
+      const heygenApiKey = await getSetting("heygen_api_key");
+      if (!heygenApiKey) {
+        return NextResponse.json({ error: "HeyGen not configured" }, { status: 503 });
+      }
+
+      const res = await fetch(`https://api.heygen.com/v2/video_translate/${encodeURIComponent(task_id)}`, {
+        headers: { "X-Api-Key": heygenApiKey, "Accept": "application/json" },
+      });
+
+      const rawText = await res.text();
+      console.log("HeyGen status raw:", rawText);
+      let data: any = {};
+      try { data = JSON.parse(rawText); } catch { data = {}; }
+
+      const jobData = data.data ?? {};
+      const state = jobData.status ?? "";
+      const isDone = state === "success" || state === "completed";
+      const isFailed = state === "failed" || state === "error";
+      const videoUrl = isDone ? (jobData.video_url ?? jobData.url ?? null) : null;
+
+      console.log("HeyGen status:", state, "videoUrl:", videoUrl);
+      return NextResponse.json({
+        success: true,
+        status: state,
+        video_url: videoUrl,
+        completed: isDone,
+        failed: isFailed,
+        fail_reason: isFailed ? (jobData.message ?? jobData.failure_message ?? "Translation failed") : undefined,
+      });
+    }
+
+    // ================================================================
     // VEO3 status — dedicated endpoint /api/v1/veo/record-info
     // Response: data.successFlag === 1 means done
     // URL: data.response.resultUrls[0]

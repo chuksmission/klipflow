@@ -114,6 +114,17 @@ export default function AdminAIProviders() {
       ],
     },
     {
+      id: "heygen",
+      name: "HeyGen",
+      desc: "AI Video Translator — translate videos with voice cloning and lip-sync",
+      docsUrl: "https://docs.heygen.com",
+      enabledKey: "heygen_enabled",
+      fields: [
+        { key: "heygen_api_key", label: "API Key", secret: true },
+      ],
+      models: [],
+    },
+    {
       id: "anthropic",
       name: "Anthropic Claude",
       desc: "Claude AI for script writing and prompt expansion",
@@ -192,7 +203,7 @@ export default function AdminAIProviders() {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
       body: JSON.stringify({
-        settings: Object.entries(settings).map(([key, value]) => ({ key, value })),
+        settings: Object.entries(settings).map(([key, value]) => ({ key, value, category: "ai_providers" })),
       }),
     });
     setSaving(false);

@@ -79,6 +79,16 @@ export default function Studio() {
   const [s2vSceneDuration, setS2vSceneDuration] = useState("10");
   const s2vPhotoRef = useRef<HTMLInputElement>(null);
 
+  // AI Video Translator
+  const [vtFile, setVtFile] = useState<File | null>(null);
+  const [vtDuration, setVtDuration] = useState(0);
+  const [vtSourceLang, setVtSourceLang] = useState("English");
+  const [vtTargetLang, setVtTargetLang] = useState("Spanish");
+  const [vtStep, setVtStep] = useState<"input" | "uploading" | "translating" | "done">("input");
+  const [vtElapsed, setVtElapsed] = useState(0);
+  const [vtVideoUrl, setVtVideoUrl] = useState<string | null>(null);
+  const vtFileRef = useRef<HTMLInputElement>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tokenCostRef = useRef(10);
   const selectedModelRef = useRef("kling-v1-6-pro");
@@ -114,6 +124,13 @@ export default function Studio() {
     { id: "veo3-fast",    name: "Veo 3.1 Fast",        tokens: 15, desc: "Google AI + native audio" },
   ];
 
+  const VT_LANGUAGES = [
+    "English", "Arabic", "Bulgarian", "Chinese", "Dutch", "French", "German", "Hindi",
+    "Italian", "Japanese", "Korean", "Polish", "Portuguese", "Russian", "Spanish", "Turkish",
+  ];
+  const VT_MAX_BYTES = 500 * 1024 * 1024;
+  const VT_MAX_SECONDS = 600; // 10 minute processing timeout
+
   const modules: Module[] = [
     { id: "text_to_video",   title: "Text to Video",    desc: "Generate cinematic videos from text descriptions", badge: "Most Popular" },
     { id: "image_to_video",  title: "Image to Video",   desc: "Animate any still image into a stunning video",    badge: "" },
@@ -122,10 +139,14 @@ export default function Studio() {
     { id: "voice",           title: "Voice Generation", desc: "Natural AI voiceovers for videos",                 badge: "" },
     { id: "text_to_image",   title: "Text to Image",    desc: "Generate images from text or reference photo",     badge: "2 Tokens" },
     { id: "script_to_video", title: "Script to Video",  desc: "Turn a script into multiple video scenes with audio", badge: "New" },
+    { id: "video_translator", title: "AI Video Translator", desc: "Translate any video into another language with lip-sync", badge: "New" },
     { id: "image_ad",        title: "Image Ad",         desc: "Scroll-stopping image advertisements",             badge: "Cheapest" },
     { id: "prompt",          title: "Prompt Expander",  desc: "Transform simple ideas into cinematic prompts",    badge: "Free" },
     { id: "script",          title: "Script Writer",    desc: "Generate viral video scripts with AI",             badge: "Free" },
   ];
+
+  // AI Video Translator only shows once HeyGen is enabled in Admin > AI Providers
+  const visibleModules = modules.filter((mod) => mod.id !== "video_translator" || enabledKeys["heygen_enabled"] === true);
 
   const visibleModels = ALL_MODELS.filter((m) => {
     if (!m.available) return false;
@@ -150,6 +171,13 @@ export default function Studio() {
     } else if (videoUrl) setProgress(100);
     return () => { if (timer) clearInterval(timer); };
   }, [loading, videoUrl]);
+
+  const vtBusy = vtStep === "uploading" || vtStep === "translating";
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | undefined;
+    if (vtBusy) timer = setInterval(() => setVtElapsed((prev) => prev + 1), 1000);
+    return () => { if (timer) clearInterval(timer); };
+  }, [vtBusy]);
 
   useEffect(() => {
     const init = async () => {
@@ -388,6 +416,119 @@ export default function Studio() {
     });
   };
 
+  // ---- AI VIDEO TRANSLATOR ----
+  const readVideoDuration = (file: File): Promise<number | null> => {
+    return new Promise((resolve) => {
+      const video = document.createElement("video");
+      const url = URL.createObjectURL(file);
+      video.preload = "metadata";
+      video.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve(isFinite(video.duration) && video.duration > 0 ? video.duration : null); };
+      video.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+      video.src = url;
+    });
+  };
+
+  const handleVtFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setError(""); setVtFile(null); setVtDuration(0);
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    if (!["mp4", "mov", "webm"].includes(ext)) { setError("Please upload an MP4, MOV or WebM video."); return; }
+    if (file.size > VT_MAX_BYTES) { setError("Video is too large. Maximum size is 500MB."); return; }
+    const seconds = await readVideoDuration(file);
+    if (!seconds) { setError("Couldn't read this video's length. Try converting it to MP4."); return; }
+    setVtFile(file); setVtDuration(seconds);
+  };
+
+  // HeyGen translations are slower than generations, so poll every 10s for up to 10 minutes
+  const pollForTranslation = (taskId: string): Promise<{ videoUrl: string | null; reason: string }> => {
+    return new Promise((resolve) => {
+      const maxAttempts = VT_MAX_SECONDS / 10;
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        if (attempts > maxAttempts) { clearInterval(poll); resolve({ videoUrl: null, reason: "Translation timed out." }); return; }
+        try {
+          const sr = await fetch(`/api/video-status?task_id=${encodeURIComponent(taskId)}&provider=heygen`);
+          const sd = await sr.json();
+          if (sd.completed && sd.video_url) { clearInterval(poll); resolve({ videoUrl: sd.video_url, reason: "" }); }
+          else if (sd.failed) { clearInterval(poll); resolve({ videoUrl: null, reason: sd.fail_reason ?? "Translation failed." }); }
+        } catch { /* continue polling */ }
+      }, 10000);
+    });
+  };
+
+  const handleTranslateVideo = async () => {
+    if (!vtFile || !vtDuration) { setError("Please upload a video."); return; }
+    if (vtSourceLang === vtTargetLang) { setError("Target language must be different from the source language."); return; }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setError("Please sign in."); return; }
+    const cost = vtTokenCost;
+    if (tokenBalance < cost) { setError(`Insufficient tokens. Need ${cost} tokens. You have ${tokenBalance}.`); return; }
+
+    setError(""); setVtVideoUrl(null); setVtElapsed(0); setVtStep("uploading");
+
+    const refund = async (message: string) => {
+      setError(message + " Tokens refunded."); setVtStep("input");
+      try {
+        const { data: { session: rs } } = await supabase.auth.getSession();
+        if (rs) { const rr = await fetch("/api/tokens/refund", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + rs.access_token }, body: JSON.stringify({ amount: cost }) }); const rd = await rr.json(); if (rd.balance !== undefined) setTokenBalance(rd.balance); }
+      } catch (e) { console.error("Refund error:", e); }
+    };
+
+    let charged = false;
+    try {
+      // Deduct tokens before anything starts
+      const tokenRes = await fetch("/api/tokens", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token }, body: JSON.stringify({ amount: cost }) });
+      const tokenData = await tokenRes.json();
+      if (!tokenRes.ok) { setError(tokenData.error ?? "Insufficient tokens."); setVtStep("input"); return; }
+      charged = true;
+      setTokenBalance(tokenData.balance);
+
+      const uploadedUrl = await uploadImage(vtFile);
+      if (!uploadedUrl) { await refund("Video upload failed."); return; }
+
+      setVtStep("translating");
+      const res = await fetch("/api/translate-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
+        body: JSON.stringify({ video_url: uploadedUrl, source_language: vtSourceLang, target_language: vtTargetLang }),
+      });
+      const data = await res.json() as { task_id?: string; error?: string };
+      if (!res.ok || !data.task_id) { await refund(data.error ?? "Failed to start translation."); return; }
+
+      const result = await pollForTranslation(data.task_id);
+      if (!result.videoUrl) { await refund(result.reason); return; }
+
+      setVtVideoUrl(result.videoUrl); setVtStep("done");
+      try {
+        const { data: { session: fs } } = await supabase.auth.getSession();
+        if (fs) {
+          await fetch("/api/generations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + fs.access_token },
+            body: JSON.stringify({
+              type: "video_translation",
+              prompt: `${vtSourceLang} → ${vtTargetLang}: ${vtFile.name}`,
+              video_url: result.videoUrl,
+              output_type: "video",
+              status: "completed",
+              tokens_used: cost,
+              duration: String(Math.round(vtDuration)),
+              model: "HeyGen Translate",
+              provider: "heygen",
+            }),
+          });
+        }
+      } catch (e) { console.error("Save error:", e); }
+    } catch (e) {
+      console.error("Video translation error:", e);
+      if (charged) await refund("Something went wrong.");
+      else { setError("Something went wrong."); setVtStep("input"); }
+    }
+  };
+
   // ---- IMAGE GENERATION ----
   const handleGenerateImage = async () => {
     setLoading(true); setError(""); setVideoUrl(null); setProgress(0);
@@ -506,6 +647,7 @@ export default function Studio() {
     setExpandedPrompt(""); setGeneratedScript(""); setScriptTopic("");
     setS2vScript(""); setS2vScenes([]); setS2vStep("input"); setS2vCurrentScene(0);
     setS2vModelPhoto(""); setS2vModelPhotoFile(null); setS2vModelDesc(""); setS2vSceneStyles({}); setS2vSceneDuration("10");
+    setVtFile(null); setVtDuration(0); setVtSourceLang("English"); setVtTargetLang("Spanish"); setVtStep("input"); setVtElapsed(0); setVtVideoUrl(null);
   };
 
   const currentModel = ALL_MODELS.find((m) => m.id === selectedModel);
@@ -518,6 +660,12 @@ export default function Studio() {
   const isPromptModule = activeModule === "prompt";
   const isScriptModule = activeModule === "script";
   const isS2VModule = activeModule === "script_to_video";
+  const isVTModule = activeModule === "video_translator";
+
+  // Charged per minute of source video, prorated, with a minimum of one minute's worth
+  const vtTokensPerMinute = tokenPricing["video_translation"] ?? 20;
+  const vtTokenCost = Math.max(vtTokensPerMinute, Math.ceil((vtDuration / 60) * vtTokensPerMinute));
+  const vtProgress = vtStep === "done" ? 100 : vtStep === "uploading" ? 5 : Math.min(95, 10 + (vtElapsed / VT_MAX_SECONDS) * 85);
 
   const s2vModelData = AUDIO_MODELS.find(m => m.id === s2vModel);
   const s2vTokensPerScene = tokenPricing[s2vModel] ?? s2vModelData?.tokens ?? 15;
@@ -527,20 +675,20 @@ export default function Studio() {
     <div className="space-y-4 max-w-2xl mx-auto">
       <div>
         <h1 className="text-xl font-extrabold mb-0.5">Video Studio</h1>
-        <p className="text-gray-400 text-xs">10 AI modules — all plans include all features</p>
+        <p className="text-gray-400 text-xs">{visibleModules.length} AI modules — all plans include all features</p>
       </div>
 
       <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3 flex items-center justify-between">
         <div>
           <p className="text-purple-300 font-semibold text-sm">{tokenBalance} tokens remaining</p>
-          <p className="text-gray-500 text-xs">{currentModel?.name ?? "Select a module"} — {tokenCost} tokens</p>
+          <p className="text-gray-500 text-xs">{isVTModule ? `AI Video Translator — ${vtTokensPerMinute} tokens/min` : `${currentModel?.name ?? "Select a module"} — ${tokenCost} tokens`}</p>
         </div>
         <a href="/dashboard/billing" className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold py-1.5 px-3 rounded-full transition">Top Up</a>
       </div>
 
       {!activeModule && (
         <div className="grid grid-cols-2 gap-3">
-          {modules.map((mod) => (
+          {visibleModules.map((mod) => (
             <div key={mod.id} onClick={() => setActiveModule(mod.id)} className="bg-white/5 border border-white/10 rounded-xl p-4 hover:border-purple-500/50 transition cursor-pointer">
               {mod.badge && <div className="inline-block bg-purple-900/40 text-purple-300 text-xs font-bold px-2 py-0.5 rounded-full mb-2">{mod.badge}</div>}
               <h3 className="font-bold text-sm mb-1">{mod.title}</h3>
@@ -924,8 +1072,114 @@ export default function Studio() {
         </div>
       )}
 
+      {/* ---- AI VIDEO TRANSLATOR ---- */}
+      {isVTModule && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            {!vtBusy && <button onClick={resetForm} className="text-gray-400 hover:text-white text-sm transition">Back</button>}
+            <h2 className="font-bold text-sm">AI Video Translator</h2>
+          </div>
+
+          {vtStep === "input" && (
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-4">
+              <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3">
+                <p className="text-purple-300 text-xs font-semibold mb-1">How it works</p>
+                <p className="text-gray-400 text-xs">Upload a video → pick a language → AI translates the speech, clones the voice and lip-syncs the speaker. {vtTokensPerMinute} tokens per minute of video.</p>
+              </div>
+              <div>
+                <input type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" ref={vtFileRef} onChange={handleVtFile} className="hidden" />
+                <div onClick={() => vtFileRef.current?.click()} className="border-2 border-dashed border-white/20 hover:border-purple-500/50 rounded-xl p-6 text-center cursor-pointer transition">
+                  {vtFile ? (
+                    <div>
+                      <p className="text-green-400 text-sm font-semibold mb-1 truncate">{vtFile.name}</p>
+                      <p className="text-gray-500 text-xs">{formatTime(Math.round(vtDuration))} • {(vtFile.size / (1024 * 1024)).toFixed(1)}MB • Click to change</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-gray-400 text-sm font-semibold mb-1">Click to upload video</p>
+                      <p className="text-gray-600 text-xs">MP4, MOV, WebM up to 500MB</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-gray-400 text-xs mb-1 block">Source Language</label>
+                  <select value={vtSourceLang} onChange={(e) => { const lang = e.target.value; setVtSourceLang(lang); if (lang === vtTargetLang) setVtTargetLang(VT_LANGUAGES.find((l) => l !== lang) ?? ""); }} className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm">
+                    {VT_LANGUAGES.map((lang) => <option key={lang} value={lang}>{lang}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-gray-400 text-xs mb-1 block">Target Language</label>
+                  <select value={vtTargetLang} onChange={(e) => setVtTargetLang(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500 transition text-sm">
+                    {VT_LANGUAGES.filter((lang) => lang !== vtSourceLang).map((lang) => <option key={lang} value={lang}>{lang}</option>)}
+                  </select>
+                </div>
+              </div>
+              {vtFile && (
+                <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-3">
+                  <p className="text-yellow-400 text-xs font-bold">Total cost: {vtTokenCost} tokens</p>
+                  <p className="text-gray-500 text-xs">{(vtDuration / 60).toFixed(1)} min × {vtTokensPerMinute} tokens/min (minimum {vtTokensPerMinute}) • You have {tokenBalance} tokens</p>
+                </div>
+              )}
+              {error && <p className="text-red-400 text-sm">{error}</p>}
+              <button onClick={handleTranslateVideo} disabled={!vtFile || vtSourceLang === vtTargetLang || tokenBalance < vtTokenCost} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition">
+                {vtFile ? `Translate Video — ${vtTokenCost} tokens` : "Translate Video"}
+              </button>
+            </div>
+          )}
+
+          {vtBusy && (
+            <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-4">
+              <div className="text-center">
+                <h3 className="font-bold mb-1">Translating Your Video</h3>
+                <p className="text-gray-400 text-sm">{vtStep === "uploading" ? "Uploading your video..." : `Translating ${vtSourceLang} → ${vtTargetLang} with lip-sync...`}</p>
+              </div>
+              <div>
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+                  <span>{Math.round(vtProgress)}% complete</span>
+                  <span>{formatTime(vtElapsed)} elapsed</span>
+                </div>
+                <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden">
+                  <div className={"h-full bg-gradient-to-r from-purple-600 to-pink-500 rounded-full transition-all duration-1000" + (vtStep === "uploading" ? " animate-pulse" : "")} style={{ width: vtProgress + "%" }} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                {[
+                  { label: "Tokens reserved", done: true },
+                  { label: "Video uploaded", done: vtStep === "translating" },
+                  { label: "Translating speech and cloning voice", done: false },
+                  { label: "Lip-syncing and rendering", done: false },
+                ].map((step, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs">
+                    <span className={step.done ? "text-green-400" : "text-gray-600"}>{step.done ? "✓" : "○"}</span>
+                    <span className={step.done ? "text-gray-300" : "text-gray-600"}>{step.label}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-gray-500 text-xs text-center">Keep this page open. Translation can take several minutes (up to 10). Tokens are refunded automatically if it fails.</p>
+            </div>
+          )}
+
+          {vtStep === "done" && vtVideoUrl && (
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="text-green-400 font-bold">Done!</span>
+                <h3 className="font-bold">Your {vtTargetLang} Video is Ready</h3>
+              </div>
+              <video src={vtVideoUrl} controls playsInline className="w-full rounded-xl" />
+              <p className="text-gray-500 text-xs">Saved to your Gallery.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => handleDownload(vtVideoUrl)} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition text-sm">Save Video</button>
+                <button onClick={() => { setVtStep("input"); setVtVideoUrl(null); setVtElapsed(0); }} className="bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition text-sm">Translate Another</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ---- VIDEO / IMAGE MODULES ---- */}
-      {activeModule && !isPromptModule && !isScriptModule && !isS2VModule && !loading && !videoUrl && (
+      {activeModule && !isPromptModule && !isScriptModule && !isS2VModule && !isVTModule && !loading && !videoUrl && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <button onClick={resetForm} className="text-gray-400 hover:text-white text-sm transition">Back</button>
