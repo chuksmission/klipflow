@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { attachTask, claimCharge, getTokenPrice, isAdminRequest, releaseClaim } from "../../lib/charges";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -44,9 +45,11 @@ async function resolveHeygenLanguage(apiKey: string, language: string): Promise<
   }
 }
 
-// Starts a HeyGen video translation. Tokens are deducted by the client before this
-// call and refunded by the client (via /api/tokens/refund) if this returns an error.
+// Starts a HeyGen video translation. Requires a paid charge (from /api/tokens);
+// if this returns an error the client refunds that charge via /api/tokens/refund.
 export async function POST(req: NextRequest) {
+  let chargeId: string | null = null;
+  const release = async () => { if (chargeId) await releaseClaim(chargeId); };
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -58,7 +61,8 @@ export async function POST(req: NextRequest) {
       video_url,
       source_language = "English",
       target_language,
-    } = await req.json() as { video_url?: string; source_language?: string; target_language?: string };
+      charge_id,
+    } = await req.json() as { video_url?: string; source_language?: string; target_language?: string; charge_id?: string };
 
     if (!video_url) return NextResponse.json({ error: "video_url is required" }, { status: 400 });
     if (!target_language) return NextResponse.json({ error: "target_language is required" }, { status: 400 });
@@ -66,8 +70,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Target language must differ from source language." }, { status: 400 });
     }
 
+    // Payment: a paid, unused charge (at least one minute's worth), or an admin
+    if (charge_id) {
+      const claim = await claimCharge(charge_id, await getTokenPrice("video_translation", 20), user.id);
+      if (claim.error) return NextResponse.json({ error: claim.error }, { status: 402 });
+      chargeId = charge_id;
+    } else if (!(await isAdminRequest(authHeader))) {
+      return NextResponse.json({ error: "Payment required" }, { status: 402 });
+    }
+
     const heygenApiKey = await getSetting("heygen_api_key");
     if (!heygenApiKey) {
+      await release();
       return NextResponse.json({ error: "HeyGen API key not configured." }, { status: 503 });
     }
 
@@ -96,6 +110,7 @@ export async function POST(req: NextRequest) {
     console.log("HeyGen translate response:", heygenRes.status, JSON.stringify(heygenData));
 
     if (!heygenRes.ok || heygenData.error) {
+      await release();
       const err = heygenData.error;
       return NextResponse.json({
         error: (typeof err === "string" ? err : err?.message) ?? heygenData.message ?? `HeyGen error (${heygenRes.status})`,
@@ -104,13 +119,16 @@ export async function POST(req: NextRequest) {
 
     const taskId = heygenData.data?.video_translate_id ?? heygenData.data?.id ?? heygenData.video_translate_id;
     if (!taskId) {
+      await release();
       return NextResponse.json({ error: "HeyGen did not return a translation ID. Raw: " + JSON.stringify(heygenData) }, { status: 500 });
     }
 
+    if (chargeId) await attachTask(chargeId, String(taskId), "heygen");
     return NextResponse.json({ success: true, task_id: taskId, status: "queued", provider: "heygen" });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Something went wrong";
     console.error("Video translation error:", error);
+    await release();
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

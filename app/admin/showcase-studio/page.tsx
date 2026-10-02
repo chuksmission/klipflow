@@ -293,7 +293,8 @@ export default function ShowcaseStudio() {
       if (feature.pipeline === "image") {
         const imgAspect = aspectRatio === "9:16" ? "2:3" : aspectRatio === "1:1" ? "1:1" : "3:2";
         startRes = await fetch("/api/generate-image", {
-          method: "POST", headers: { "Content-Type": "application/json" },
+          // Admin login stands in for a token charge (admin tools spend the showcase balance)
+          method: "POST", headers: (await authHeaders()) ?? { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt, aspect_ratio: imgAspect }),
         });
       } else if (feature.pipeline === "translate") {
@@ -304,7 +305,8 @@ export default function ShowcaseStudio() {
         });
       } else {
         startRes = await fetch("/api/generate-video", {
-          method: "POST", headers: { "Content-Type": "application/json" },
+          // Admin login stands in for a token charge (admin tools spend the showcase balance)
+          method: "POST", headers: (await authHeaders()) ?? { "Content-Type": "application/json" },
           body: JSON.stringify({
             prompt,
             mode: imageUrl ? "image_to_video" : "text_to_video",

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { attachTask, claimCharge, getTokenPrice, isAdminRequest, releaseClaim } from "../../lib/charges";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,25 +16,6 @@ async function getSetting(key: string): Promise<string> {
   return data?.value ?? "";
 }
 
-async function refundTokens(userId: string, amount: number) {
-  try {
-    const { data } = await supabase
-      .from("user_tokens")
-      .select("balance, total_used")
-      .eq("user_id", userId)
-      .single();
-    if (data) {
-      await supabase.from("user_tokens").update({
-        balance: data.balance + amount,
-        total_used: Math.max(0, data.total_used - amount),
-        updated_at: new Date().toISOString(),
-      }).eq("user_id", userId);
-    }
-  } catch (err) {
-    console.error("Refund error:", err);
-  }
-}
-
 async function safeJson(response: Response): Promise<any> {
   try {
     const text = await response.text();
@@ -45,12 +27,13 @@ async function safeJson(response: Response): Promise<any> {
 }
 
 export async function POST(req: NextRequest) {
+  let chargeId: string | null = null;
+  const release = async () => { if (chargeId) await releaseClaim(chargeId); };
   let body: {
     prompt: string;
     image_url?: string;
     aspect_ratio?: string;
-    user_id?: string;
-    tokens_used?: number;
+    charge_id?: string;
   } = { prompt: "" };
 
   try {
@@ -60,18 +43,27 @@ export async function POST(req: NextRequest) {
       prompt,
       image_url,
       aspect_ratio = "1:1",
-      user_id,
-      tokens_used = 2,
+      charge_id,
     } = body;
 
     if (!prompt) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
 
+    // Payment: a paid, unused charge that covers this generation, or an admin
+    // (admin tools spend the separate showcase balance)
+    if (charge_id) {
+      const claim = await claimCharge(charge_id, await getTokenPrice("text_to_image", 2));
+      if (claim.error) return NextResponse.json({ error: claim.error }, { status: 402 });
+      chargeId = charge_id;
+    } else if (!(await isAdminRequest(req.headers.get("authorization")))) {
+      return NextResponse.json({ error: "Payment required" }, { status: 402 });
+    }
+
     const kieApiKey = await getSetting("kie_api_key");
     if (!kieApiKey) {
-      if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-      return NextResponse.json({ error: "Kie.ai API key not configured.", refunded: true }, { status: 503 });
+      await release();
+      return NextResponse.json({ error: "Kie.ai API key not configured." }, { status: 503 });
     }
 
     const isImageToImage = !!image_url;
@@ -101,19 +93,19 @@ export async function POST(req: NextRequest) {
       console.log("Kie.ai image-to-image response:", kieRes.status, JSON.stringify(kieData));
 
       if (kieData.code !== 200 || !kieData.data) {
-        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+        await release();
         return NextResponse.json({
           error: kieData.msg ?? kieData.message ?? kieData.error ?? `Kie.ai error (${kieRes.status}): ${JSON.stringify(kieData)}`,
-          refunded: true,
         }, { status: 400 });
       }
 
       const taskId = kieData.data?.taskId ?? kieData.data?.task_id ?? kieData.taskId;
       if (!taskId) {
-        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-        return NextResponse.json({ error: "Kie.ai did not return a taskId. Raw: " + JSON.stringify(kieData), refunded: true }, { status: 500 });
+        await release();
+        return NextResponse.json({ error: "Kie.ai did not return a taskId. Raw: " + JSON.stringify(kieData) }, { status: 500 });
       }
 
+      if (chargeId) await attachTask(chargeId, String(taskId), "kie");
       return NextResponse.json({ success: true, task_id: taskId, status: "queued", provider: "kie" });
 
     } else {
@@ -136,28 +128,26 @@ export async function POST(req: NextRequest) {
       console.log("Kie.ai text-to-image response:", kieRes.status, JSON.stringify(kieData));
 
       if (kieData.code !== 200 || !kieData.data) {
-        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+        await release();
         return NextResponse.json({
           error: kieData.msg ?? kieData.message ?? kieData.error ?? `Kie.ai error (${kieRes.status}): ${JSON.stringify(kieData)}`,
-          refunded: true,
         }, { status: 400 });
       }
 
       const taskId = kieData.data?.taskId ?? kieData.data?.task_id ?? kieData.taskId;
       if (!taskId) {
-        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-        return NextResponse.json({ error: "Kie.ai did not return a taskId. Raw: " + JSON.stringify(kieData), refunded: true }, { status: 500 });
+        await release();
+        return NextResponse.json({ error: "Kie.ai did not return a taskId. Raw: " + JSON.stringify(kieData) }, { status: 500 });
       }
 
+      if (chargeId) await attachTask(chargeId, String(taskId), "kie");
       return NextResponse.json({ success: true, task_id: taskId, status: "queued", provider: "kie" });
     }
 
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Something went wrong";
     console.error("Image generation error:", error);
-    if (body?.user_id && body?.tokens_used && body.tokens_used > 0) {
-      await refundTokens(body.user_id, body.tokens_used);
-    }
-    return NextResponse.json({ error: message, refunded: true }, { status: 500 });
+    await release();
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

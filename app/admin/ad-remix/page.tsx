@@ -355,7 +355,8 @@ export default function AdRemix() {
           : scene.visual_prompt.trim();
         savedModel = useModel;
         const res = await fetch("/api/generate-video", {
-          method: "POST", headers: { "Content-Type": "application/json" },
+          // Admin login stands in for a token charge (admin tools spend the showcase balance)
+          method: "POST", headers: (await authHeaders()) ?? { "Content-Type": "application/json" },
           body: JSON.stringify({
             prompt: savedPrompt,
             mode: imageUrl ? "image_to_video" : "text_to_video",

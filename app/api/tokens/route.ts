@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createCharge } from '../../lib/charges';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -46,34 +47,18 @@ export async function POST(req: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { amount = 10 } = await req.json();
-
-    const { data: tokenData } = await supabase
-      .from('user_tokens')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
-
-    if (!tokenData) {
-      return NextResponse.json({ error: 'Token record not found' }, { status: 404 });
+    const { amount, feature } = await req.json() as { amount?: number; feature?: string };
+    const value = Math.round(Number(amount));
+    if (!Number.isFinite(value) || value <= 0) {
+      return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
     }
 
-    if (tokenData.balance < amount) {
-      return NextResponse.json({ error: 'Insufficient token balance' }, { status: 400 });
-    }
+    // Atomic deduction + charge record (supabase/token_charges.sql). The returned
+    // charge_id is what generation routes and refunds are tied to.
+    const result = await createCharge(user.id, value, feature ?? null);
+    if ('error' in result) return NextResponse.json({ error: result.error }, { status: result.status });
 
-    const { data: updated } = await supabase
-      .from('user_tokens')
-      .update({
-        balance: tokenData.balance - amount,
-        total_used: tokenData.total_used + amount,
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', user.id)
-      .select()
-      .single();
-
-    return NextResponse.json({ balance: updated?.balance, total_used: updated?.total_used });
+    return NextResponse.json({ balance: result.balance, total_used: result.totalUsed, charge_id: result.chargeId });
   } catch (error) {
     return NextResponse.json({ error: 'Something went wrong' }, { status: 500 });
   }

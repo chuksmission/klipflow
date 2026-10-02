@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { completeCharge, isChargeId } from "../../lib/charges";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest) {
       aspect_ratio?: string;
       model?: string;
       provider?: string;
+      charge_id?: string;
     };
 
     const {
@@ -74,6 +76,7 @@ export async function POST(req: NextRequest) {
       aspect_ratio,
       model,
       provider,
+      charge_id,
     } = body;
 
     // Either video_url or image_url must be provided
@@ -104,6 +107,9 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // The result was delivered: close the charge so it can no longer be refunded
+    if (isChargeId(charge_id)) await completeCharge(charge_id, user.id, data?.id != null ? String(data.id) : null);
 
     return NextResponse.json({ success: true, generation: data });
   } catch (error: unknown) {

@@ -6,6 +6,7 @@ import {
   Palette, Repeat2, Upload, UsersRound, type LucideIcon,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { chargeTokens, refundCharge, refundNote } from "../../lib/token-client";
 import { VIDEO_MODELS, isModelVisible, savePendingGeneration, studioHref } from "../../components/catalog";
 import { Alert, Badge, Button, Field, Input, Progress, Select, Textarea, Toggle, cardClass } from "../../components/ui";
 
@@ -158,6 +159,7 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
   const [rewrite, setRewrite] = useState<RewriteResult | null>(null);
   const [runwayTask, setRunwayTask] = useState<string | null>(null);
   const cancelRef = useRef(false);
+  const chargeRef = useRef<string | null>(null);
 
   const sourceRef = useRef<HTMLInputElement>(null);
   const performerRef = useRef<HTMLInputElement>(null);
@@ -270,7 +272,7 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
 
   const cancel = async () => {
     cancelRef.current = true;
-    if (runwayTask) await authed("/api/video-remix", { action: "cancel", task_id: runwayTask });
+    if (runwayTask) await authed("/api/video-remix", { action: "cancel", task_id: runwayTask, charge_id: chargeRef.current });
   };
 
   // ---- run ----
@@ -288,30 +290,22 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
     cancelRef.current = false;
     setError(""); setResult(null); setRewrite(null); setRunwayTask(null); setElapsed(0); setRunning(true); setStage("charging");
     const amount = cost;
-    let charged = false;
+    chargeRef.current = null;
 
     const fail = async (message: string) => {
-      if (charged) {
-        try {
-          const { data: { session: rs } } = await supabase.auth.getSession();
-          if (rs) {
-            const rr = await fetch("/api/tokens/refund", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + rs.access_token }, body: JSON.stringify({ amount }) });
-            const rd = await rr.json();
-            if (rd.balance !== undefined) setTokenBalance(() => rd.balance);
-          }
-        } catch (e) { console.error("Refund error:", e); }
-      }
-      setError(message + (charged ? ` ${amount} tokens refunded.` : ""));
+      const r = await refundCharge(chargeRef.current);
+      if (r.balance !== undefined) setTokenBalance(() => r.balance!);
+      setError(message + refundNote(r));
       setRunning(false);
     };
 
     try {
-      // 1. Deduct tokens before any processing (existing token route)
-      const tokenRes = await fetch("/api/tokens", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + s.access_token }, body: JSON.stringify({ amount }) });
-      const tokenData = await tokenRes.json();
-      if (!tokenRes.ok) { setError(tokenData.error ?? "Insufficient tokens."); setRunning(false); return; }
-      charged = true;
-      setTokenBalance(() => tokenData.balance);
+      // 1. Deduct tokens before any processing (creates the charge this job is tied to)
+      const charge = await chargeTokens(amount, `video_remix_${mode.id}`);
+      if (!charge.ok) { setError(charge.error); setRunning(false); return; }
+      chargeRef.current = charge.chargeId;
+      const chargeId = charge.chargeId;
+      setTokenBalance(() => charge.balance);
 
       // 2. Source into our storage (or use the pasted link for Runway modes)
       setStage("uploading");
@@ -330,7 +324,7 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
       if (mode.id === "restyle") {
         setStage("generating");
         savedPrompt = style.trim();
-        const r = await authed("/api/video-remix", { action: "restyle", video_url: videoUrl, prompt: savedPrompt });
+        const r = await authed("/api/video-remix", { action: "restyle", video_url: videoUrl, prompt: savedPrompt, charge_id: chargeId });
         if (!r.ok) { await fail(r.data.error ?? "Couldn't start the restyle."); return; }
         start = r.data;
         setRunwayTask(r.data.task_id);
@@ -340,7 +334,7 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
         setStage("generating");
         savedPrompt = "Actor swap";
         const r = await authed("/api/video-remix", {
-          action: "actor_swap", video_url: videoUrl, character_url: performerUrl,
+          action: "actor_swap", video_url: videoUrl, character_url: performerUrl, charge_id: chargeId,
           character_type: performer!.type.startsWith("video/") ? "video" : "image",
           ratio: actRatio(sourceMeta.width, sourceMeta.height), body_control: bodyControl, expression_intensity: intensity,
         });
@@ -351,13 +345,13 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
         // Recreate: transcribe → rewrite → generate with the chosen model
         setStage("transcribing");
         const frames = sourceFile ? await extractFrames(sourceFile, sourceMeta.seconds) : [];
-        const tr = await authed("/api/video-remix", { action: "transcribe", video_url: videoUrl });
+        const tr = await authed("/api/video-remix", { action: "transcribe", video_url: videoUrl, charge_id: chargeId });
         if (!tr.ok) { await fail(tr.data.error ?? "Transcription failed."); return; }
         if (cancelRef.current) { await fail("Cancelled."); return; }
 
         setStage("rewriting");
         const rw = await authed("/api/video-remix", {
-          action: "rewrite", transcript: tr.data.text, segments: tr.data.segments, frames, duration: sourceMeta.seconds, topic,
+          action: "rewrite", charge_id: chargeId, transcript: tr.data.text, segments: tr.data.segments, frames, duration: sourceMeta.seconds, topic,
         });
         if (!rw.ok) { await fail(rw.data.error ?? "Couldn't write the new video."); return; }
         const rewritten: RewriteResult = rw.data.result;
@@ -369,7 +363,7 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
         savedPrompt = modelInfo?.hasSound && line ? `${rewritten.main_visual_prompt} The narrator says: "${line}"` : rewritten.main_visual_prompt;
         const res = await fetch("/api/generate-video", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: savedPrompt, mode: "text_to_video", duration, aspect_ratio: aspect, model: activeModel, with_audio: modelInfo?.hasSound === true }),
+          body: JSON.stringify({ prompt: savedPrompt, mode: "text_to_video", duration, aspect_ratio: aspect, model: activeModel, with_audio: modelInfo?.hasSound === true, charge_id: chargeId }),
         });
         start = await res.json();
         if (!res.ok || !start.task_id) { await fail(start.error ?? "Couldn't start generation."); return; }
@@ -391,6 +385,7 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
         duration: String(mode.id === "recreate" ? duration : Math.round(sourceMeta.seconds)),
         aspect_ratio: aspect,
         model: `Video Remix - ${mode.title}`,
+        charge_id: chargeId,
         provider: start.provider ?? null,
       });
       if (!save.ok) console.error("Gallery save failed:", save.data.error);

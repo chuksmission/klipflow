@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Check, CheckCircle2, ChevronLeft, Circle, Coins, X } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { chargeTokens, refundCharge, refundNote } from "../../lib/token-client";
 import VideoRemix from "./VideoRemix";
 import { VIDEO_MODELS, getStudioModule, isModelVisible, studioHref, takePendingGeneration, type StudioModuleId, type VideoModel } from "../../components/catalog";
 
@@ -300,15 +301,11 @@ function Studio() {
       setS2vScenes([...updatedScenes]);
 
       try {
-        // Deduct tokens
-        const tokenRes = await fetch("/api/tokens", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
-          body: JSON.stringify({ amount: tokenCostPerScene }),
-        });
-        const tokenData = await tokenRes.json();
-        if (!tokenRes.ok) { setError(tokenData.error ?? "Insufficient tokens."); break; }
-        setTokenBalance(tokenData.balance);
+        // Deduct tokens (creates a charge this scene's job is tied to)
+        const charge = await chargeTokens(tokenCostPerScene, "script_to_video");
+        if (!charge.ok) { setError(charge.error); break; }
+        setTokenBalance(charge.balance);
+        const sceneRefund = async () => { const r = await refundCharge(charge.chargeId); if (r.balance !== undefined) setTokenBalance(r.balance); };
 
         // Generate video
         const genRes = await fetch("/api/generate-video", {
@@ -322,8 +319,7 @@ function Studio() {
             aspect_ratio: s2vAspectRatio,
             model: s2vModel,
             with_audio: true,
-            user_id: session.user.id,
-            tokens_used: tokenCostPerScene,
+            charge_id: charge.chargeId,
           }),
         });
         const genData = await genRes.json();
@@ -331,9 +327,7 @@ function Studio() {
         if (!genRes.ok || !genData.task_id) {
           updatedScenes[i] = { ...updatedScenes[i], status: "failed" };
           setS2vScenes([...updatedScenes]);
-          // Refund
-          await fetch("/api/tokens/refund", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token }, body: JSON.stringify({ amount: tokenCostPerScene }) });
-          setTokenBalance(p => p + tokenCostPerScene);
+          await sceneRefund();
           continue;
         }
 
@@ -358,14 +352,14 @@ function Studio() {
                 tokens_used: tokenCostPerScene,
                 model: s2vModel,
                 scene_index: i + 1,
+                charge_id: charge.chargeId,
               }),
             });
           } catch { /* non-critical */ }
         } else {
           updatedScenes[i] = { ...updatedScenes[i], status: "failed" };
           setS2vScenes([...updatedScenes]);
-          await fetch("/api/tokens/refund", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token }, body: JSON.stringify({ amount: tokenCostPerScene }) });
-          setTokenBalance(p => p + tokenCostPerScene);
+          await sceneRefund();
         }
       } catch (e) {
         console.error("Scene generation error:", e);
@@ -447,22 +441,22 @@ function Studio() {
 
     setError(""); setVtVideoUrl(null); setVtElapsed(0); setVtStep("uploading");
 
+    let chargeId: string | null = null;
     const refund = async (message: string) => {
-      setError(message + " Tokens refunded."); setVtStep("input");
-      try {
-        const { data: { session: rs } } = await supabase.auth.getSession();
-        if (rs) { const rr = await fetch("/api/tokens/refund", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + rs.access_token }, body: JSON.stringify({ amount: cost }) }); const rd = await rr.json(); if (rd.balance !== undefined) setTokenBalance(rd.balance); }
-      } catch (e) { console.error("Refund error:", e); }
+      setVtStep("input");
+      const r = await refundCharge(chargeId);
+      if (r.balance !== undefined) setTokenBalance(r.balance);
+      setError(message + refundNote(r));
     };
 
     let charged = false;
     try {
-      // Deduct tokens before anything starts
-      const tokenRes = await fetch("/api/tokens", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token }, body: JSON.stringify({ amount: cost }) });
-      const tokenData = await tokenRes.json();
-      if (!tokenRes.ok) { setError(tokenData.error ?? "Insufficient tokens."); setVtStep("input"); return; }
+      // Deduct tokens before anything starts (creates the charge this job is tied to)
+      const charge = await chargeTokens(cost, "video_translation");
+      if (!charge.ok) { setError(charge.error); setVtStep("input"); return; }
       charged = true;
-      setTokenBalance(tokenData.balance);
+      chargeId = charge.chargeId;
+      setTokenBalance(charge.balance);
 
       const uploadedUrl = await uploadImage(vtFile);
       if (!uploadedUrl) { await refund("Video upload failed."); return; }
@@ -471,7 +465,7 @@ function Studio() {
       const res = await fetch("/api/translate-video", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
-        body: JSON.stringify({ video_url: uploadedUrl, source_language: vtSourceLang, target_language: vtTargetLang }),
+        body: JSON.stringify({ video_url: uploadedUrl, source_language: vtSourceLang, target_language: vtTargetLang, charge_id: chargeId }),
       });
       const data = await res.json() as { task_id?: string; error?: string };
       if (!res.ok || !data.task_id) { await refund(data.error ?? "Failed to start translation."); return; }
@@ -496,6 +490,7 @@ function Studio() {
               duration: String(Math.round(vtDuration)),
               model: "HeyGen Translate",
               provider: "heygen",
+              charge_id: chargeId,
             }),
           });
         }
@@ -514,17 +509,17 @@ function Studio() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { setError("Please sign in."); setLoading(false); return; }
-      const tokenRes = await fetch("/api/tokens", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token }, body: JSON.stringify({ amount: tokenCostImg }) });
-      const tokenData = await tokenRes.json();
-      if (!tokenRes.ok) { setError(tokenData.error ?? "Insufficient tokens."); setLoading(false); return; }
-      setTokenBalance(tokenData.balance);
+      const charge = await chargeTokens(tokenCostImg, "text_to_image");
+      if (!charge.ok) { setError(charge.error); setLoading(false); return; }
+      setTokenBalance(charge.balance);
+      const chargeId = charge.chargeId;
+      const imgRefund = async (message: string) => { const r = await refundCharge(chargeId); if (r.balance !== undefined) setTokenBalance(r.balance); setError(message + refundNote(r)); };
       let refImageUrl = imageUrlInput;
       if (imageFile && !useUrl) { const uploaded = await uploadImage(imageFile); if (uploaded) refImageUrl = uploaded; }
       const imgAspectRatio = aspectRatio === "9:16" ? "2:3" : aspectRatio === "1:1" ? "1:1" : "3:2";
-      const res = await fetch("/api/generate-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, image_url: refImageUrl || undefined, aspect_ratio: imgAspectRatio, user_id: session.user.id, tokens_used: tokenCostImg }) });
-      const data = await res.json() as { task_id?: string; error?: string; refunded?: boolean };
-      if (!res.ok) { setError((data.error ?? "Generation failed.") + (data.refunded ? " Tokens refunded." : "")); setLoading(false); if (data.refunded) setTokenBalance((p) => p + tokenCostImg); return; }
-      if (!data.task_id) { setError("Failed to start generation."); setLoading(false); return; }
+      const res = await fetch("/api/generate-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, image_url: refImageUrl || undefined, aspect_ratio: imgAspectRatio, charge_id: chargeId }) });
+      const data = await res.json() as { task_id?: string; error?: string };
+      if (!res.ok || !data.task_id) { setLoading(false); await imgRefund(data.error ?? "Failed to start generation."); return; }
       let generationComplete = false;
       const poll = setInterval(async () => {
         try {
@@ -535,12 +530,11 @@ function Studio() {
             setVideoUrl(sd.video_url); setProgress(100); setLoading(false); clearInterval(poll);
             try {
               const { data: { session: fs } } = await supabase.auth.getSession();
-              if (fs) { await fetch("/api/generations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + fs.access_token }, body: JSON.stringify({ type: "text_to_image", prompt, image_url: sd.video_url, output_type: "image", status: "completed", tokens_used: tokenCostImg }) }); }
+              if (fs) { await fetch("/api/generations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + fs.access_token }, body: JSON.stringify({ type: "text_to_image", prompt, image_url: sd.video_url, output_type: "image", status: "completed", tokens_used: tokenCostImg, charge_id: chargeId }) }); }
             } catch (e) { console.error("Save error:", e); }
           } else if (sd.failed) {
-            setError("Generation failed. Tokens refunded."); setLoading(false); clearInterval(poll);
-            await fetch("/api/tokens/refund", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token }, body: JSON.stringify({ amount: tokenCostImg }) });
-            setTokenBalance((p) => p + tokenCostImg);
+            setLoading(false); clearInterval(poll);
+            await imgRefund("Generation failed.");
           }
         } catch (e) { console.error("Poll error:", e); }
       }, 5000);
@@ -562,14 +556,15 @@ function Studio() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { setError("Please sign in."); setLoading(false); return; }
-      const tokenRes = await fetch("/api/tokens", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token }, body: JSON.stringify({ amount: tokenCost }) });
-      const tokenData = await tokenRes.json();
-      if (!tokenRes.ok) { setError(tokenData.error ?? "Insufficient tokens."); setLoading(false); return; }
-      setTokenBalance(tokenData.balance);
+      const charge = await chargeTokens(tokenCost, activeModule ?? "text_to_video");
+      if (!charge.ok) { setError(charge.error); setLoading(false); return; }
+      setTokenBalance(charge.balance);
+      const chargeId = charge.chargeId;
+      const videoRefund = async (message: string) => { const r = await refundCharge(chargeId); if (r.balance !== undefined) setTokenBalance(r.balance); setError(message + refundNote(r)); };
       let imageUrl = imageUrlInput;
       if (needsImage && imageFile && !useUrl) {
         const uploaded = await uploadImage(imageFile);
-        if (!uploaded) { setError("Image upload failed. Try URL instead."); setLoading(false); const { data: { session: rs } } = await supabase.auth.getSession(); if (rs) { await fetch("/api/tokens/refund", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + rs.access_token }, body: JSON.stringify({ amount: tokenCost }) }); setTokenBalance((p) => p + tokenCost); } return; }
+        if (!uploaded) { setLoading(false); await videoRefund("Image upload failed. Try URL instead."); return; }
         imageUrl = uploaded;
       }
       const capturedModule = activeModuleRef.current;
@@ -578,11 +573,10 @@ function Studio() {
       const capturedProvider = providerRef.current;
       const capturedMode = needsImage ? "image_to_video" : "text_to_video";
       const useAudio = modelData?.hasSound === true;
-      const res = await fetch("/api/generate-video", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, mode: capturedMode, image_url: imageUrl || undefined, duration: String(duration), aspect_ratio: aspectRatio, model: selectedModel, with_audio: useAudio, user_id: session.user.id, tokens_used: tokenCost }) });
-      const data = await res.json() as { task_id?: string; error?: string; refunded?: boolean; provider?: string };
-      if (!res.ok) { setError((data.error ?? "Generation failed.") + (data.refunded ? " Tokens refunded." : "")); setLoading(false); if (data.refunded) setTokenBalance((p) => p + tokenCost); return; }
+      const res = await fetch("/api/generate-video", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, mode: capturedMode, image_url: imageUrl || undefined, duration: String(duration), aspect_ratio: aspectRatio, model: selectedModel, with_audio: useAudio, charge_id: chargeId }) });
+      const data = await res.json() as { task_id?: string; error?: string; provider?: string };
+      if (!res.ok || !data.task_id) { setLoading(false); await videoRefund(data.error ?? "Failed to start generation."); return; }
       const genProvider = data.provider ?? capturedProvider;
-      if (!data.task_id) { setError("Failed to start generation."); setLoading(false); if (data.refunded) setTokenBalance((p) => p + tokenCost); return; }
       let timedOut = false; let generationComplete = false; let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
       const poll = setInterval(async () => {
         try {
@@ -591,18 +585,17 @@ function Studio() {
           if (sd.completed && sd.video_url) {
             if (timedOut) return; generationComplete = true; clearTimeout(timeoutHandle);
             setVideoUrl(sd.video_url); setProgress(100); setLoading(false); clearInterval(poll);
-            try { const { data: { session: fs } } = await supabase.auth.getSession(); if (fs) { await fetch("/api/generations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + fs.access_token }, body: JSON.stringify({ type: capturedModule, prompt, video_url: sd.video_url, status: "completed", tokens_used: capturedCost, duration, aspect_ratio: aspectRatio, model: capturedModel }) }); } } catch (e) { console.error("Save error:", e); }
+            try { const { data: { session: fs } } = await supabase.auth.getSession(); if (fs) { await fetch("/api/generations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + fs.access_token }, body: JSON.stringify({ type: capturedModule, prompt, video_url: sd.video_url, status: "completed", tokens_used: capturedCost, duration, aspect_ratio: aspectRatio, model: capturedModel, charge_id: chargeId }) }); } } catch (e) { console.error("Save error:", e); }
           } else if (sd.failed) {
-            setError("Generation failed. Tokens refunded."); setLoading(false); clearInterval(poll);
-            try { const { data: { session: rs } } = await supabase.auth.getSession(); if (rs) { const rr = await fetch("/api/tokens/refund", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + rs.access_token }, body: JSON.stringify({ amount: capturedCost }) }); const rd = await rr.json(); if (rd.balance !== undefined) setTokenBalance(rd.balance); } } catch (e) { console.error("Refund error:", e); }
+            setLoading(false); clearInterval(poll);
+            await videoRefund("Generation failed.");
           }
         } catch (e) { console.error("Poll error:", e); }
       }, 5000);
       const timeoutMs = ["veo3-fast", "veo3-quality", "sora-2", "seedance-2", "seedance-2-fast"].includes(selectedModel) ? 600000 : 300000;
       timeoutHandle = setTimeout(async () => {
-        if (generationComplete) return; timedOut = true; clearInterval(poll); setLoading(false); setError("Generation timed out. Tokens refunded.");
-        const { data: { session: ts } } = await supabase.auth.getSession();
-        if (ts) { const rr = await fetch("/api/tokens/refund", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + ts.access_token }, body: JSON.stringify({ amount: capturedCost }) }); const rd = await rr.json(); if (rd.balance !== undefined) setTokenBalance(rd.balance); }
+        if (generationComplete) return; timedOut = true; clearInterval(poll); setLoading(false);
+        await videoRefund("Generation timed out.");
       }, timeoutMs);
     } catch (e) { setError("Something went wrong."); setLoading(false); }
   };

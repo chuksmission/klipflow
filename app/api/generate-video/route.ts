@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { attachTask, claimCharge, isAdminRequest, releaseClaim, videoModelPrice } from "../../lib/charges";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,25 +16,6 @@ async function getSetting(key: string): Promise<string> {
   return data?.value ?? "";
 }
 
-async function refundTokens(userId: string, amount: number) {
-  try {
-    const { data } = await supabase
-      .from("user_tokens")
-      .select("balance, total_used")
-      .eq("user_id", userId)
-      .single();
-    if (data) {
-      await supabase.from("user_tokens").update({
-        balance: data.balance + amount,
-        total_used: Math.max(0, data.total_used - amount),
-        updated_at: new Date().toISOString(),
-      }).eq("user_id", userId);
-    }
-  } catch (err) {
-    console.error("Refund error:", err);
-  }
-}
-
 async function safeJson(response: Response): Promise<any> {
   try {
     const text = await response.text();
@@ -45,6 +27,8 @@ async function safeJson(response: Response): Promise<any> {
 }
 
 export async function POST(req: NextRequest) {
+  let chargeId: string | null = null;
+  const release = async () => { if (chargeId) await releaseClaim(chargeId); };
   let body: {
     prompt: string;
     mode?: string;
@@ -53,8 +37,7 @@ export async function POST(req: NextRequest) {
     aspect_ratio?: string;
     model?: string;
     with_audio?: boolean;
-    user_id?: string;
-    tokens_used?: number;
+    charge_id?: string;
   } = { prompt: "" };
 
   try {
@@ -67,12 +50,21 @@ export async function POST(req: NextRequest) {
       duration = "5",
       aspect_ratio = "16:9",
       model = "kling-v1-6-pro",
-      user_id,
-      tokens_used = 15,
+      charge_id,
     } = body;
 
     if (!prompt) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
+    }
+
+    // Payment: a paid, unused charge that covers this generation, or an admin
+    // (admin tools spend the separate showcase balance)
+    if (charge_id) {
+      const claim = await claimCharge(charge_id, await videoModelPrice(model));
+      if (claim.error) return NextResponse.json({ error: claim.error }, { status: 402 });
+      chargeId = charge_id;
+    } else if (!(await isAdminRequest(req.headers.get("authorization")))) {
+      return NextResponse.json({ error: "Payment required" }, { status: 402 });
     }
 
     const isImageMode = mode === "image_to_video" && !!image_url;
@@ -85,12 +77,12 @@ export async function POST(req: NextRequest) {
       const keySecret = await getSetting("higgsfield_key_secret");
 
       if (!keyId || !keySecret) {
-        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-        return NextResponse.json({ error: "Higgsfield is not configured.", refunded: true }, { status: 503 });
+        await release();
+        return NextResponse.json({ error: "Higgsfield is not configured." }, { status: 503 });
       }
       if (!image_url) {
-        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-        return NextResponse.json({ error: "Higgsfield UGC requires an image. Please upload one.", refunded: true }, { status: 400 });
+        await release();
+        return NextResponse.json({ error: "Higgsfield UGC requires an image. Please upload one." }, { status: 400 });
       }
 
       const higgsfieldRes = await fetch("https://platform.higgsfield.ai/higgsfield-ai/dop/standard", {
@@ -111,20 +103,20 @@ export async function POST(req: NextRequest) {
       console.log("Higgsfield response:", higgsfieldRes.status, JSON.stringify(higgsfieldData));
 
       if (!higgsfieldRes.ok) {
-        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+        await release();
         return NextResponse.json({
           error: higgsfieldData.error ?? higgsfieldData.message ?? higgsfieldData.detail ?? `Higgsfield error (${higgsfieldRes.status})`,
-          refunded: true,
         }, { status: higgsfieldRes.status });
       }
 
       const taskId = higgsfieldData.request_id ?? higgsfieldData.id ?? higgsfieldData.job_id;
       console.log("Higgsfield taskId:", taskId, "raw:", JSON.stringify(higgsfieldData));
       if (!taskId) {
-        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-        return NextResponse.json({ error: "Higgsfield did not return a task ID.", refunded: true }, { status: 500 });
+        await release();
+        return NextResponse.json({ error: "Higgsfield did not return a task ID." }, { status: 500 });
       }
 
+      if (chargeId) await attachTask(chargeId, String(taskId), "higgsfield");
       return NextResponse.json({ success: true, task_id: taskId, status: "queued", provider: "higgsfield" });
     }
 
@@ -133,8 +125,8 @@ export async function POST(req: NextRequest) {
     // ================================================================
     const kieApiKey = await getSetting("kie_api_key");
     if (!kieApiKey) {
-      if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-      return NextResponse.json({ error: "Kie.ai API key not configured.", refunded: true }, { status: 503 });
+      await release();
+      return NextResponse.json({ error: "Kie.ai API key not configured." }, { status: 503 });
     }
 
     // ----------------------------------------------------------------
@@ -165,19 +157,19 @@ export async function POST(req: NextRequest) {
       console.log("Veo3 response:", veoRes.status, JSON.stringify(veoData));
 
       if (!veoRes.ok || (veoData.code !== undefined && veoData.code !== 200)) {
-        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+        await release();
         return NextResponse.json({
           error: veoData.msg ?? veoData.message ?? veoData.error ?? `Veo3 error (${veoRes.status})`,
-          refunded: true,
         }, { status: 400 });
       }
 
       const veoTaskId = veoData.data?.taskId ?? veoData.data?.task_id ?? veoData.taskId ?? veoData.task_id;
       if (!veoTaskId) {
-        if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
-        return NextResponse.json({ error: "Veo3 did not return a task ID. Raw: " + JSON.stringify(veoData), refunded: true }, { status: 500 });
+        await release();
+        return NextResponse.json({ error: "Veo3 did not return a task ID. Raw: " + JSON.stringify(veoData) }, { status: 500 });
       }
 
+      if (chargeId) await attachTask(chargeId, String(veoTaskId), "veo3");
       return NextResponse.json({ success: true, task_id: veoTaskId, status: "queued", provider: "veo3" });
     }
 
@@ -344,10 +336,9 @@ export async function POST(req: NextRequest) {
     console.log("Kie.ai response:", kieRes.status, JSON.stringify(kieData));
 
     if (kieData.code !== 200 || !kieData.data) {
-      if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+      await release();
       return NextResponse.json({
         error: kieData.msg ?? kieData.message ?? kieData.error ?? `Kie.ai error (${kieRes.status}): ${JSON.stringify(kieData)}`,
-        refunded: true,
       }, { status: 400 });
     }
 
@@ -355,21 +346,19 @@ export async function POST(req: NextRequest) {
     console.log("Kie.ai taskId:", taskId);
 
     if (!taskId) {
-      if (user_id && tokens_used > 0) await refundTokens(user_id, tokens_used);
+      await release();
       return NextResponse.json({
         error: "Kie.ai did not return a taskId. Raw: " + JSON.stringify(kieData),
-        refunded: true,
       }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, task_id: taskId, status: "queued", provider: "kie" });
+    if (chargeId) await attachTask(chargeId, String(taskId), "kie");
+      return NextResponse.json({ success: true, task_id: taskId, status: "queued", provider: "kie" });
 
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Something went wrong";
     console.error("Video generation error:", error);
-    if (body?.user_id && body?.tokens_used && body.tokens_used > 0) {
-      await refundTokens(body.user_id, body.tokens_used);
-    }
-    return NextResponse.json({ error: message, refunded: true }, { status: 500 });
+    await release();
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
