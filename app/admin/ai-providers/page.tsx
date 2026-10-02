@@ -125,6 +125,30 @@ export default function AdminAIProviders() {
       models: [],
     },
     {
+      id: "runway",
+      name: "Runway",
+      desc: "Video Remix: Aleph restyling and Act-Two performer swap",
+      docsUrl: "https://docs.dev.runwayml.com",
+      enabledKey: "runway_enabled",
+      fields: [
+        { key: "runway_api_key", label: "API Key", secret: true },
+      ],
+      models: [],
+    },
+    {
+      id: "video_remix",
+      name: "Video Remix Studio",
+      desc: "Studio module. Restyle and Actor Swap need Runway; Recreate needs OpenAI (Whisper) plus Claude or OpenAI",
+      docsUrl: "https://docs.dev.runwayml.com",
+      enabledKey: "video_remix_enabled",
+      fields: [],
+      models: [
+        { key: "video_remix_restyle_enabled",    label: "Mode A: Restyle (Runway Aleph)" },
+        { key: "video_remix_recreate_enabled",   label: "Mode B: Recreate (Whisper + Claude + video model)" },
+        { key: "video_remix_actor_swap_enabled", label: "Mode C: Actor Swap (Runway Act-Two)" },
+      ],
+    },
+    {
       id: "anthropic",
       name: "Anthropic Claude",
       desc: "Claude AI for script writing and prompt expansion",
@@ -308,7 +332,7 @@ export default function AdminAIProviders() {
                         <div className="flex items-center justify-between">
                           <span className="text-sm">{settings[`model_label_${MODEL_IDS[model.key]?.split(",")[0]}`] || model.label}</span>
                           <div className="flex items-center gap-3">
-                            <button
+                            {MODEL_IDS[model.key] && <button
                               onClick={() => {
                                 const id = MODEL_IDS[model.key]?.split(",")[0] ?? "";
                                 setEditingModel(editingModel === model.key ? null : model.key);
@@ -326,7 +350,7 @@ export default function AdminAIProviders() {
                               className="text-purple-400 hover:text-white text-xs transition"
                             >
                               {editingModel === model.key ? "Cancel" : "Edit"}
-                            </button>
+                            </button>}
                             <button
                               onClick={() => toggleEnabled(model.key)}
                               className={"relative w-10 h-5 rounded-full transition-colors " + (settings[model.key] === "true" ? "bg-purple-600" : "bg-raised-hover")}

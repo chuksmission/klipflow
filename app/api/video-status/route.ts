@@ -140,6 +140,41 @@ export async function GET(req: NextRequest) {
     }
 
     // ================================================================
+    // RUNWAY task status (Video Remix: Aleph restyle, Act-Two)
+    // Endpoint: /v1/tasks/{id}
+    // Status values: PENDING, THROTTLED, RUNNING, SUCCEEDED, FAILED, CANCELLED
+    // ================================================================
+    if (provider === "runway") {
+      const runwayApiKey = await getSetting("runway_api_key");
+      if (!runwayApiKey) {
+        return NextResponse.json({ error: "Runway not configured" }, { status: 503 });
+      }
+
+      const res = await fetch(`https://api.dev.runwayml.com/v1/tasks/${encodeURIComponent(task_id)}`, {
+        headers: { "Authorization": `Bearer ${runwayApiKey}`, "X-Runway-Version": "2024-11-06" },
+      });
+
+      const rawText = await res.text();
+      console.log("Runway status raw:", rawText);
+      let data: any = {};
+      try { data = JSON.parse(rawText); } catch { data = {}; }
+
+      const state = data.status ?? (res.status === 404 ? "CANCELLED" : "");
+      const isDone = state === "SUCCEEDED";
+      const isFailed = state === "FAILED" || state === "CANCELLED";
+      const videoUrl = isDone ? (Array.isArray(data.output) ? data.output[0] : null) ?? null : null;
+
+      return NextResponse.json({
+        success: true,
+        status: state,
+        video_url: videoUrl,
+        completed: isDone,
+        failed: isFailed,
+        fail_reason: isFailed ? (state === "CANCELLED" ? "Cancelled" : (data.failure ?? "Runway generation failed")) : undefined,
+      });
+    }
+
+    // ================================================================
     // VEO3 status — dedicated endpoint /api/v1/veo/record-info
     // Response: data.successFlag === 1 means done
     // URL: data.response.resultUrls[0]

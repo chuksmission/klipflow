@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Check, CheckCircle2, ChevronLeft, Circle, Coins, X } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import VideoRemix from "./VideoRemix";
 import { VIDEO_MODELS, getStudioModule, isModelVisible, studioHref, takePendingGeneration, type StudioModuleId, type VideoModel } from "../../components/catalog";
 
 type Model = VideoModel;
@@ -47,6 +48,7 @@ function Studio() {
   const [modelDescs, setModelDescs] = useState<Record<string, string>>({});
   const [modelBadges, setModelBadges] = useState<Record<string, string>>({});
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [remixBusy, setRemixBusy] = useState(false);
 
   // Prompt Expander
   const [expandedPrompt, setExpandedPrompt] = useState("");
@@ -118,6 +120,7 @@ function Studio() {
     { id: "voice",           title: "Voice Generation", desc: "Natural AI voiceovers for videos",                 badge: "" },
     { id: "text_to_image",   title: "Text to Image",    desc: "Generate images from text or reference photo",     badge: "2 Tokens" },
     { id: "script_to_video", title: "Script to Video",  desc: "Turn a script into multiple video scenes with audio", badge: "New" },
+    { id: "video_remix",     title: "Video Remix",      desc: "Restyle, recreate or recast any video",           badge: "New" },
     { id: "video_translator", title: "AI Video Translator", desc: "Translate any video into another language with lip-sync", badge: "New" },
     { id: "image_ad",        title: "Image Ad",         desc: "Scroll-stopping image advertisements",             badge: "Cheapest" },
     { id: "prompt",          title: "Prompt Expander",  desc: "Transform simple ideas into cinematic prompts",    badge: "Free" },
@@ -125,7 +128,9 @@ function Studio() {
   ];
 
   // AI Video Translator only shows once HeyGen is enabled in Admin > AI Providers
-  const visibleModules = modules.filter((mod) => mod.id !== "video_translator" || enabledKeys["heygen_enabled"] === true);
+  const visibleModules = modules.filter((mod) =>
+    (mod.id !== "video_translator" || enabledKeys["heygen_enabled"] === true) &&
+    (mod.id !== "video_remix" || enabledKeys["video_remix_enabled"] === true));
 
   const visibleModels = ALL_MODELS.filter((m) => isModelVisible(m, enabledKeys));
 
@@ -624,7 +629,7 @@ function Studio() {
   };
 
   const goBackToModules = () => { resetForm(); router.replace("/dashboard/studio"); };
-  const isBusy = loading || vtBusy || s2vStep === "generating";
+  const isBusy = loading || vtBusy || s2vStep === "generating" || remixBusy;
 
   // Open the module named in the URL (sidebar links) and apply any prompt or
   // template handed over from the homepage.
@@ -670,6 +675,7 @@ function Studio() {
   const isScriptModule = activeModule === "script";
   const isS2VModule = activeModule === "script_to_video";
   const isVTModule = activeModule === "video_translator";
+  const isRemixModule = activeModule === "video_remix";
 
   // Charged per minute of source video, prorated, with a minimum of one minute's worth
   const vtTokensPerMinute = tokenPricing["video_translation"] ?? 20;
@@ -1206,7 +1212,19 @@ function Studio() {
       )}
 
       {/* ---- VIDEO / IMAGE MODULES ---- */}
-      {activeModule && !isPromptModule && !isScriptModule && !isS2VModule && !isVTModule && !loading && !videoUrl && (
+      {isRemixModule && (
+        <VideoRemix
+          tokenBalance={tokenBalance}
+          setTokenBalance={setTokenBalance}
+          tokenPricing={tokenPricing}
+          enabledKeys={enabledKeys}
+          settingsLoaded={settingsLoaded}
+          onBack={goBackToModules}
+          onBusyChange={setRemixBusy}
+        />
+      )}
+
+      {activeModule && !isPromptModule && !isScriptModule && !isS2VModule && !isVTModule && !isRemixModule && !loading && !videoUrl && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <button onClick={goBackToModules} className="inline-flex items-center gap-1 h-9 pl-2 pr-3 rounded-lg border border-line bg-raised text-ink text-sm hover:border-line-strong transition-colors"><ChevronLeft size={16} aria-hidden /> All tools</button>

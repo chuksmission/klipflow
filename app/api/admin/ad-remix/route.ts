@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { TranscriptionError, transcribeVideoUrl } from "../../../lib/whisper";
 
 // Whisper and the analysis call can each take 10-40s
 export const maxDuration = 60;
@@ -8,8 +9,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
-
-const WHISPER_MAX_BYTES = 25 * 1024 * 1024; // OpenAI transcription upload limit
 
 async function checkAdmin(token: string) {
   const { data: { user } } = await supabase.auth.getUser(token);
@@ -224,32 +223,12 @@ export async function POST(req: NextRequest) {
       const openaiKey = await getSetting("openai_api_key");
       if (!openaiKey) return NextResponse.json({ error: "Add an OpenAI API key in Admin → AI Providers to transcribe." }, { status: 503 });
 
-      const fileRes = await fetch(body.video_url);
-      if (!fileRes.ok) return NextResponse.json({ error: "Couldn't download the uploaded video for transcription." }, { status: 400 });
-      const blob = await fileRes.blob();
-      if (blob.size > WHISPER_MAX_BYTES) {
-        return NextResponse.json({ error: "Video is over 25MB, the transcription limit. Compress it or trim it and try again." }, { status: 400 });
+      try {
+        return NextResponse.json(await transcribeVideoUrl(openaiKey, body.video_url));
+      } catch (err) {
+        if (err instanceof TranscriptionError) return NextResponse.json({ error: err.message }, { status: 400 });
+        throw err;
       }
-      const ext = (body.video_url.split("?")[0].split(".").pop() ?? "mp4").toLowerCase();
-
-      const form = new FormData();
-      form.append("file", blob, `ad.${ext}`);
-      form.append("model", "whisper-1");
-      form.append("response_format", "verbose_json");
-
-      const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${openaiKey}` },
-        body: form,
-      });
-      const data = await safeJson(res);
-      if (!res.ok) return NextResponse.json({ error: data.error?.message ?? `Whisper failed (${res.status})` }, { status: 400 });
-      return NextResponse.json({
-        text: data.text ?? "",
-        language: data.language ?? null,
-        duration: data.duration ?? null,
-        segments: (data.segments ?? []).map((s: { start: number; end: number; text: string }) => ({ start: s.start, end: s.end, text: s.text?.trim() ?? "" })),
-      });
     }
 
     // ---- 2. Analysis + KlipflowAI rewrite ----
