@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { attachTask, claimCharge, getTokenPrice, refundCharge, releaseClaim } from "../../lib/charges";
 import { getTaskStatus } from "../../lib/task-status";
 import { transcribeVideoUrl } from "../../lib/whisper";
+import { speak } from "../../lib/elevenlabs";
 import {
   ACTOR_SWAP_LANGUAGES, ACTOR_SWAP_MAX_SECONDS, BACKGROUND_PRESETS, actorSwapCost, chunkCount, voicePortion,
   type ActorSwapChoices, type ActorSwapRates, type BackgroundMode, type VoiceGender,
@@ -199,40 +200,6 @@ async function stepFace(job: Job) {
   else f.status = "running";
 }
 
-const ELEVEN_V2_LANGS = new Set(["en", "ja", "zh", "de", "hi", "fr", "ko", "pt", "it", "es", "id", "nl", "tr", "fil", "pl", "sv", "bg", "ro", "ar", "cs", "el", "fi", "hr", "ms", "sk", "da", "ta", "uk", "ru"]);
-const ACCENT_QUERY: Record<string, string> = {
-  "American (neutral)": "american", "American Southern": "southern american", "African American": "african american",
-  "British (RP)": "british", "British (Cockney)": "cockney", "Australian": "australian", "Irish": "irish", "Scottish": "scottish",
-  "Indian English": "indian", "Nigerian English": "nigerian", "Jamaican": "jamaican", "Canadian": "canadian",
-  "South African": "south african", "New Zealand": "new zealand",
-};
-const FALLBACK_VOICES: Record<VoiceGender, string> = { female: "21m00Tcm4TlvDq8ikWAM", male: "pNInz6obpgDQGcFmaJgB" };
-
-async function pickVoice(key: string, lang: string, accent: string | null, gender: VoiceGender) {
-  const headers = { "xi-api-key": key, Accept: "application/json" };
-  const attempts: Record<string, string>[] = [
-    { language: lang, gender, ...(accent ? { accent: ACCENT_QUERY[accent] ?? accent.toLowerCase().replace(/\s*\(.*\)/, "") } : {}) },
-    { language: lang, gender },
-    { language: lang },
-  ];
-  for (const q of attempts) {
-    const params = new URLSearchParams({ ...q, page_size: "5", sort: "usage_character_count_1y" });
-    const res = await fetch(`https://api.elevenlabs.io/v1/shared-voices?${params}`, { headers });
-    const data = await safeJson(res);
-    const v = data.voices?.[0];
-    if (v?.voice_id) return { voice_id: v.voice_id as string, owner: v.public_owner_id as string | undefined, name: v.name as string };
-  }
-  return { voice_id: FALLBACK_VOICES[gender], owner: undefined, name: "default" };
-}
-
-async function synthesize(key: string, voiceId: string, text: string, lang: string): Promise<Response> {
-  return fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
-    method: "POST",
-    headers: { "xi-api-key": key, "Content-Type": "application/json", Accept: "audio/mpeg" },
-    body: JSON.stringify({ text, model_id: ELEVEN_V2_LANGS.has(lang) ? "eleven_multilingual_v2" : "eleven_v3" }),
-  });
-}
-
 const TRANSLATE_SCHEMA = {
   type: "object",
   properties: { script: { type: "string", description: "The spoken script in the target language and accent" } },
@@ -301,19 +268,7 @@ async function stepVoice(job: Job) {
   if (v.step === "tts") {
     const key = await getSetting("elevenlabs_api_key");
     if (!key) throw new Error("Voice generation isn't configured.");
-    const lang = o.language_code ?? "en";
-    const voice = await pickVoice(key, lang, o.accent, o.gender);
-    let res = await synthesize(key, voice.voice_id, v.script!, lang);
-    if (!res.ok && voice.owner) {
-      // Shared voices may need adding to the account before use
-      const add = await fetch(`https://api.elevenlabs.io/v1/voices/add/${voice.owner}/${voice.voice_id}`, {
-        method: "POST", headers: { "xi-api-key": key, "Content-Type": "application/json" }, body: JSON.stringify({ new_name: `KF ${voice.name}`.slice(0, 40) }),
-      });
-      const added = await safeJson(add);
-      res = await synthesize(key, added.voice_id ?? voice.voice_id, v.script!, lang);
-    }
-    if (!res.ok) { const e = await safeJson(res); throw new Error(e.detail?.message ?? e.detail ?? "Voice generation failed."); }
-    const bytes = new Uint8Array(await res.arrayBuffer());
+    const bytes = await speak(key, v.script!, o.language_code ?? "en", o.accent, o.gender);
     const path = `actor-swap/${job.id}/voice.mp3`;
     const { error } = await supabase.storage.from("generation-inputs").upload(path, bytes, { contentType: "audio/mpeg", upsert: true });
     if (error) throw new Error(`Storage upload failed: ${error.message}`);
@@ -322,27 +277,40 @@ async function stepVoice(job: Job) {
   }
 }
 
+// HeyGen Lipsync (same API key as Video Translation): re-times the mouth on
+// the video to the new ElevenLabs voice
 async function stepLipsync(job: Job, videoUrl: string) {
   const l = job.state.lipsync;
-  const key = await getSetting("synclabs_api_key");
+  const key = await getSetting("heygen_api_key");
   if (!key) throw new Error("Lip sync isn't configured.");
+  const headers = { "Content-Type": "application/json", "x-api-key": key, Accept: "application/json" };
   if (l.status === "pending") {
-    const res = await fetch("https://api.sync.so/v2/generate", {
+    const res = await fetch("https://api.heygen.com/v3/lipsyncs", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": key },
-      body: JSON.stringify({ model: "lipsync-2", input: [{ type: "video", url: videoUrl }, { type: "audio", url: job.state.voice.audio_url }], options: { sync_mode: "bounce" } }),
+      headers,
+      body: JSON.stringify({
+        video: { type: "url", url: videoUrl },
+        audio: { type: "url", url: job.state.voice.audio_url },
+        mode: "speed",
+        title: `KlipflowAI actor swap ${job.id}`,
+      }),
     });
     const data = await safeJson(res);
-    if (res.status === 429) return;
-    if (!res.ok || !data.id) throw new Error(data.message ?? data.error ?? `Lip sync couldn't start (${res.status}).`);
-    l.status = "running"; l.task_id = data.id;
+    if (res.status === 429) return;            // rate limited: retry next tick
+    const id = data.data?.lipsync_id ?? data.lipsync_id;
+    if (!res.ok || !id) {
+      const err = data.error;
+      throw new Error((typeof err === "string" ? err : err?.message) ?? data.message ?? `Lip sync couldn't start (${res.status}).`);
+    }
+    l.status = "running"; l.task_id = id;
     return;
   }
   if (l.status === "running" && l.task_id) {
-    const res = await fetch(`https://api.sync.so/v2/generate/${l.task_id}`, { headers: { "x-api-key": key } });
-    const data = await safeJson(res);
-    if (data.status === "COMPLETED" && data.outputUrl) { l.status = "done"; l.url = data.outputUrl; }
-    else if (data.status === "FAILED" || data.status === "REJECTED") throw new Error(data.error ?? "Lip sync failed.");
+    const res = await fetch(`https://api.heygen.com/v3/lipsyncs/${l.task_id}`, { headers });
+    const raw = await safeJson(res);
+    const data = raw.data ?? raw;
+    if (data.status === "completed" && data.video_url) { l.status = "done"; l.url = data.video_url; }
+    else if (data.status === "failed") throw new Error(data.failure_message ?? "Lip sync failed.");
   }
 }
 
@@ -471,7 +439,7 @@ export async function POST(req: NextRequest) {
         if (!ours(body.audio_url)) return NextResponse.json({ error: "Audio is missing. Please try again." }, { status: 400 });
         if (!ACTOR_SWAP_LANGUAGES.some((l) => l.code === body.language_code)) return NextResponse.json({ error: "Choose a language." }, { status: 400 });
       }
-      const needs = [changeFace && "runway_api_key", changeVoice && "elevenlabs_api_key", changeVoice && "synclabs_api_key", changeVoice && "openai_api_key"].filter(Boolean) as string[];
+      const needs = [changeFace && "runway_api_key", changeVoice && "elevenlabs_api_key", changeVoice && "heygen_api_key", changeVoice && "openai_api_key"].filter(Boolean) as string[];
       for (const k of needs) if (!(await getSetting(k))) return NextResponse.json({ error: "This option isn't configured yet." }, { status: 503 });
 
       const options: Options = {

@@ -17,8 +17,6 @@ WHERE NOT EXISTS (SELECT 1 FROM token_pricing t WHERE t.action = v.action);
 -- Provider keys and the module switch (switch must be non-secret; starts OFF)
 INSERT INTO admin_settings (key, value, category, is_secret, updated_at)
 VALUES
-  ('synclabs_api_key',      '',      'ai_providers', true,  now()),
-  ('synclabs_enabled',      'false', 'ai_providers', false, now()),
   ('elevenlabs_api_key',    '',      'ai_providers', true,  now()),
   ('ai_actor_swap_enabled', 'false', 'ai_providers', false, now())
 ON CONFLICT (key) DO UPDATE
