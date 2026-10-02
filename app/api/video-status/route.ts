@@ -103,6 +103,43 @@ export async function GET(req: NextRequest) {
     }
 
     // ================================================================
+    // HEYGEN avatar (talking-head) video status
+    // Endpoint: /v1/video_status.get?video_id=
+    // Status values: pending, waiting, processing, completed, failed
+    // ================================================================
+    if (provider === "heygen_avatar") {
+      const heygenApiKey = await getSetting("heygen_api_key");
+      if (!heygenApiKey) {
+        return NextResponse.json({ error: "HeyGen not configured" }, { status: 503 });
+      }
+
+      const res = await fetch(`https://api.heygen.com/v1/video_status.get?video_id=${encodeURIComponent(task_id)}`, {
+        headers: { "X-Api-Key": heygenApiKey, "Accept": "application/json" },
+      });
+
+      const rawText = await res.text();
+      console.log("HeyGen avatar status raw:", rawText);
+      let data: any = {};
+      try { data = JSON.parse(rawText); } catch { data = {}; }
+
+      const jobData = data.data ?? {};
+      const state = jobData.status ?? "";
+      const isDone = state === "completed" || state === "success";
+      const isFailed = state === "failed" || state === "error";
+      const videoUrl = isDone ? (jobData.video_url ?? jobData.url ?? null) : null;
+      const failReason = jobData.error?.message ?? jobData.error?.detail ?? (typeof jobData.error === "string" ? jobData.error : null);
+
+      return NextResponse.json({
+        success: true,
+        status: state,
+        video_url: videoUrl,
+        completed: isDone,
+        failed: isFailed,
+        fail_reason: isFailed ? (failReason ?? "HeyGen video failed") : undefined,
+      });
+    }
+
+    // ================================================================
     // VEO3 status — dedicated endpoint /api/v1/veo/record-info
     // Response: data.successFlag === 1 means done
     // URL: data.response.resultUrls[0]
