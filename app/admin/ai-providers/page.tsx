@@ -158,6 +158,28 @@ export default function AdminAIProviders() {
       models: [],
     },
     {
+      id: "browserless",
+      name: "Browserless",
+      desc: "Demo Studio: records walkthroughs of klipflowai.com in a cloud browser (needs a paid plan with session recording)",
+      docsUrl: "https://docs.browserless.io/baas/monitor-sessions/screen-recording",
+      enabledKey: "browserless_enabled",
+      fields: [
+        { key: "browserless_api_key", label: "API Token", secret: true },
+      ],
+      models: [],
+    },
+    {
+      id: "replicate",
+      name: "Replicate",
+      desc: "Video Remix Actor Swap with the original background: Robust Video Matting cuts out the people, ProPainter rebuilds the background behind them, then the new performer is composited back. The toggle turns the option on; without a token the background is kept from the video's opening frame (needs Kie)",
+      docsUrl: "https://replicate.com/account/api-tokens",
+      enabledKey: "remix_bg_preserve_enabled",
+      fields: [
+        { key: "replicate_api_key", label: "API Token", secret: true },
+      ],
+      models: [],
+    },
+    {
       id: "series_cloner",
       name: "Series Cloner",
       desc: "Studio module. Analysis needs OpenAI (GPT-4o Vision + Whisper) and Claude (OpenAI as fallback); storyboards and videos need Kie; avatar videos need HeyGen and ElevenLabs",
@@ -165,6 +187,17 @@ export default function AdminAIProviders() {
       enabledKey: "series_cloner_enabled",
       fields: [],
       models: [],
+    },
+    {
+      id: "faceless_reels",
+      name: "Faceless Reels",
+      desc: "Studio module. Characters, series bibles and scripts need Claude (OpenAI as fallback); character sheets (Nano Banana Pro) and videos need Kie. Videos use the first enabled of Seedance 2.5, Seedance 2.0, Seedance 2.0 Fast",
+      docsUrl: "https://kie.ai",
+      enabledKey: "faceless_reels_enabled",
+      fields: [],
+      models: [
+        { key: "seedance25_enabled", label: "Seedance 2.5 — reference-image clips up to 30s (Faceless Reels)" },
+      ],
     },
     {
       id: "anthropic",

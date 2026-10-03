@@ -1,6 +1,7 @@
 // Cost line for duration-billed tools: "Cost: 73 tokens · 1m 27s · you have X",
 // with the per-second breakdown underneath.
-import { MIN_BILLED_SECONDS, formatDuration } from "../lib/duration-pricing";
+import { useTranslations } from "next-intl";
+import { MIN_BILLED_SECONDS } from "../lib/duration-pricing";
 
 interface Props {
   cost: number;
@@ -12,18 +13,20 @@ interface Props {
 }
 
 export default function CostSummary({ cost, ratePerMinute, seconds, balance, rateLabel }: Props) {
+  const t = useTranslations("cost");
   const billed = seconds === null ? null : Math.max(MIN_BILLED_SECONDS, seconds);
+  const duration = (s: number) => { const total = Math.max(0, Math.round(s)); const m = Math.floor(total / 60); return m ? t("minSec", { m, s: total % 60 }) : t("sec", { s: total }); };
   return (
     <div className="space-y-0.5">
       <p className="text-sm text-ink-muted">
-        Cost: <span className="font-semibold text-ink">{seconds === null ? `from ${cost} tokens` : `${cost} tokens`}</span>
-        {seconds !== null && <> · {formatDuration(seconds)}</>}
-        {" "}· you have {balance}
+        {t.rich(seconds === null ? "lineFrom" : "line", { cost, strong: (chunks) => <span className="font-semibold text-ink">{chunks}</span> })}
+        {seconds !== null && <> · {duration(seconds)}</>}
+        {" "}· {t("youHave", { balance })}
       </p>
       <p className="text-xs text-ink-subtle">
-        {ratePerMinute} tokens/min{rateLabel ? ` (${rateLabel})` : ""}, billed per second with a {MIN_BILLED_SECONDS}s minimum
-        {billed !== null && <>: {formatDuration(billed)} × {ratePerMinute}/min = {((billed * ratePerMinute) / 60).toFixed(1)} → {cost} tokens</>}
-        {seconds !== null && seconds < MIN_BILLED_SECONDS && <> (billed as {MIN_BILLED_SECONDS}s)</>}
+        {rateLabel ? t("rateLabelled", { rate: ratePerMinute, label: rateLabel, min: MIN_BILLED_SECONDS }) : t("rate", { rate: ratePerMinute, min: MIN_BILLED_SECONDS })}
+        {billed !== null && <>: {t("math", { duration: duration(billed), rate: ratePerMinute, exact: ((billed * ratePerMinute) / 60).toFixed(1), cost })}</>}
+        {seconds !== null && seconds < MIN_BILLED_SECONDS && <> {t("billedAs", { min: MIN_BILLED_SECONDS })}</>}
       </p>
     </div>
   );

@@ -51,3 +51,22 @@ export async function mediaSeconds(file: string): Promise<number> {
   const m = log.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
   return m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : 0;
 }
+
+/** Size, duration and whether there's an audio track, from ffmpeg's input summary. */
+export async function probeMedia(file: string): Promise<{ seconds: number; width: number; height: number; hasAudio: boolean }> {
+  const log = await new Promise<string>((resolve) => {
+    const proc = spawn(ffmpegPath as string, ["-hide_banner", "-i", file]);
+    let out = "";
+    proc.stderr.on("data", (d) => { out += d.toString(); });
+    proc.on("close", () => resolve(out));
+    proc.on("error", () => resolve(out));
+  });
+  const d = log.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+  const v = log.match(/Video:.*?,\s(\d{2,5})x(\d{2,5})/);
+  return {
+    seconds: d ? Number(d[1]) * 3600 + Number(d[2]) * 60 + Number(d[3]) : 0,
+    width: v ? Number(v[1]) : 0,
+    height: v ? Number(v[2]) : 0,
+    hasAudio: /Stream #.*Audio:/.test(log),
+  };
+}

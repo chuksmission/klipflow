@@ -49,7 +49,7 @@ export default function PSEOPage({
           <p className="mx-auto mt-5 max-w-2xl text-lg text-ink-muted">{subtitle}</p>
           <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-ink-subtle">{description}</p>
           <div className="mt-9 flex flex-wrap justify-center gap-3">
-            <ButtonLink href="/signup" variant="primary" size="lg">Start free with 25 tokens <ArrowRight size={17} aria-hidden /></ButtonLink>
+            <ButtonLink href="/signup" variant="primary" size="lg">Start free with 25 tokens <ArrowRight size={17} className="rtl:-scale-x-100" aria-hidden /></ButtonLink>
             <ButtonLink href="/#templates" variant="secondary" size="lg">See examples</ButtonLink>
           </div>
           <p className="mt-4 text-xs text-ink-subtle">No credit card required · Cancel anytime</p>
@@ -120,7 +120,7 @@ export default function PSEOPage({
           <div className="relative">
             <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">{ctaTitle}</h2>
             <p className="mx-auto mt-3 max-w-lg text-ink-muted">{ctaDesc}</p>
-            <ButtonLink href="/signup" variant="primary" size="lg" className="mt-8">Start for free <ArrowRight size={17} aria-hidden /></ButtonLink>
+            <ButtonLink href="/signup" variant="primary" size="lg" className="mt-8">Start for free <ArrowRight size={17} className="rtl:-scale-x-100" aria-hidden /></ButtonLink>
           </div>
         </div>
       </section>

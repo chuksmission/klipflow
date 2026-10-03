@@ -91,6 +91,9 @@ export async function releaseClaim(chargeId: string) {
 }
 
 export async function refundCharge(chargeId: string, userId: string, amount?: number) {
+  // Charges paid from the admin showcase balance go back to that balance
+  const pooled = await getCharge(chargeId);
+  if (pooled && pooled.feature?.startsWith(SHOWCASE_PREFIX)) return refundShowcaseCharge(pooled, userId, amount);
   const { data, error } = await supabase.rpc("refund_token_charge", { p_charge_id: chargeId, p_user_id: userId, p_amount: amount ?? null });
   if (error) {
     if (error.message.includes("charge_not_found")) return { error: "Charge not found.", status: 404 };
@@ -120,4 +123,66 @@ export async function isAdminRequest(authHeader: string | null): Promise<boolean
   if (!user) return false;
   const { data: profile } = await supabase.from("user_profiles").select("is_admin").eq("id", user.id).single();
   return !!profile?.is_admin;
+}
+
+// ---- showcase pool ----
+// Admin tools (Showcase Studio) can run the real Studio modules. Their charges
+// are paid from the admin showcase balance (admin_settings.admin_token_balance)
+// instead of the admin's own tokens; the charge row is marked "showcase:" and
+// every refund path credits that balance back.
+
+export const SHOWCASE_PREFIX = "showcase:";
+const BALANCE_KEY = "admin_token_balance";
+
+async function readShowcaseBalance(): Promise<{ raw: string | null; value: number }> {
+  const { data } = await supabase.from("admin_settings").select("value").eq("key", BALANCE_KEY).maybeSingle();
+  const raw = (data?.value as string | undefined) ?? null;
+  return { raw, value: Math.max(0, parseInt(raw ?? "0", 10) || 0) };
+}
+
+/** Adds `delta` (may be negative) to the showcase balance; fails if it would go below zero. */
+async function adjustShowcaseBalance(delta: number): Promise<number | null> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { raw, value } = await readShowcaseBalance();
+    const next = value + delta;
+    if (next < 0) return null;
+    // Compare-and-set on the stored text so concurrent runs can't overspend
+    const query = raw === null
+      ? supabase.from("admin_settings").insert({ key: BALANCE_KEY, value: String(next), category: "showcase", is_secret: false, updated_at: new Date().toISOString() }).select("key")
+      : supabase.from("admin_settings").update({ value: String(next), updated_at: new Date().toISOString() }).eq("key", BALANCE_KEY).eq("value", raw).select("key");
+    const { data } = await query;
+    if (data && data.length) return next;
+  }
+  throw new Error("The showcase balance is busy. Try again.");
+}
+
+export async function createShowcaseCharge(adminId: string, amount: number, feature: string | null) {
+  if (!Number.isInteger(amount) || amount <= 0 || amount > 100000) return { error: "Invalid amount", status: 400 };
+  const balance = await adjustShowcaseBalance(-amount);
+  if (balance === null) return { error: "Not enough showcase tokens.", status: 400 };
+  const { data, error } = await supabase.from("token_charges")
+    .insert({ user_id: adminId, amount, feature: `${SHOWCASE_PREFIX}${feature ?? ""}`.slice(0, 64) })
+    .select("id").single();
+  if (error || !data) {
+    await adjustShowcaseBalance(amount);
+    return { error: "Couldn't reserve showcase tokens.", status: 500 };
+  }
+  return { chargeId: data.id as string, balance, totalUsed: 0 };
+}
+
+async function refundShowcaseCharge(charge: Charge, userId: string, amount?: number) {
+  if (charge.user_id !== userId) return { error: "Charge not found.", status: 404 };
+  if (charge.status !== "charged" && charge.status !== "partially_refunded") return { error: "This charge has already been settled.", status: 409 };
+  const remaining = charge.amount - charge.refunded_amount;
+  const refund = amount === undefined ? remaining : Math.min(Math.round(amount), remaining);
+  if (!(refund > 0)) return { error: "Nothing left to refund on this charge.", status: 409 };
+  const refunded = charge.refunded_amount + refund;
+  // Conditional on the amount read, so two refunds can't both pass
+  const { data } = await supabase.from("token_charges")
+    .update({ refunded_amount: refunded, status: refunded >= charge.amount ? "refunded" : "partially_refunded", ...(refunded >= charge.amount ? { settled_at: new Date().toISOString() } : {}) })
+    .eq("id", charge.id).eq("refunded_amount", charge.refunded_amount).in("status", ["charged", "partially_refunded"])
+    .select("id");
+  if (!data?.length) return { error: "This charge has already been settled.", status: 409 };
+  const balance = await adjustShowcaseBalance(refund);
+  return { refunded: refund, balance: balance ?? 0 };
 }

@@ -1,14 +1,14 @@
 import {
   Activity, AudioLines, BookOpen, Bot, CircleHelp, Clapperboard, CreditCard, FileVideo, GraduationCap,
   Image, ImagePlay, Images, Languages, Layers, Repeat2, LayoutDashboard, Megaphone, Newspaper, PenLine, Radar,
-  ScanFace, Settings, UserRound, WandSparkles, type LucideIcon,
+  ScanFace, Settings, Drama, UserRound, WandSparkles, type LucideIcon,
 } from "lucide-react";
 
 // Single source of truth for Studio modules, shared by the sidebar, the
 // homepage Quick Starts and the Studio itself.
 export type StudioModuleId =
   | "text_to_video" | "image_to_video" | "ugc_ad" | "ai_actor" | "voice" | "text_to_image"
-  | "script_to_video" | "image_ad" | "prompt" | "script" | "video_translator" | "video_remix" | "ai_actor_swap" | "series_cloner";
+  | "script_to_video" | "image_ad" | "prompt" | "script" | "video_translator" | "video_remix" | "ai_actor_swap" | "series_cloner" | "faceless_reels";
 
 export interface StudioModule {
   id: StudioModuleId;
@@ -27,6 +27,7 @@ export const STUDIO_MODULES: StudioModule[] = [
   { id: "video_remix",      title: "Video Remix",         desc: "Restyle, recreate or recast any video",     icon: Repeat2, badge: "New" },
   { id: "ai_actor_swap",    title: "AI Actor Swap",       desc: "New face, language and voice for any video", icon: ScanFace, badge: "New" },
   { id: "series_cloner",    title: "Series Cloner",       desc: "Clone a viral series formula with new characters", icon: Layers, badge: "New" },
+  { id: "faceless_reels",   title: "Faceless Reels",      desc: "Original AI character series from viral templates", icon: Drama, badge: "New" },
   { id: "ai_actor",         title: "AI Actor",            desc: "Photorealistic AI presenters",              icon: UserRound },
   { id: "text_to_image",    title: "Text to Image",       desc: "Images from text or a reference photo",     icon: Image },
   { id: "image_ad",         title: "Image Ads",           desc: "Scroll-stopping static ads",                icon: Newspaper },
@@ -40,31 +41,33 @@ export const getStudioModule = (id: string | null | undefined) =>
 
 export interface NavLink {
   href: string;
+  /** English label; `key` looks up the translation in messages "nav" */
   label: string;
+  key?: string;
   icon: LucideIcon;
   authOnly?: boolean;
 }
 
 export const TOOL_LINKS: NavLink[] = [
-  { href: "/dashboard/ad-spy",    label: "Ad Spy",    icon: Radar },
-  { href: "/dashboard/autopilot", label: "Autopilot", icon: Bot },
+  { href: "/dashboard/ad-spy",    label: "Ad Spy",    key: "adSpy",     icon: Radar },
+  { href: "/dashboard/autopilot", label: "Autopilot", key: "autopilot", icon: Bot },
 ];
 
 export const LIBRARY_LINKS: NavLink[] = [
-  { href: "/dashboard",          label: "Overview", icon: LayoutDashboard, authOnly: true },
-  { href: "/dashboard/gallery",  label: "Gallery",  icon: Images,          authOnly: true },
-  { href: "/dashboard/activity", label: "Activity", icon: Activity,        authOnly: true },
+  { href: "/dashboard",          label: "Overview", key: "overview", icon: LayoutDashboard, authOnly: true },
+  { href: "/dashboard/gallery",  label: "Gallery",  key: "gallery",  icon: Images,          authOnly: true },
+  { href: "/dashboard/activity", label: "Activity", key: "activity", icon: Activity,        authOnly: true },
 ];
 
 export const ACCOUNT_LINKS: NavLink[] = [
-  { href: "/dashboard/billing",  label: "Billing",  icon: CreditCard, authOnly: true },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings,   authOnly: true },
-  { href: "/dashboard/help",     label: "Help",     icon: CircleHelp, authOnly: true },
+  { href: "/dashboard/billing",  label: "Billing",  key: "billing",  icon: CreditCard, authOnly: true },
+  { href: "/dashboard/settings", label: "Settings", key: "settings", icon: Settings,   authOnly: true },
+  { href: "/dashboard/help",     label: "Help",     key: "help",     icon: CircleHelp, authOnly: true },
 ];
 
 export const LEARN_LINKS: NavLink[] = [
-  { href: "/academy", label: "Academy", icon: GraduationCap },
-  { href: "/blog",    label: "Blog",    icon: BookOpen },
+  { href: "/academy", label: "Academy", key: "academy", icon: GraduationCap },
+  { href: "/blog",    label: "Blog",    key: "blog",    icon: BookOpen },
 ];
 
 // Hand-off from the marketing site / templates into the Studio. Stored in
@@ -77,6 +80,8 @@ export interface PendingGeneration {
   model?: string;
   aspect_ratio?: string;
   duration?: string;
+  language?: string;
+  accent?: string;
   savedAt: number;
 }
 
@@ -115,10 +120,15 @@ export const SHOWCASE_CATEGORIES = [
 ] as const;
 
 // Maps a generation's stored `type` back to the Studio module that made it.
-export function moduleForGenerationType(type: string | null | undefined): StudioModuleId {
+export function moduleForGenerationType(type: string | null | undefined, model?: string | null): StudioModuleId {
   const found = getStudioModule(type ?? "");
   if (found) return found.id;
   if (type === "video_translation") return "video_translator";
+  // Demo Studio videos are labelled "Demo Studio · <tool title>"
+  if (type === "demo_video" && model) {
+    const tool = STUDIO_MODULES.find((m) => model.endsWith(`· ${m.title}`));
+    if (tool) return tool.id;
+  }
   return "text_to_video";
 }
 

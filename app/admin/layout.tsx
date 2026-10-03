@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { ArrowLeft, ChartLine, Clapperboard, Coins, Cpu, CreditCard, FileText, Film, Inbox, KeyRound, LayoutDashboard, Loader2, LogOut, Mail, MailOpen, Megaphone, Menu, Newspaper, Package, Plug, Receipt, Repeat2, Search, Settings2, ShieldAlert, ShieldCheck, Sparkles, Users, WandSparkles, X, type LucideIcon } from "lucide-react";
+import { ArrowLeft, ChartLine, Clapperboard, Coins, Cpu, CreditCard, FileText, Film, Inbox, KeyRound, LayoutDashboard, Loader2, LogOut, Mail, MailOpen, Megaphone, Menu, Newspaper, Package, Plug, Receipt, Repeat2, Search, Settings2, ShieldAlert, ShieldCheck, Sparkles, Users, WandSparkles, X, type LucideIcon, MonitorPlay, Drama } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -45,8 +45,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       { href: "/admin/ai-providers", label: "AI Providers", icon: Cpu },
       { href: "/admin/showcase-studio", label: "Showcase Studio", icon: WandSparkles },
       { href: "/admin/ad-remix", label: "Ad Remix", icon: Repeat2 },
+      { href: "/admin/demo-studio", label: "Demo Studio", icon: MonitorPlay },
       { href: "/admin/prompt-templates", label: "Prompt Templates", icon: FileText },
       { href: "/admin/video-templates", label: "Video Templates", icon: Film },
+      { href: "/admin/reel-templates", label: "Reel Templates", icon: Drama },
       { href: "/admin/token-pricing", label: "Token Pricing", icon: Coins },
     ]},
     { title: "Monetization", items: [

@@ -3,6 +3,7 @@
 // draggable selection on a timeline, and a slider for keyboard/touch users.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pause, Play, Scissors } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface Props {
   file: File;
@@ -16,6 +17,7 @@ interface Props {
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
 export default function VideoTrimmer({ file, duration, windowSeconds, start, onChange, message }: Props) {
+  const t = useTranslations("trimmer");
   const url = useMemo(() => URL.createObjectURL(file), [file]);
   // Revoke only once the URL is really unused: React may unmount and remount
   // the same instance (Strict Mode), which must keep the memoised URL alive
@@ -109,17 +111,17 @@ export default function VideoTrimmer({ file, duration, windowSeconds, start, onC
       <input
         type="range" min={0} max={maxStart} step={0.1} value={start}
         onChange={(e) => setStart(Number(e.target.value))}
-        aria-label={`Start of the ${Math.round(length)} second clip`}
+        aria-label={t("startAria", { seconds: Math.round(length) })}
         className="w-full accent-[var(--kf-accent)]"
       />
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <span className="text-ink">
           <span className="font-semibold">{fmt(start)} – {fmt(end)}</span>
-          <span className="text-ink-subtle"> · {Math.round(length)}s selected of {fmt(duration)}</span>
+          <span className="text-ink-subtle"> · {t("selectedOf", { seconds: Math.round(length), total: fmt(duration) })}</span>
         </span>
         <button onClick={togglePreview} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-raised px-3 text-sm text-ink transition-colors hover:border-line-strong">
-          {playing ? <Pause size={15} aria-hidden /> : <Play size={15} aria-hidden />} {playing ? "Pause" : "Play selection"}
+          {playing ? <Pause size={15} aria-hidden /> : <Play size={15} aria-hidden />} {playing ? t("pause") : t("play")}
         </button>
       </div>
     </div>

@@ -1,10 +1,17 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Clapperboard, Download, Image as ImageIcon, Images } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
+import { useTypeLabel } from "../../lib/use-type-label";
 import { supabase } from "../../lib/supabase";
 import { ButtonLink, EmptyState, PageHeader, Skeleton } from "../../components/ui";
 
 export default function Gallery() {
+  const t = useTranslations("gallery");
+  const nav = useTranslations("nav");
+  const c = useTranslations("common");
+  const typeLabel = useTypeLabel();
+  const locale = useLocale();
   const [generations, setGenerations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
@@ -58,14 +65,14 @@ export default function Gallery() {
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
-        title="Gallery"
-        description={`${generations.length} total · ${videoCount} videos, ${imageCount} images`}
+        title={nav("gallery")}
+        description={t("summary", { total: generations.length, videos: videoCount, images: imageCount })}
         actions={
-          <div className="inline-flex rounded-xl border border-line bg-surface p-1" role="tablist" aria-label="Filter">
+          <div className="inline-flex rounded-xl border border-line bg-surface p-1" role="tablist" aria-label={t("filter")}>
             {[
-              { key: "all", label: "All" },
-              { key: "video", label: "Videos" },
-              { key: "image", label: "Images" },
+              { key: "all", label: t("all") },
+              { key: "video", label: t("videos") },
+              { key: "image", label: t("images") },
             ].map((f) => (
               <button
                 key={f.key}
@@ -93,9 +100,9 @@ export default function Gallery() {
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={filter === "image" ? ImageIcon : filter === "video" ? Clapperboard : Images}
-          title={filter === "all" ? "Your gallery is empty" : `No ${filter}s yet`}
-          description="Everything you generate in the Studio is saved here automatically."
-          action={<ButtonLink href="/dashboard/studio" variant="primary">Open Studio</ButtonLink>}
+          title={filter === "all" ? t("emptyAll") : filter === "video" ? t("emptyVideos") : t("emptyImages")}
+          description={t("emptyDesc")}
+          action={<ButtonLink href="/dashboard/studio" variant="primary">{t("openStudio")}</ButtonLink>}
         />
       ) : (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
@@ -105,7 +112,7 @@ export default function Gallery() {
                 {isImage(gen) ? (
                   <img
                     src={gen.video_url}
-                    alt={gen.prompt || "Generated image"}
+                    alt={gen.prompt || t("generatedImage")}
                     loading="lazy"
                     className="h-full w-full object-cover"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
@@ -122,13 +129,13 @@ export default function Gallery() {
                     onError={(e) => { (e.target as HTMLVideoElement).style.display = "none"; }}
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-sm text-ink-subtle">No preview</div>
+                  <div className="flex h-full w-full items-center justify-center text-sm text-ink-subtle">{t("noPreview")}</div>
                 )}
                 {gen.video_url && (
                   <button
                     onClick={() => handleDownload(gen.video_url, isImage(gen))}
-                    aria-label="Download"
-                    className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-lg bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80"
+                    aria-label={c("download")}
+                    className="absolute end-2 top-2 grid h-9 w-9 place-items-center rounded-lg bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80"
                   >
                     <Download size={16} aria-hidden />
                   </button>
@@ -139,12 +146,12 @@ export default function Gallery() {
                 <div className="mb-1 flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 truncate text-xs font-medium capitalize text-accent-text">
                     {isImage(gen) ? <ImageIcon size={13} aria-hidden /> : <Clapperboard size={13} aria-hidden />}
-                    {isImage(gen) ? "Image" : (gen.type?.replace(/_/g, " ") ?? "Video")}
+                    {isImage(gen) && !gen.type ? t("image") : typeLabel(gen.type)}
                   </span>
-                  <span className="flex-shrink-0 text-xs tabular-nums text-ink-subtle">{gen.tokens_used} tokens</span>
+                  <span className="flex-shrink-0 text-xs tabular-nums text-ink-subtle">{c("tokens", { count: gen.tokens_used ?? 0 })}</span>
                 </div>
                 <p className="mb-2 truncate text-xs text-ink-muted">{gen.prompt}</p>
-                <span className="text-xs text-ink-subtle">{new Date(gen.created_at).toLocaleDateString()}</span>
+                <span className="text-xs text-ink-subtle">{new Date(gen.created_at).toLocaleDateString(locale)}</span>
               </div>
             </div>
           ))}

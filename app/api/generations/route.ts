@@ -65,6 +65,8 @@ export async function POST(req: NextRequest) {
       charge_id?: string;
       language?: string;
       accent?: string;
+      source_image_url?: string;
+      settings?: Record<string, unknown>;
     };
 
     const {
@@ -107,10 +109,22 @@ export async function POST(req: NextRequest) {
     const outputLanguage = parseOutputLanguage(body.language, body.accent);
     if (outputLanguage) { row.language = outputLanguage.code; row.accent = outputLanguage.accent || null; }
 
+    // The input image (image modules), shown on the showcase when an admin features this
+    const source = typeof body.source_image_url === "string" ? body.source_image_url.trim() : "";
+    if (/^https:\/\/\S+$/.test(source) && source.length <= 2048) row.source_image_url = source;
+
+    // Settings used (remix mode, languages, template...), shown on showcase cards for upload tools
+    if (body.settings && typeof body.settings === "object" && !Array.isArray(body.settings)) {
+      const settings = Object.fromEntries(Object.entries(body.settings)
+        .filter(([k, v]) => /^[a-z_]{1,24}$/.test(k) && (typeof v === "string" || typeof v === "number"))
+        .slice(0, 8).map(([k, v]) => [k, String(v).slice(0, 80)]));
+      if (Object.keys(settings).length) row.settings = settings;
+    }
+
     let { data, error } = await supabase.from("generations").insert(row).select().single();
-    // Before supabase/generation_language.sql is run the columns don't exist yet: save without them
-    if (error && outputLanguage && /language|accent/.test(error.message)) {
-      delete row.language; delete row.accent;
+    // Before the migrations add these columns (generation_language.sql, showcase_details.sql): save without them
+    if (error && /language|accent|source_image_url|settings/.test(error.message)) {
+      delete row.language; delete row.accent; delete row.source_image_url; delete row.settings;
       ({ data, error } = await supabase.from("generations").insert(row).select().single());
     }
 

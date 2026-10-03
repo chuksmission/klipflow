@@ -24,7 +24,7 @@
 @theme inline {
   --color-background: var(--kf-canvas);
   --color-foreground: var(--kf-text);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-geist-sans), var(--font-noto-arabic), var(--font-noto-devanagari);
   --font-mono: var(--font-geist-mono);
 
   --color-canvas: var(--kf-canvas);
@@ -84,7 +84,7 @@ html {
 body {
   background: var(--kf-canvas);
   color: var(--kf-text);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-geist-sans), var(--font-noto-arabic), var(--font-noto-devanagari), ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 

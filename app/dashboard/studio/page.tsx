@@ -1,14 +1,17 @@
 "use client";
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { Check, CheckCircle2, ChevronLeft, Circle, Coins, X } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { chargeTokens, refundCharge, refundNote } from "../../lib/token-client";
 import VideoRemix from "./VideoRemix";
 import ActorSwap from "./ActorSwap";
 import SeriesCloner from "./SeriesCloner";
+import FacelessReels from "./FacelessReels";
 import LanguageAccentSelector, { DEFAULT_LANGUAGE, type LanguageChoice } from "../../components/LanguageAccentSelector";
 import PromptTranslateBanner from "../../components/PromptTranslateBanner";
+import { ACTOR_SWAP_LANGUAGES } from "../../lib/actor-swap";
 import { VIDEO_MODELS, getStudioModule, isModelVisible, studioHref, takePendingGeneration, type StudioModuleId, type VideoModel } from "../../components/catalog";
 
 type Model = VideoModel;
@@ -29,6 +32,9 @@ interface Scene {
 }
 
 function Studio() {
+  const t = useTranslations("studio");
+  const c = useTranslations("common");
+  const locale = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlModule = searchParams.get("module");
@@ -56,8 +62,11 @@ function Studio() {
   const [remixBusy, setRemixBusy] = useState(false);
   const [swapBusy, setSwapBusy] = useState(false);
   const [clonerBusy, setClonerBusy] = useState(false);
+  const [reelsBusy, setReelsBusy] = useState(false);
   // Output language & accent, shared by the prompt-based modules (defaults to English)
   const [outputLang, setOutputLang] = useState<LanguageChoice>(DEFAULT_LANGUAGE);
+  // Image Ad: optional headline rendered into the ad
+  const [adHeadline, setAdHeadline] = useState("");
 
   // Prompt Expander
   const [expandedPrompt, setExpandedPrompt] = useState("");
@@ -109,33 +118,38 @@ function Studio() {
 
   // Only confirmed audio models for Script to Video
   const AUDIO_MODELS = [
-    { id: "kling-v3-std", name: "Kling 3.0 Standard", tokens: 15, desc: "Cinematic + native audio" },
-    { id: "kling-v3-pro", name: "Kling 3.0 Pro",      tokens: 20, desc: "1080p cinematic + native audio" },
-    { id: "veo3-fast",    name: "Veo 3.1 Fast",        tokens: 15, desc: "Google AI + native audio" },
+    { id: "kling-v3-std", name: "Kling 3.0 Standard", tokens: 15, desc: t("s2v.models.klingStd") },
+    { id: "kling-v3-pro", name: "Kling 3.0 Pro",      tokens: 20, desc: t("s2v.models.klingPro") },
+    { id: "veo3-fast",    name: "Veo 3.1 Fast",        tokens: 15, desc: t("s2v.models.veoFast") },
   ];
 
   const VT_LANGUAGES = [
     "English", "Arabic", "Bulgarian", "Chinese", "Dutch", "French", "German", "Hindi",
     "Italian", "Japanese", "Korean", "Polish", "Portuguese", "Russian", "Spanish", "Turkish",
   ];
+  // Values stay HeyGen's English names; labels use the browser's names in the interface language
+  const VT_CODES: Record<string, string> = { English: "en", Arabic: "ar", Bulgarian: "bg", Chinese: "zh", Dutch: "nl", French: "fr", German: "de", Hindi: "hi", Italian: "it", Japanese: "ja", Korean: "ko", Polish: "pl", Portuguese: "pt", Russian: "ru", Spanish: "es", Turkish: "tr" };
+  const languageNames = typeof Intl.DisplayNames === "function" ? new Intl.DisplayNames([locale], { type: "language" }) : null;
+  const vtLabel = (lang: string) => { const name = languageNames?.of(VT_CODES[lang] ?? "") ?? lang; return name.charAt(0).toLocaleUpperCase(locale) + name.slice(1); };
   const VT_MAX_BYTES = 500 * 1024 * 1024;
   const VT_MAX_SECONDS = 600; // 10 minute processing timeout
 
   const modules: Module[] = [
-    { id: "text_to_video",   title: "Text to Video",    desc: "Generate cinematic videos from text descriptions", badge: "Most Popular" },
-    { id: "image_to_video",  title: "Image to Video",   desc: "Animate any still image into a stunning video",    badge: "" },
-    { id: "ugc_ad",          title: "UGC Ad Creator",   desc: "AI avatar testimonial and product review videos",  badge: "Best for Ads" },
-    { id: "ai_actor",        title: "AI Actor",         desc: "Create photorealistic AI human avatars",           badge: "" },
-    { id: "voice",           title: "Voice Generation", desc: "Natural AI voiceovers for videos",                 badge: "" },
-    { id: "text_to_image",   title: "Text to Image",    desc: "Generate images from text or reference photo",     badge: "2 Tokens" },
-    { id: "script_to_video", title: "Script to Video",  desc: "Turn a script into multiple video scenes with audio", badge: "New" },
-    { id: "video_remix",     title: "Video Remix",      desc: "Restyle, recreate or recast any video",           badge: "New" },
-    { id: "ai_actor_swap",   title: "AI Actor Swap",    desc: "Give any video a new face, language and voice",   badge: "New" },
-    { id: "series_cloner",   title: "Series Cloner",    desc: "Extract a viral series formula and make your own", badge: "New" },
-    { id: "video_translator", title: "AI Video Translator", desc: "Translate any video into another language with lip-sync", badge: "New" },
-    { id: "image_ad",        title: "Image Ad",         desc: "Scroll-stopping image advertisements",             badge: "Cheapest" },
-    { id: "prompt",          title: "Prompt Expander",  desc: "Transform simple ideas into cinematic prompts",    badge: "Free" },
-    { id: "script",          title: "Script Writer",    desc: "Generate viral video scripts with AI",             badge: "Free" },
+    { id: "text_to_video",   title: t("cards.text_to_video.title"),    desc: t("cards.text_to_video.desc"), badge: t("badges.mostPopular") },
+    { id: "image_to_video",  title: t("cards.image_to_video.title"),   desc: t("cards.image_to_video.desc"),    badge: "" },
+    { id: "ugc_ad",          title: t("cards.ugc_ad.title"),   desc: t("cards.ugc_ad.desc"),  badge: t("badges.bestForAds") },
+    { id: "ai_actor",        title: t("cards.ai_actor.title"),         desc: t("cards.ai_actor.desc"),           badge: "" },
+    { id: "voice",           title: t("cards.voice.title"), desc: t("cards.voice.desc"),                 badge: "" },
+    { id: "text_to_image",   title: t("cards.text_to_image.title"),    desc: t("cards.text_to_image.desc"),     badge: t("badges.twoTokens") },
+    { id: "script_to_video", title: t("cards.script_to_video.title"),  desc: t("cards.script_to_video.desc"), badge: t("badges.new") },
+    { id: "video_remix",     title: t("cards.video_remix.title"),      desc: t("cards.video_remix.desc"),           badge: t("badges.new") },
+    { id: "ai_actor_swap",   title: t("cards.ai_actor_swap.title"),    desc: t("cards.ai_actor_swap.desc"),   badge: t("badges.new") },
+    { id: "series_cloner",   title: t("cards.series_cloner.title"),    desc: t("cards.series_cloner.desc"), badge: t("badges.new") },
+    { id: "faceless_reels",  title: t("cards.faceless_reels.title"),   desc: t("cards.faceless_reels.desc"), badge: t("badges.new") },
+    { id: "video_translator", title: t("cards.video_translator.title"), desc: t("cards.video_translator.desc"), badge: t("badges.new") },
+    { id: "image_ad",        title: t("cards.image_ad.title"),         desc: t("cards.image_ad.desc"),             badge: t("badges.cheapest") },
+    { id: "prompt",          title: t("cards.prompt.title"),  desc: t("cards.prompt.desc"),    badge: t("badges.free") },
+    { id: "script",          title: t("cards.script.title"),    desc: t("cards.script.desc"),             badge: t("badges.free") },
   ];
 
   // AI Video Translator only shows once HeyGen is enabled in Admin > AI Providers
@@ -143,7 +157,8 @@ function Studio() {
     (mod.id !== "video_translator" || enabledKeys["heygen_enabled"] === true) &&
     (mod.id !== "video_remix" || enabledKeys["video_remix_enabled"] === true) &&
     (mod.id !== "ai_actor_swap" || enabledKeys["ai_actor_swap_enabled"] === true) &&
-    (mod.id !== "series_cloner" || enabledKeys["series_cloner_enabled"] === true));
+    (mod.id !== "series_cloner" || enabledKeys["series_cloner_enabled"] === true) &&
+    (mod.id !== "faceless_reels" || enabledKeys["faceless_reels_enabled"] === true));
 
   const visibleModels = ALL_MODELS.filter((m) => isModelVisible(m, enabledKeys));
 
@@ -201,11 +216,11 @@ function Studio() {
   };
 
   const getStatusMsg = (e: number) => {
-    if (e < 10) return "Initializing AI models...";
-    if (e < 30) return "Analyzing your prompt...";
-    if (e < 60) return "Generating video frames...";
-    if (e < 120) return "Rendering cinematic details...";
-    return "Almost ready, finalizing...";
+    if (e < 10) return t("progress.init");
+    if (e < 30) return t("progress.analyzing");
+    if (e < 60) return t("progress.frames");
+    if (e < 120) return t("progress.rendering");
+    return t("progress.finalizing");
   };
 
   const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -231,73 +246,73 @@ function Studio() {
 
   // ---- PROMPT EXPANDER ----
   const handleExpandPrompt = async () => {
-    if (!prompt) { setError("Please enter a simple idea to expand."); return; }
+    if (!prompt) { setError(t("errors.enterIdea")); return; }
     setExpandLoading(true); setError(""); setExpandedPrompt("");
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { setError("Please sign in."); setExpandLoading(false); return; }
+      if (!session) { setError(t("errors.signIn")); setExpandLoading(false); return; }
       const res = await fetch("/api/expand-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
         body: JSON.stringify({ idea: prompt, aspect_ratio: aspectRatio, language: outputLang.language, accent: outputLang.accent }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Failed to expand prompt."); setExpandLoading(false); return; }
+      if (!res.ok) { setError(data.error ?? t("errors.expandFailed")); setExpandLoading(false); return; }
       setExpandedPrompt(data.prompt);
-    } catch { setError("Something went wrong."); }
+    } catch { setError(t("errors.generic")); }
     setExpandLoading(false);
   };
 
   // ---- SCRIPT WRITER ----
   const handleWriteScript = async () => {
-    if (!scriptTopic) { setError("Please enter a topic."); return; }
+    if (!scriptTopic) { setError(t("errors.enterTopic")); return; }
     setScriptLoading(true); setError(""); setGeneratedScript("");
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { setError("Please sign in."); setScriptLoading(false); return; }
+      if (!session) { setError(t("errors.signIn")); setScriptLoading(false); return; }
       const res = await fetch("/api/write-script", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
         body: JSON.stringify({ topic: scriptTopic, format: scriptFormat, platform: scriptPlatform, duration: scriptDuration, language: outputLang.language, accent: outputLang.accent }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Failed to write script."); setScriptLoading(false); return; }
+      if (!res.ok) { setError(data.error ?? t("errors.scriptFailed")); setScriptLoading(false); return; }
       setGeneratedScript(data.script);
-    } catch { setError("Something went wrong."); }
+    } catch { setError(t("errors.generic")); }
     setScriptLoading(false);
   };
 
   // ---- SCRIPT TO VIDEO: Split into scenes ----
   const handleSplitScenes = async () => {
-    if (!s2vScript.trim()) { setError("Please enter or paste your script."); return; }
+    if (!s2vScript.trim()) { setError(t("errors.enterScript")); return; }
     setS2vSplitting(true); setError(""); setS2vScenes([]);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { setError("Please sign in."); setS2vSplitting(false); return; }
+      if (!session) { setError(t("errors.signIn")); setS2vSplitting(false); return; }
       const res = await fetch("/api/script-to-scenes", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
         body: JSON.stringify({ script: s2vScript, aspect_ratio: s2vAspectRatio, model_description: s2vModelDesc || undefined, scene_styles: s2vSceneStyles }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Failed to split script."); setS2vSplitting(false); return; }
+      if (!res.ok) { setError(data.error ?? t("errors.splitFailed")); setS2vSplitting(false); return; }
       setS2vScenes(data.scenes.map((s: Scene) => ({ ...s, status: "pending" })));
       setS2vStep("review");
-    } catch { setError("Something went wrong."); }
+    } catch { setError(t("errors.generic")); }
     setS2vSplitting(false);
   };
 
   // ---- SCRIPT TO VIDEO: Generate all scenes ----
   const handleGenerateScenes = async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setError("Please sign in."); return; }
+    if (!session) { setError(t("errors.signIn")); return; }
 
     const modelData = AUDIO_MODELS.find(m => m.id === s2vModel);
     const tokenCostPerScene = tokenPricing[s2vModel] ?? modelData?.tokens ?? 15;
     const totalCost = tokenCostPerScene * s2vScenes.length;
 
     if (tokenBalance < totalCost) {
-      setError(`Insufficient tokens. Need ${totalCost} tokens for ${s2vScenes.length} scenes. You have ${tokenBalance}.`);
+      setError(t("errors.insufficientScenes", { cost: totalCost, scenes: s2vScenes.length, balance: tokenBalance }));
       return;
     }
 
@@ -418,10 +433,10 @@ function Studio() {
     if (!file) return;
     setError(""); setVtFile(null); setVtDuration(0);
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-    if (!["mp4", "mov", "webm"].includes(ext)) { setError("Please upload an MP4, MOV or WebM video."); return; }
-    if (file.size > VT_MAX_BYTES) { setError("Video is too large. Maximum size is 500MB."); return; }
+    if (!["mp4", "mov", "webm"].includes(ext)) { setError(t("errors.videoFormat")); return; }
+    if (file.size > VT_MAX_BYTES) { setError(t("errors.videoTooLarge")); return; }
     const seconds = await readVideoDuration(file);
-    if (!seconds) { setError("Couldn't read this video's length. Try converting it to MP4."); return; }
+    if (!seconds) { setError(t("errors.videoLength")); return; }
     setVtFile(file); setVtDuration(seconds);
   };
 
@@ -432,24 +447,24 @@ function Studio() {
       let attempts = 0;
       const poll = setInterval(async () => {
         attempts++;
-        if (attempts > maxAttempts) { clearInterval(poll); resolve({ videoUrl: null, reason: "Translation timed out." }); return; }
+        if (attempts > maxAttempts) { clearInterval(poll); resolve({ videoUrl: null, reason: t("errors.translationTimeout") }); return; }
         try {
           const sr = await fetch(`/api/video-status?task_id=${encodeURIComponent(taskId)}&provider=heygen`);
           const sd = await sr.json();
           if (sd.completed && sd.video_url) { clearInterval(poll); resolve({ videoUrl: sd.video_url, reason: "" }); }
-          else if (sd.failed) { clearInterval(poll); resolve({ videoUrl: null, reason: sd.fail_reason ?? "Translation failed." }); }
+          else if (sd.failed) { clearInterval(poll); resolve({ videoUrl: null, reason: sd.fail_reason ?? t("errors.translationFailed") }); }
         } catch { /* continue polling */ }
       }, 10000);
     });
   };
 
   const handleTranslateVideo = async () => {
-    if (!vtFile || !vtDuration) { setError("Please upload a video."); return; }
-    if (vtSourceLang === vtTargetLang) { setError("Target language must be different from the source language."); return; }
+    if (!vtFile || !vtDuration) { setError(t("errors.uploadVideo")); return; }
+    if (vtSourceLang === vtTargetLang) { setError(t("errors.sameLanguage")); return; }
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setError("Please sign in."); return; }
+    if (!session) { setError(t("errors.signIn")); return; }
     const cost = vtTokenCost;
-    if (tokenBalance < cost) { setError(`Insufficient tokens. Need ${cost} tokens. You have ${tokenBalance}.`); return; }
+    if (tokenBalance < cost) { setError(t("errors.insufficient", { cost, balance: tokenBalance })); return; }
 
     setError(""); setVtVideoUrl(null); setVtElapsed(0); setVtStep("uploading");
 
@@ -471,7 +486,7 @@ function Studio() {
       setTokenBalance(charge.balance);
 
       const uploadedUrl = await uploadImage(vtFile);
-      if (!uploadedUrl) { await refund("Video upload failed."); return; }
+      if (!uploadedUrl) { await refund(t("errors.videoUploadFailed")); return; }
 
       setVtStep("translating");
       const res = await fetch("/api/translate-video", {
@@ -480,7 +495,7 @@ function Studio() {
         body: JSON.stringify({ video_url: uploadedUrl, source_language: vtSourceLang, target_language: vtTargetLang, charge_id: chargeId }),
       });
       const data = await res.json() as { task_id?: string; error?: string };
-      if (!res.ok || !data.task_id) { await refund(data.error ?? "Failed to start translation."); return; }
+      if (!res.ok || !data.task_id) { await refund(data.error ?? t("errors.translationStart")); return; }
 
       const result = await pollForTranslation(data.task_id);
       if (!result.videoUrl) { await refund(result.reason); return; }
@@ -502,6 +517,7 @@ function Studio() {
               duration: String(Math.round(vtDuration)),
               model: "HeyGen Translate",
               provider: "heygen",
+              settings: { from: vtSourceLang, to: vtTargetLang },
               charge_id: chargeId,
             }),
           });
@@ -509,19 +525,20 @@ function Studio() {
       } catch (e) { console.error("Save error:", e); }
     } catch (e) {
       console.error("Video translation error:", e);
-      if (charged) await refund("Something went wrong.");
-      else { setError("Something went wrong."); setVtStep("input"); }
+      if (charged) await refund(t("errors.generic"));
+      else { setError(t("errors.generic")); setVtStep("input"); }
     }
   };
 
   // ---- IMAGE GENERATION ----
   const handleGenerateImage = async () => {
+    const isAd = activeModule === "image_ad";
     setLoading(true); setError(""); setVideoUrl(null); setProgress(0);
     const tokenCostImg = tokenPricing["text_to_image"] ?? 2;
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { setError("Please sign in."); setLoading(false); return; }
-      const charge = await chargeTokens(tokenCostImg, "text_to_image");
+      if (!session) { setError(t("errors.signIn")); setLoading(false); return; }
+      const charge = await chargeTokens(tokenCostImg, isAd ? "image_ad" : "text_to_image");
       if (!charge.ok) { setError(charge.error); setLoading(false); return; }
       setTokenBalance(charge.balance);
       const chargeId = charge.chargeId;
@@ -529,9 +546,9 @@ function Studio() {
       let refImageUrl = imageUrlInput;
       if (imageFile && !useUrl) { const uploaded = await uploadImage(imageFile); if (uploaded) refImageUrl = uploaded; }
       const imgAspectRatio = aspectRatio === "9:16" ? "2:3" : aspectRatio === "1:1" ? "1:1" : "3:2";
-      const res = await fetch("/api/generate-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, image_url: refImageUrl || undefined, aspect_ratio: imgAspectRatio, charge_id: chargeId, language: outputLang.language, accent: outputLang.accent }) });
+      const res = await fetch("/api/generate-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, image_url: refImageUrl || undefined, aspect_ratio: imgAspectRatio, charge_id: chargeId, language: outputLang.language, accent: outputLang.accent, ...(isAd ? { purpose: "ad", headline: adHeadline.trim() || undefined } : {}) }) });
       const data = await res.json() as { task_id?: string; error?: string };
-      if (!res.ok || !data.task_id) { setLoading(false); await imgRefund(data.error ?? "Failed to start generation."); return; }
+      if (!res.ok || !data.task_id) { setLoading(false); await imgRefund(data.error ?? t("errors.startFailed")); return; }
       let generationComplete = false;
       const poll = setInterval(async () => {
         try {
@@ -542,24 +559,24 @@ function Studio() {
             setVideoUrl(sd.video_url); setProgress(100); setLoading(false); clearInterval(poll);
             try {
               const { data: { session: fs } } = await supabase.auth.getSession();
-              if (fs) { await fetch("/api/generations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + fs.access_token }, body: JSON.stringify({ type: "text_to_image", prompt, image_url: sd.video_url, output_type: "image", status: "completed", tokens_used: tokenCostImg, charge_id: chargeId, language: outputLang.language, accent: outputLang.accent }) }); }
+              if (fs) { await fetch("/api/generations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + fs.access_token }, body: JSON.stringify({ type: isAd ? "image_ad" : "text_to_image", prompt, image_url: sd.video_url, output_type: "image", status: "completed", tokens_used: tokenCostImg, charge_id: chargeId, model: isAd ? "Image Ad · gpt-image-1.5" : "gpt-image-1.5", language: outputLang.language, accent: outputLang.accent, source_image_url: refImageUrl || undefined }) }); }
             } catch (e) { console.error("Save error:", e); }
           } else if (sd.failed) {
             setLoading(false); clearInterval(poll);
-            await imgRefund("Generation failed.");
+            await imgRefund(t("errors.generationFailed"));
           }
         } catch (e) { console.error("Poll error:", e); }
       }, 5000);
       void generationComplete;
-    } catch (e) { setError("Something went wrong."); setLoading(false); }
+    } catch (e) { setError(t("errors.generic")); setLoading(false); }
   };
 
   // ---- VIDEO GENERATION ----
   const handleGenerate = async () => {
-    if (!prompt) { setError("Please enter a prompt."); return; }
-    if (activeModule === "text_to_image") { await handleGenerateImage(); return; }
+    if (!prompt) { setError(t("errors.enterPrompt")); return; }
+    if (activeModule === "text_to_image" || activeModule === "image_ad") { await handleGenerateImage(); return; }
     const needsImage = activeModule === "image_to_video" || activeModule === "ugc_ad";
-    if (needsImage && !imageFile && !imageUrlInput) { setError("Please upload an image or enter an image URL."); return; }
+    if (needsImage && !imageFile && !imageUrlInput) { setError(t("errors.needImage")); return; }
     setLoading(true); setError(""); setVideoUrl(null); setProgress(0);
     const modelData = ALL_MODELS.find((m) => m.id === selectedModel);
     const tokenCost = tokenPricing[selectedModel] ?? modelData?.tokens ?? 10;
@@ -567,7 +584,7 @@ function Studio() {
     tokenCostRef.current = tokenCost; providerRef.current = provider;
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { setError("Please sign in."); setLoading(false); return; }
+      if (!session) { setError(t("errors.signIn")); setLoading(false); return; }
       const charge = await chargeTokens(tokenCost, activeModule ?? "text_to_video");
       if (!charge.ok) { setError(charge.error); setLoading(false); return; }
       setTokenBalance(charge.balance);
@@ -576,7 +593,7 @@ function Studio() {
       let imageUrl = imageUrlInput;
       if (needsImage && imageFile && !useUrl) {
         const uploaded = await uploadImage(imageFile);
-        if (!uploaded) { setLoading(false); await videoRefund("Image upload failed. Try URL instead."); return; }
+        if (!uploaded) { setLoading(false); await videoRefund(t("errors.imageUploadFailed")); return; }
         imageUrl = uploaded;
       }
       const capturedModule = activeModuleRef.current;
@@ -587,7 +604,7 @@ function Studio() {
       const useAudio = modelData?.hasSound === true;
       const res = await fetch("/api/generate-video", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, mode: capturedMode, image_url: imageUrl || undefined, duration: String(duration), aspect_ratio: aspectRatio, model: selectedModel, with_audio: useAudio, charge_id: chargeId, language: outputLang.language, accent: outputLang.accent }) });
       const data = await res.json() as { task_id?: string; error?: string; provider?: string };
-      if (!res.ok || !data.task_id) { setLoading(false); await videoRefund(data.error ?? "Failed to start generation."); return; }
+      if (!res.ok || !data.task_id) { setLoading(false); await videoRefund(data.error ?? t("errors.startFailed")); return; }
       const genProvider = data.provider ?? capturedProvider;
       let timedOut = false; let generationComplete = false; let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
       const poll = setInterval(async () => {
@@ -597,19 +614,19 @@ function Studio() {
           if (sd.completed && sd.video_url) {
             if (timedOut) return; generationComplete = true; clearTimeout(timeoutHandle);
             setVideoUrl(sd.video_url); setProgress(100); setLoading(false); clearInterval(poll);
-            try { const { data: { session: fs } } = await supabase.auth.getSession(); if (fs) { await fetch("/api/generations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + fs.access_token }, body: JSON.stringify({ type: capturedModule, prompt, video_url: sd.video_url, status: "completed", tokens_used: capturedCost, duration, aspect_ratio: aspectRatio, model: capturedModel, charge_id: chargeId, language: outputLang.language, accent: outputLang.accent }) }); } } catch (e) { console.error("Save error:", e); }
+            try { const { data: { session: fs } } = await supabase.auth.getSession(); if (fs) { await fetch("/api/generations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + fs.access_token }, body: JSON.stringify({ type: capturedModule, prompt, video_url: sd.video_url, status: "completed", tokens_used: capturedCost, duration, aspect_ratio: aspectRatio, model: capturedModel, charge_id: chargeId, language: outputLang.language, accent: outputLang.accent, source_image_url: imageUrl || undefined }) }); } } catch (e) { console.error("Save error:", e); }
           } else if (sd.failed) {
             setLoading(false); clearInterval(poll);
-            await videoRefund("Generation failed.");
+            await videoRefund(t("errors.generationFailed"));
           }
         } catch (e) { console.error("Poll error:", e); }
       }, 5000);
       const timeoutMs = ["veo3-fast", "veo3-quality", "sora-2", "seedance-2", "seedance-2-fast"].includes(selectedModel) ? 600000 : 300000;
       timeoutHandle = setTimeout(async () => {
         if (generationComplete) return; timedOut = true; clearInterval(poll); setLoading(false);
-        await videoRefund("Generation timed out.");
+        await videoRefund(t("errors.timedOut"));
       }, timeoutMs);
-    } catch (e) { setError("Something went wrong."); setLoading(false); }
+    } catch (e) { setError(t("errors.generic")); setLoading(false); }
   };
 
   const handleDownload = async (url: string, isImg = false) => {
@@ -634,7 +651,7 @@ function Studio() {
   };
 
   const goBackToModules = () => { resetForm(); router.replace("/dashboard/studio"); };
-  const isBusy = loading || vtBusy || s2vStep === "generating" || remixBusy || swapBusy || clonerBusy;
+  const isBusy = loading || vtBusy || s2vStep === "generating" || remixBusy || swapBusy || clonerBusy || reelsBusy;
 
   // Open the module named in the URL (sidebar links) and apply any prompt or
   // template handed over from the homepage.
@@ -664,6 +681,8 @@ function Studio() {
       if (pending.model && ALL_MODELS.some((m) => m.id === pending.model)) setSelectedModel(pending.model);
       if (pending.aspect_ratio) { setAspectRatio(pending.aspect_ratio); setS2vAspectRatio(pending.aspect_ratio); }
       if (pending.duration && ["5", "8", "10", "15"].includes(pending.duration)) setDuration(pending.duration);
+      const lang = ACTOR_SWAP_LANGUAGES.find((l) => l.code === pending.language);
+      if (lang) setOutputLang({ language: lang.code, accent: lang.accents.includes(pending.accent ?? "") ? pending.accent! : lang.accents[0] });
       if (target !== urlModule) router.replace(studioHref(target));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -673,9 +692,11 @@ function Studio() {
   const durationMultiplier = duration === "5" ? 1 : duration === "8" ? 1.6 : duration === "10" ? 2 : duration === "15" ? 3 : 1;
   const baseTokens = tokenPricing[selectedModel] ?? currentModel?.tokens ?? 10;
   const tokenCost = Math.ceil(baseTokens * durationMultiplier);
-  const needsImage = activeModule === "image_to_video" || activeModule === "ugc_ad" || activeModule === "text_to_image";
+  const needsImage = activeModule === "image_to_video" || activeModule === "ugc_ad" || activeModule === "text_to_image" || activeModule === "image_ad";
   const showModels = activeModule === "text_to_video" || activeModule === "image_to_video" || activeModule === "ugc_ad" || activeModule === "ai_actor";
-  const isImageModule = activeModule === "text_to_image";
+  // Image Ad and Text to Image both produce images (Image Ad adds ad framing and an optional headline)
+  const isImageModule = activeModule === "text_to_image" || activeModule === "image_ad";
+  const isImageAd = activeModule === "image_ad";
   const isPromptModule = activeModule === "prompt";
   const isScriptModule = activeModule === "script";
   const isS2VModule = activeModule === "script_to_video";
@@ -683,6 +704,7 @@ function Studio() {
   const isRemixModule = activeModule === "video_remix";
   const isSwapModule = activeModule === "ai_actor_swap";
   const isClonerModule = activeModule === "series_cloner";
+  const isReelsModule = activeModule === "faceless_reels";
 
   // Charged per minute of source video, prorated, with a minimum of one minute's worth
   const vtTokensPerMinute = tokenPricing["video_translation"] ?? 20;
@@ -697,20 +719,20 @@ function Studio() {
     <div className={"space-y-4 mx-auto " + (activeModule ? "max-w-2xl" : "max-w-5xl")}>
       {!activeModule && (
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">What do you want to create?</h1>
-          <p className="text-ink-muted text-sm mt-1">Every plan includes every tool.</p>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("pickerTitle")}</h1>
+          <p className="text-ink-muted text-sm mt-1">{t("pickerSubtitle")}</p>
         </div>
       )}
 
-      <div className="bg-surface border border-line rounded-xl p-3 pl-4 flex items-center justify-between gap-3">
+      <div className="bg-surface border border-line rounded-xl p-3 ps-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <Coins size={18} className="text-accent-text flex-shrink-0" aria-hidden />
           <div className="min-w-0">
-            <p className="text-ink font-medium text-sm">{tokenBalance} tokens</p>
-            {activeModule && <p className="text-ink-subtle text-xs truncate">{isVTModule ? `Video Translator · ${vtTokensPerMinute} tokens per minute` : isSwapModule ? "AI Actor Swap · billed per second of video" : isClonerModule ? "Series Cloner" : `${currentModel?.name ?? ""} · ${tokenCost} tokens`}</p>}
+            <p className="text-ink font-medium text-sm">{c("tokens", { count: tokenBalance })}</p>
+            {activeModule && <p className="text-ink-subtle text-xs truncate">{isVTModule ? t("header.translator", { rate: vtTokensPerMinute }) : isSwapModule ? t("header.actorSwap") : isClonerModule ? t("cards.series_cloner.title") : isReelsModule ? t("cards.faceless_reels.title") : t("header.model", { model: currentModel?.name ?? "", cost: tokenCost })}</p>}
           </div>
         </div>
-        <a href="/dashboard/billing" className="inline-flex items-center h-9 px-4 rounded-lg bg-accent hover:bg-accent-hover text-white text-sm font-medium transition-colors flex-shrink-0">Top up</a>
+        <a href="/dashboard/billing" className="inline-flex items-center h-9 px-4 rounded-lg bg-accent hover:bg-accent-hover text-white text-sm font-medium transition-colors flex-shrink-0">{t("topUp")}</a>
       </div>
 
       {!activeModule && (
@@ -718,7 +740,7 @@ function Studio() {
           {visibleModules.map((mod) => {
             const Icon = getStudioModule(mod.id)?.icon;
             return (
-              <button key={mod.id} onClick={() => router.push(studioHref(mod.id as StudioModuleId))} className="text-left bg-surface border border-line rounded-2xl p-4 hover:border-line-strong hover:bg-raised transition-colors">
+              <button key={mod.id} onClick={() => router.push(studioHref(mod.id as StudioModuleId))} className="text-start bg-surface border border-line rounded-2xl p-4 hover:border-line-strong hover:bg-raised transition-colors">
                 <div className="flex items-start justify-between gap-2 mb-3">
                   {Icon && <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent/15 text-accent-text"><Icon size={20} aria-hidden /></span>}
                   {mod.badge && <span className="bg-white/[0.06] text-ink-muted text-[11px] font-medium px-2 py-0.5 rounded-full">{mod.badge}</span>}
@@ -735,43 +757,43 @@ function Studio() {
       {isPromptModule && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <button onClick={goBackToModules} className="inline-flex items-center gap-1 h-9 pl-2 pr-3 rounded-lg border border-line bg-raised text-ink text-sm hover:border-line-strong transition-colors"><ChevronLeft size={16} aria-hidden /> All tools</button>
-            <h2 className="font-semibold text-base">Prompt Expander</h2>
+            <button onClick={goBackToModules} className="inline-flex items-center gap-1 h-9 ps-2 pe-3 rounded-lg border border-line bg-raised text-ink text-sm hover:border-line-strong transition-colors"><ChevronLeft size={16} className="rtl:-scale-x-100" aria-hidden /> {c("allTools")}</button>
+            <h2 className="font-semibold text-base">{t("cards.prompt.title")}</h2>
           </div>
           <div className="bg-surface border border-line rounded-2xl p-5 space-y-5">
             <div className="bg-accent/[0.07] border border-accent/25 rounded-xl p-3.5">
-              <p className="text-accent-text text-xs font-semibold mb-1">Free — no tokens required</p>
-              <p className="text-ink-muted text-xs">Type a simple idea and AI transforms it into a detailed cinematic prompt.</p>
+              <p className="text-accent-text text-xs font-semibold mb-1">{t("freeNoTokens")}</p>
+              <p className="text-ink-muted text-xs">{t("expander.intro")}</p>
             </div>
             <div>
-              <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Your simple idea</label>
-              <textarea placeholder="e.g. cat playing piano, sunset over mountains, product showcase..." value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-3 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm resize-none" />
+              <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">{t("expander.idea")}</label>
+              <textarea placeholder={t("expander.ideaPlaceholder")} value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-3 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm resize-none" />
             </div>
             <PromptTranslateBanner text={prompt} onTextChange={setPrompt} target={outputLang} />
-            <LanguageAccentSelector label="Output Language & Accent" value={outputLang} onChange={setOutputLang} />
+            <LanguageAccentSelector label={t("outputLanguage")} value={outputLang} onChange={setOutputLang} />
             <div>
-              <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Target Format</label>
+              <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">{t("expander.format")}</label>
               <select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
-                <option value="16:9">16:9 YouTube / Widescreen</option>
-                <option value="9:16">9:16 TikTok / Reels / Shorts</option>
-                <option value="1:1">1:1 Square Feed</option>
+                <option value="16:9">{t("expander.formatWide")}</option>
+                <option value="9:16">{t("expander.formatVertical")}</option>
+                <option value="1:1">{t("expander.formatSquare")}</option>
               </select>
             </div>
             {error && <p className="text-red-400 text-sm">{error}</p>}
             <button onClick={handleExpandPrompt} disabled={expandLoading} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition">
-              {expandLoading ? "Expanding..." : "Expand Prompt — Free"}
+              {expandLoading ? t("expander.expanding") : t("expander.submit")}
             </button>
             {expandedPrompt && (
               <div className="space-y-3">
                 <div className="bg-canvas border border-line rounded-xl p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-emerald-400 text-xs font-semibold">Expanded Prompt</p>
-                    <button onClick={() => navigator.clipboard.writeText(expandedPrompt)} className="text-ink-muted hover:text-white text-xs transition">Copy</button>
+                    <p className="text-emerald-400 text-xs font-semibold">{t("expander.result")}</p>
+                    <button onClick={() => navigator.clipboard.writeText(expandedPrompt)} className="text-ink-muted hover:text-white text-xs transition">{t("copy")}</button>
                   </div>
                   <p className="text-ink text-sm leading-relaxed">{expandedPrompt}</p>
                 </div>
                 <button onClick={() => { setPrompt(expandedPrompt); setActiveModule("text_to_video"); setExpandedPrompt(""); router.replace(studioHref("text_to_video")); }} className="w-full bg-raised hover:bg-raised-hover border border-line text-white font-semibold py-2.5 rounded-xl transition text-sm">
-                  Use this prompt to generate a video →
+                  {t("expander.useIt")}
                 </button>
               </div>
             )}
@@ -783,61 +805,61 @@ function Studio() {
       {isScriptModule && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <button onClick={goBackToModules} className="inline-flex items-center gap-1 h-9 pl-2 pr-3 rounded-lg border border-line bg-raised text-ink text-sm hover:border-line-strong transition-colors"><ChevronLeft size={16} aria-hidden /> All tools</button>
-            <h2 className="font-semibold text-base">Script Writer</h2>
+            <button onClick={goBackToModules} className="inline-flex items-center gap-1 h-9 ps-2 pe-3 rounded-lg border border-line bg-raised text-ink text-sm hover:border-line-strong transition-colors"><ChevronLeft size={16} className="rtl:-scale-x-100" aria-hidden /> {c("allTools")}</button>
+            <h2 className="font-semibold text-base">{t("cards.script.title")}</h2>
           </div>
           <div className="bg-surface border border-line rounded-2xl p-5 space-y-5">
             <div className="bg-accent/[0.07] border border-accent/25 rounded-xl p-3.5">
-              <p className="text-accent-text text-xs font-semibold mb-1">Free — no tokens required</p>
-              <p className="text-ink-muted text-xs">AI writes a complete viral script with hook, body, and call to action.</p>
+              <p className="text-accent-text text-xs font-semibold mb-1">{t("freeNoTokens")}</p>
+              <p className="text-ink-muted text-xs">{t("writer.intro")}</p>
             </div>
             <div>
-              <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Video Topic</label>
-              <textarea placeholder="e.g. 5 signs your gut health is ruined, how I made $10k with AI..." value={scriptTopic} onChange={(e) => setScriptTopic(e.target.value)} rows={3} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-3 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm resize-none" />
+              <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">{t("writer.topic")}</label>
+              <textarea placeholder={t("writer.topicPlaceholder")} value={scriptTopic} onChange={(e) => setScriptTopic(e.target.value)} rows={3} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-3 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm resize-none" />
             </div>
             <PromptTranslateBanner text={scriptTopic} onTextChange={setScriptTopic} target={outputLang} />
-            <LanguageAccentSelector label="Output Language & Accent" value={outputLang} onChange={setOutputLang} />
+            <LanguageAccentSelector label={t("outputLanguage")} value={outputLang} onChange={setOutputLang} />
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Platform</label>
+                <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">{t("writer.platform")}</label>
                 <select value={scriptPlatform} onChange={(e) => setScriptPlatform(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
                   <option value="tiktok">TikTok</option>
-                  <option value="instagram">Instagram Reels</option>
-                  <option value="youtube">YouTube Shorts</option>
+                  <option value="instagram">{t("writer.instagram")}</option>
+                  <option value="youtube">{t("writer.youtube")}</option>
                   <option value="facebook">Facebook</option>
                 </select>
               </div>
               <div>
-                <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Video Length</label>
+                <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">{t("writer.length")}</label>
                 <select value={scriptDuration} onChange={(e) => setScriptDuration(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
-                  <option value="15">15 seconds</option>
-                  <option value="30">30 seconds</option>
-                  <option value="60">60 seconds</option>
-                  <option value="90">90 seconds</option>
+                  <option value="15">{t("sec15")}</option>
+                  <option value="30">{t("sec30")}</option>
+                  <option value="60">{t("sec60")}</option>
+                  <option value="90">{t("sec90")}</option>
                 </select>
               </div>
             </div>
             <div>
-              <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Script Style</label>
+              <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">{t("writer.style")}</label>
               <select value={scriptFormat} onChange={(e) => setScriptFormat(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
-                <option value="storytelling">Storytelling</option>
-                <option value="educational">Educational / How-to</option>
-                <option value="listicle">Listicle (Top 5...)</option>
-                <option value="what-if">What If / Hypothetical</option>
-                <option value="ugc">UGC / Testimonial</option>
-                <option value="motivation">Motivational</option>
+                <option value="storytelling">{t("writer.storytelling")}</option>
+                <option value="educational">{t("writer.educational")}</option>
+                <option value="listicle">{t("writer.listicle")}</option>
+                <option value="what-if">{t("writer.whatIf")}</option>
+                <option value="ugc">{t("writer.ugc")}</option>
+                <option value="motivation">{t("writer.motivation")}</option>
               </select>
             </div>
             {error && <p className="text-red-400 text-sm">{error}</p>}
             <button onClick={handleWriteScript} disabled={scriptLoading} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition">
-              {scriptLoading ? "Writing Script..." : "Write Script — Free"}
+              {scriptLoading ? t("writer.writing") : t("writer.submit")}
             </button>
             {generatedScript && (
               <div className="space-y-3">
                 <div className="bg-canvas border border-line rounded-xl p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-emerald-400 text-xs font-semibold">Your Script</p>
-                    <button onClick={() => navigator.clipboard.writeText(generatedScript)} className="text-ink-muted hover:text-white text-xs transition">Copy</button>
+                    <p className="text-emerald-400 text-xs font-semibold">{t("writer.result")}</p>
+                    <button onClick={() => navigator.clipboard.writeText(generatedScript)} className="text-ink-muted hover:text-white text-xs transition">{t("copy")}</button>
                   </div>
                   <pre className="text-ink text-xs leading-relaxed whitespace-pre-wrap">{generatedScript}</pre>
                 </div>
@@ -845,7 +867,7 @@ function Studio() {
                   onClick={() => { setS2vScript(generatedScript); setActiveModule("script_to_video"); setGeneratedScript(""); router.replace(studioHref("script_to_video")); }}
                   className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 rounded-xl transition text-sm"
                 >
-                  Turn this script into a video →
+                  {t("writer.toVideo")}
                 </button>
               </div>
             )}
@@ -857,10 +879,10 @@ function Studio() {
       {isS2VModule && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <button onClick={goBackToModules} className="inline-flex items-center gap-1 h-9 pl-2 pr-3 rounded-lg border border-line bg-raised text-ink text-sm hover:border-line-strong transition-colors"><ChevronLeft size={16} aria-hidden /> All tools</button>
-            <h2 className="font-semibold text-base">Script to Video</h2>
+            <button onClick={goBackToModules} className="inline-flex items-center gap-1 h-9 ps-2 pe-3 rounded-lg border border-line bg-raised text-ink text-sm hover:border-line-strong transition-colors"><ChevronLeft size={16} className="rtl:-scale-x-100" aria-hidden /> {c("allTools")}</button>
+            <h2 className="font-semibold text-base">{t("cards.script_to_video.title")}</h2>
             {s2vStep !== "input" && (
-              <div className="ml-auto flex gap-2">
+              <div className="ms-auto flex gap-2">
                 {["input", "review", "generating", "done"].map((step, i) => (
                   <div key={step} className={"w-2 h-2 rounded-full " + (["input", "review", "generating", "done"].indexOf(s2vStep) >= i ? "bg-purple-500" : "bg-raised-hover")} />
                 ))}
@@ -872,32 +894,32 @@ function Studio() {
           {s2vStep === "input" && (
             <div className="bg-surface border border-line rounded-2xl p-5 space-y-5">
               <div className="bg-accent/[0.07] border border-accent/25 rounded-xl p-3.5">
-                <p className="text-accent-text text-xs font-semibold mb-1">How it works</p>
-                <p className="text-ink-muted text-xs">Paste your script → AI splits it into 3-5 scenes → Review visual prompts → Generate all videos with native audio</p>
+                <p className="text-accent-text text-xs font-semibold mb-1">{t("howItWorks")}</p>
+                <p className="text-ink-muted text-xs">{t("s2v.howItWorksDesc")}</p>
               </div>
               <div>
-                <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Your Script</label>
+                <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">{t("writer.result")}</label>
                 <textarea
-                  placeholder="Paste your script here, or write it directly. AI will split it into scenes automatically..."
+                  placeholder={t("s2v.scriptPlaceholder")}
                   value={s2vScript} onChange={(e) => setS2vScript(e.target.value)} rows={8}
                   className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-3 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm resize-none"
                 />
               </div>
               <div>
-                <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Video Format</label>
+                <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">{t("s2v.format")}</label>
                 <select value={s2vAspectRatio} onChange={(e) => setS2vAspectRatio(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
-                  <option value="9:16">9:16 TikTok / Reels (Recommended)</option>
-                  <option value="16:9">16:9 YouTube</option>
-                  <option value="1:1">1:1 Square Feed</option>
+                  <option value="9:16">{t("s2v.formatVertical")}</option>
+                  <option value="16:9">{t("s2v.formatWide")}</option>
+                  <option value="1:1">{t("expander.formatSquare")}</option>
                 </select>
               </div>
               <div className="border border-line rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-white text-xs font-semibold">Model / Creator Photo</p>
-                    <p className="text-ink-subtle text-xs">Optional — upload a photo to use the same person in all scenes</p>
+                    <p className="text-white text-xs font-semibold">{t("s2v.photoTitle")}</p>
+                    <p className="text-ink-subtle text-xs">{t("s2v.photoDesc")}</p>
                   </div>
-                  <span className="text-ink-subtle text-xs">Optional</span>
+                  <span className="text-ink-subtle text-xs">{t("optional")}</span>
                 </div>
                 <input type="file" accept="image/*" ref={s2vPhotoRef} onChange={async (e) => {
                   const file = e.target.files?.[0];
@@ -909,37 +931,37 @@ function Studio() {
                     setS2vModelPhoto(uploaded);
                   } else {
                     setS2vModelPhoto("");
-                    setError("Photo upload failed. Please try again.");
+                    setError(t("errors.photoUploadFailed"));
                   }
                 }} className="hidden" />
                 {s2vModelPhoto === "uploading" ? (
                   <div className="flex items-center gap-3">
                     <div className="w-16 h-16 rounded-xl bg-raised animate-pulse" />
-                    <p className="text-ink-muted text-xs">Uploading photo...</p>
+                    <p className="text-ink-muted text-xs">{t("s2v.uploadingPhoto")}</p>
                   </div>
                 ) : s2vModelPhoto ? (
                   <div className="flex items-center gap-3">
-                    <img src={s2vModelPhoto} alt="Model" className="w-16 h-16 rounded-xl object-cover" />
+                    <img src={s2vModelPhoto} alt={t("s2v.modelAlt")} className="w-16 h-16 rounded-xl object-cover" />
                     <div>
-                      <p className="text-emerald-400 text-xs font-semibold mb-1">Photo uploaded</p>
-                      <button onClick={() => { setS2vModelPhoto(""); setS2vModelPhotoFile(null); }} className="text-ink-subtle hover:text-white text-xs transition">Remove</button>
+                      <p className="text-emerald-400 text-xs font-semibold mb-1">{t("s2v.photoUploaded")}</p>
+                      <button onClick={() => { setS2vModelPhoto(""); setS2vModelPhotoFile(null); }} className="text-ink-subtle hover:text-white text-xs transition">{t("remove")}</button>
                     </div>
                   </div>
                 ) : (
                   <button onClick={() => s2vPhotoRef.current?.click()} className="w-full border border-dashed border-line-strong hover:border-accent/60 bg-canvas rounded-xl p-4 text-center transition">
-                    <p className="text-ink-muted text-xs font-semibold">Click to upload model photo</p>
-                    <p className="text-ink-subtle text-xs mt-1">JPG, PNG — face clearly visible</p>
+                    <p className="text-ink-muted text-xs font-semibold">{t("s2v.uploadPhoto")}</p>
+                    <p className="text-ink-subtle text-xs mt-1">{t("s2v.photoHint")}</p>
                   </button>
                 )}
                 <div>
-                  <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Describe your model (helps AI stay consistent)</label>
-                  <input type="text" placeholder="e.g. Young African woman, natural hair, warm smile, casual style" value={s2vModelDesc} onChange={(e) => setS2vModelDesc(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-xs" />
+                  <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">{t("s2v.describeModel")}</label>
+                  <input type="text" placeholder={t("s2v.describePlaceholder")} value={s2vModelDesc} onChange={(e) => setS2vModelDesc(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-xs" />
                 </div>
               </div>
 
               {error && <p className="text-red-400 text-sm">{error}</p>}
               <button onClick={handleSplitScenes} disabled={s2vSplitting} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition">
-                {s2vSplitting ? "AI is analyzing your script..." : "Split into Scenes →"}
+                {s2vSplitting ? t("s2v.analyzing") : t("s2v.split")}
               </button>
             </div>
           )}
@@ -949,18 +971,18 @@ function Studio() {
             <div className="space-y-4">
               <div className="bg-surface border border-line rounded-2xl p-5 space-y-5">
                 <div>
-                  <p className="text-white font-semibold text-sm mb-1">AI found {s2vScenes.length} scenes</p>
-                  <p className="text-ink-muted text-xs">Review and edit the visual prompts before generating. Each scene is 5 seconds.</p>
+                  <p className="text-white font-semibold text-sm mb-1">{t("s2v.found", { count: s2vScenes.length })}</p>
+                  <p className="text-ink-muted text-xs">{t("s2v.reviewHint")}</p>
                 </div>
                 <div className="space-y-3">
                   {s2vScenes.map((scene, i) => (
                     <div key={i} className="bg-canvas border border-line rounded-xl p-4">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="bg-purple-600 text-white text-xs font-semibold w-6 h-6 rounded-full flex items-center justify-center">{scene.scene_number}</span>
-                        <span className="text-ink-muted text-xs font-semibold">Scene {scene.scene_number}</span>
+                        <span className="text-ink-muted text-xs font-semibold">{t("s2v.scene", { number: scene.scene_number })}</span>
                       </div>
-                      <p className="text-ink-muted text-xs mb-2 italic">"{scene.narration}"</p>
-                      <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Visual Prompt (editable)</label>
+                      <p className="text-ink-muted text-xs mb-2 italic">&ldquo;{scene.narration}&rdquo;</p>
+                      <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">{t("s2v.visualPrompt")}</label>
                       <textarea
                         value={scene.visual_prompt}
                         onChange={(e) => {
@@ -972,10 +994,10 @@ function Studio() {
                         className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition resize-none"
                       />
                       <div className="mt-2">
-                        <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Scene Style Override (optional)</label>
+                        <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">{t("s2v.styleOverride")}</label>
                         <input
                           type="text"
-                          placeholder="e.g. red dress, braided hair, outdoor garden"
+                          placeholder={t("s2v.stylePlaceholder")}
                           value={s2vSceneStyles[scene.scene_number] || ""}
                           onChange={(e) => setS2vSceneStyles({ ...s2vSceneStyles, [scene.scene_number]: e.target.value })}
                           className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-xs"
@@ -986,18 +1008,18 @@ function Studio() {
                 </div>
 
                 <div>
-                  <label className="text-ink-muted text-[13px] font-medium mb-2 block">AI Model (audio models only)</label>
+                  <label className="text-ink-muted text-[13px] font-medium mb-2 block">{t("s2v.modelLabel")}</label>
                   <div className="grid grid-cols-1 gap-2">
                     {AUDIO_MODELS.map((model) => (
                       <button key={model.id} onClick={() => setS2vModel(model.id)}
-                        className={"p-3 rounded-xl border text-left transition " + (s2vModel === model.id ? "border-accent bg-accent/10" : "border-line bg-surface hover:border-line-strong")}
+                        className={"p-3 rounded-xl border text-start transition " + (s2vModel === model.id ? "border-accent bg-accent/10" : "border-line bg-surface hover:border-line-strong")}
                       >
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="font-semibold text-xs">{model.name}</div>
                             <div className="text-ink-subtle text-xs">{model.desc}</div>
                           </div>
-                          <div className="text-accent-text text-xs font-semibold">{tokenPricing[model.id] ?? model.tokens} tokens/scene</div>
+                          <div className="text-accent-text text-xs font-semibold">{t("s2v.perScene", { count: tokenPricing[model.id] ?? model.tokens })}</div>
                         </div>
                       </button>
                     ))}
@@ -1006,33 +1028,33 @@ function Studio() {
 
                 {s2vModelPhoto && (
                   <div className="bg-emerald-500/[0.07] border border-emerald-500/25 rounded-xl p-3 flex items-center gap-3">
-                    <img src={s2vModelPhoto} alt="Model" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                    <img src={s2vModelPhoto} alt={t("s2v.modelAlt")} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
                     <div>
-                      <p className="text-emerald-400 text-xs font-semibold">Model photo active</p>
-                      <p className="text-ink-subtle text-xs">Your model will appear in all scenes</p>
+                      <p className="text-emerald-400 text-xs font-semibold">{t("s2v.photoActive")}</p>
+                      <p className="text-ink-subtle text-xs">{t("s2v.photoActiveDesc")}</p>
                     </div>
                   </div>
                 )}
                 <div>
-                  <label className="text-ink-muted text-[13px] font-medium mb-2 block">Scene Duration</label>
+                  <label className="text-ink-muted text-[13px] font-medium mb-2 block">{t("s2v.duration")}</label>
                   <select value={s2vSceneDuration} onChange={(e) => setS2vSceneDuration(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
-                    <option value="5">5 seconds — short hook</option>
-                    <option value="8">8 seconds — standard</option>
-                    <option value="10">10 seconds — recommended for dialogue</option>
-                    <option value="15">15 seconds — long dialogue (Kling 3.0 only)</option>
+                    <option value="5">{t("s2v.d5")}</option>
+                    <option value="8">{t("s2v.d8")}</option>
+                    <option value="10">{t("s2v.d10")}</option>
+                    <option value="15">{t("s2v.d15")}</option>
                   </select>
                 </div>
                 <div className="bg-amber-500/[0.07] border border-amber-500/25 rounded-xl p-3">
-                  <p className="text-amber-300 text-xs font-semibold">Total cost: {s2vTotalTokens} tokens</p>
-                  <p className="text-ink-subtle text-xs">{s2vScenes.length} scenes × {s2vTokensPerScene} tokens each • You have {tokenBalance} tokens</p>
+                  <p className="text-amber-300 text-xs font-semibold">{t("totalCost", { count: s2vTotalTokens })}</p>
+                  <p className="text-ink-subtle text-xs">{t("s2v.costBreakdown", { scenes: s2vScenes.length, each: s2vTokensPerScene, balance: tokenBalance })}</p>
                 </div>
 
                 {error && <p className="text-red-400 text-sm">{error}</p>}
 
                 <div className="grid grid-cols-2 gap-3">
-                  <button onClick={() => setS2vStep("input")} className="bg-raised hover:bg-raised-hover border border-line text-white font-semibold py-3 rounded-xl transition text-sm">← Edit Script</button>
+                  <button onClick={() => setS2vStep("input")} className="bg-raised hover:bg-raised-hover border border-line text-white font-semibold py-3 rounded-xl transition text-sm">{t("s2v.editScript")}</button>
                   <button onClick={handleGenerateScenes} disabled={tokenBalance < s2vTotalTokens} className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition text-sm">
-                    Generate {s2vScenes.length} Videos →
+                    {t("s2v.generateAll", { count: s2vScenes.length })}
                   </button>
                 </div>
               </div>
@@ -1043,8 +1065,8 @@ function Studio() {
           {s2vStep === "generating" && (
             <div className="bg-surface border border-line rounded-2xl p-6 space-y-5">
               <div className="text-center">
-                <h3 className="font-semibold mb-1">Generating Your Videos</h3>
-                <p className="text-ink-muted text-sm">Scene {s2vCurrentScene + 1} of {s2vScenes.length} — please keep this page open</p>
+                <h3 className="font-semibold mb-1">{t("s2v.generatingTitle")}</h3>
+                <p className="text-ink-muted text-sm">{t("s2v.progress", { current: s2vCurrentScene + 1, total: s2vScenes.length })}</p>
               </div>
               <div className="space-y-3">
                 {s2vScenes.map((scene, i) => (
@@ -1063,12 +1085,12 @@ function Studio() {
                       (scene.status === "done" ? "text-emerald-400" :
                        scene.status === "generating" ? "text-purple-400" :
                        scene.status === "failed" ? "text-red-400" : "text-ink-subtle")}>
-                      {scene.status === "done" ? "Done" : scene.status === "generating" ? "Generating..." : scene.status === "failed" ? "Failed" : "Waiting"}
+                      {scene.status === "done" ? t("status.done") : scene.status === "generating" ? t("status.generating") : scene.status === "failed" ? t("status.failed") : t("status.waiting")}
                     </span>
                   </div>
                 ))}
               </div>
-              <p className="text-ink-subtle text-xs text-center">Each scene takes 1-3 minutes. Do not close this page.</p>
+              <p className="text-ink-subtle text-xs text-center">{t("s2v.sceneTime")}</p>
             </div>
           )}
 
@@ -1076,33 +1098,33 @@ function Studio() {
           {s2vStep === "done" && (
             <div className="space-y-4">
               <div className="bg-emerald-500/[0.07] border border-emerald-500/25 rounded-xl p-4">
-                <p className="text-emerald-400 font-semibold mb-1">All scenes generated</p>
-                <p className="text-ink-muted text-xs">Your videos have been saved to the Gallery. Download each scene below.</p>
+                <p className="text-emerald-400 font-semibold mb-1">{t("s2v.allDone")}</p>
+                <p className="text-ink-muted text-xs">{t("s2v.allDoneDesc")}</p>
               </div>
               <div className="space-y-4">
                 {s2vScenes.map((scene, i) => (
                   <div key={i} className="bg-surface border border-line rounded-xl overflow-hidden">
                     <div className="px-4 py-2 border-b border-line flex items-center justify-between">
-                      <span className="text-xs font-semibold text-accent-text">Scene {scene.scene_number}</span>
+                      <span className="text-xs font-semibold text-accent-text">{t("s2v.scene", { number: scene.scene_number })}</span>
                       {scene.status === "done" && scene.video_url && (
-                        <button onClick={() => handleDownload(scene.video_url!)} className="text-purple-400 hover:text-white text-xs transition font-semibold">Download</button>
+                        <button onClick={() => handleDownload(scene.video_url!)} className="text-purple-400 hover:text-white text-xs transition font-semibold">{t("download")}</button>
                       )}
-                      {scene.status === "failed" && <span className="text-red-400 text-xs">Failed</span>}
+                      {scene.status === "failed" && <span className="text-red-400 text-xs">{t("status.failed")}</span>}
                     </div>
                     {scene.status === "done" && scene.video_url ? (
                       <video src={scene.video_url} controls playsInline className="w-full" />
                     ) : (
-                      <div className="p-4 text-center text-ink-subtle text-sm">Generation failed for this scene</div>
+                      <div className="p-4 text-center text-ink-subtle text-sm">{t("s2v.sceneFailed")}</div>
                     )}
                     <div className="px-4 py-2">
-                      <p className="text-ink-subtle text-xs italic">"{scene.narration}"</p>
+                      <p className="text-ink-subtle text-xs italic">&ldquo;{scene.narration}&rdquo;</p>
                     </div>
                   </div>
                 ))}
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => { setS2vStep("input"); setS2vScenes([]); setS2vScript(""); }} className="bg-raised hover:bg-raised-hover border border-line text-white font-semibold py-3 rounded-xl transition text-sm">New Script</button>
-                <button onClick={goBackToModules} className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-xl transition text-sm">Back to Studio</button>
+                <button onClick={() => { setS2vStep("input"); setS2vScenes([]); setS2vScript(""); }} className="bg-raised hover:bg-raised-hover border border-line text-white font-semibold py-3 rounded-xl transition text-sm">{t("s2v.newScript")}</button>
+                <button onClick={goBackToModules} className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-xl transition text-sm">{t("backToStudio")}</button>
               </div>
             </div>
           )}
@@ -1113,22 +1135,22 @@ function Studio() {
       {isVTModule && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            {!vtBusy && <button onClick={goBackToModules} className="inline-flex items-center gap-1 h-9 pl-2 pr-3 rounded-lg border border-line bg-raised text-ink text-sm hover:border-line-strong transition-colors"><ChevronLeft size={16} aria-hidden /> All tools</button>}
-            <h2 className="font-semibold text-base">AI Video Translator</h2>
+            {!vtBusy && <button onClick={goBackToModules} className="inline-flex items-center gap-1 h-9 ps-2 pe-3 rounded-lg border border-line bg-raised text-ink text-sm hover:border-line-strong transition-colors"><ChevronLeft size={16} className="rtl:-scale-x-100" aria-hidden /> {c("allTools")}</button>}
+            <h2 className="font-semibold text-base">{t("cards.video_translator.title")}</h2>
           </div>
 
           {settingsLoaded && enabledKeys["heygen_enabled"] !== true && vtStep === "input" && (
             <div className="bg-surface border border-line rounded-xl p-6 text-center">
-              <p className="text-ink font-medium mb-1">Video Translator isn&apos;t available yet</p>
-              <p className="text-ink-muted text-sm">It&apos;s coming soon. In the meantime, try another tool.</p>
+              <p className="text-ink font-medium mb-1">{t("vt.unavailable")}</p>
+              <p className="text-ink-muted text-sm">{t("vt.unavailableDesc")}</p>
             </div>
           )}
 
           {settingsLoaded && enabledKeys["heygen_enabled"] === true && vtStep === "input" && (
             <div className="bg-surface border border-line rounded-2xl p-5 space-y-5">
               <div className="bg-accent/[0.07] border border-accent/25 rounded-xl p-3.5">
-                <p className="text-accent-text text-xs font-semibold mb-1">How it works</p>
-                <p className="text-ink-muted text-xs">Upload a video → pick a language → AI translates the speech, clones the voice and lip-syncs the speaker. {vtTokensPerMinute} tokens per minute of video.</p>
+                <p className="text-accent-text text-xs font-semibold mb-1">{t("howItWorks")}</p>
+                <p className="text-ink-muted text-xs">{t("vt.howItWorksDesc", { rate: vtTokensPerMinute })}</p>
               </div>
               <div>
                 <input type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" ref={vtFileRef} onChange={handleVtFile} className="hidden" />
@@ -1136,39 +1158,39 @@ function Studio() {
                   {vtFile ? (
                     <div>
                       <p className="text-emerald-400 text-sm font-semibold mb-1 truncate">{vtFile.name}</p>
-                      <p className="text-ink-subtle text-xs">{formatTime(Math.round(vtDuration))} • {(vtFile.size / (1024 * 1024)).toFixed(1)}MB • Click to change</p>
+                      <p className="text-ink-subtle text-xs">{t("vt.fileInfo", { time: formatTime(Math.round(vtDuration)), size: (vtFile.size / (1024 * 1024)).toFixed(1) })}</p>
                     </div>
                   ) : (
                     <div>
-                      <p className="text-ink-muted text-sm font-semibold mb-1">Click to upload video</p>
-                      <p className="text-ink-subtle text-xs">MP4, MOV, WebM up to 500MB</p>
+                      <p className="text-ink-muted text-sm font-semibold mb-1">{t("vt.upload")}</p>
+                      <p className="text-ink-subtle text-xs">{t("vt.uploadHint")}</p>
                     </div>
                   )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Source Language</label>
+                  <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">{t("vt.source")}</label>
                   <select value={vtSourceLang} onChange={(e) => { const lang = e.target.value; setVtSourceLang(lang); if (lang === vtTargetLang) setVtTargetLang(VT_LANGUAGES.find((l) => l !== lang) ?? ""); }} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
-                    {VT_LANGUAGES.map((lang) => <option key={lang} value={lang}>{lang}</option>)}
+                    {VT_LANGUAGES.map((lang) => <option key={lang} value={lang}>{vtLabel(lang)}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Target Language</label>
+                  <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">{t("vt.target")}</label>
                   <select value={vtTargetLang} onChange={(e) => setVtTargetLang(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
-                    {VT_LANGUAGES.filter((lang) => lang !== vtSourceLang).map((lang) => <option key={lang} value={lang}>{lang}</option>)}
+                    {VT_LANGUAGES.filter((lang) => lang !== vtSourceLang).map((lang) => <option key={lang} value={lang}>{vtLabel(lang)}</option>)}
                   </select>
                 </div>
               </div>
               {vtFile && (
                 <div className="bg-amber-500/[0.07] border border-amber-500/25 rounded-xl p-3">
-                  <p className="text-amber-300 text-xs font-semibold">Total cost: {vtTokenCost} tokens</p>
-                  <p className="text-ink-subtle text-xs">{(vtDuration / 60).toFixed(1)} min × {vtTokensPerMinute} tokens/min (minimum {vtTokensPerMinute}) • You have {tokenBalance} tokens</p>
+                  <p className="text-amber-300 text-xs font-semibold">{t("totalCost", { count: vtTokenCost })}</p>
+                  <p className="text-ink-subtle text-xs">{t("vt.costBreakdown", { minutes: (vtDuration / 60).toFixed(1), rate: vtTokensPerMinute, balance: tokenBalance })}</p>
                 </div>
               )}
               {error && <p className="text-red-400 text-sm">{error}</p>}
               <button onClick={handleTranslateVideo} disabled={!vtFile || vtSourceLang === vtTargetLang || tokenBalance < vtTokenCost} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition">
-                {vtFile ? `Translate Video — ${vtTokenCost} tokens` : "Translate Video"}
+                {vtFile ? t("vt.translateCost", { count: vtTokenCost }) : t("vt.translate")}
               </button>
             </div>
           )}
@@ -1176,13 +1198,13 @@ function Studio() {
           {vtBusy && (
             <div className="bg-surface border border-line rounded-2xl p-6 space-y-5">
               <div className="text-center">
-                <h3 className="font-semibold mb-1">Translating Your Video</h3>
-                <p className="text-ink-muted text-sm">{vtStep === "uploading" ? "Uploading your video..." : `Translating ${vtSourceLang} → ${vtTargetLang} with lip-sync...`}</p>
+                <h3 className="font-semibold mb-1">{t("vt.translatingTitle")}</h3>
+                <p className="text-ink-muted text-sm">{vtStep === "uploading" ? t("vt.uploading") : t("vt.translating", { from: vtLabel(vtSourceLang), to: vtLabel(vtTargetLang) })}</p>
               </div>
               <div>
                 <div className="flex items-center justify-between text-xs text-ink-subtle mb-2">
-                  <span>{Math.round(vtProgress)}% complete</span>
-                  <span>{formatTime(vtElapsed)} elapsed</span>
+                  <span>{t("percentComplete", { percent: Math.round(vtProgress) })}</span>
+                  <span>{t("elapsed", { time: formatTime(vtElapsed) })}</span>
                 </div>
                 <div className="w-full h-2 bg-white/[0.07] rounded-full overflow-hidden">
                   <div className={"h-full bg-accent rounded-full transition-all duration-1000" + (vtStep === "uploading" ? " animate-pulse" : "")} style={{ width: vtProgress + "%" }} />
@@ -1190,10 +1212,10 @@ function Studio() {
               </div>
               <div className="space-y-2">
                 {[
-                  { label: "Tokens reserved", done: true },
-                  { label: "Video uploaded", done: vtStep === "translating" },
-                  { label: "Translating speech and cloning voice", done: false },
-                  { label: "Lip-syncing and rendering", done: false },
+                  { label: t("steps.reserved"), done: true },
+                  { label: t("vt.stepUploaded"), done: vtStep === "translating" },
+                  { label: t("vt.stepSpeech"), done: false },
+                  { label: t("vt.stepLipsync"), done: false },
                 ].map((step, i) => (
                   <div key={i} className="flex items-center gap-2 text-xs">
                     <span className={step.done ? "text-emerald-400" : "text-ink-subtle"}>{step.done ? <CheckCircle2 size={15} aria-hidden /> : <Circle size={15} aria-hidden />}</span>
@@ -1201,21 +1223,21 @@ function Studio() {
                   </div>
                 ))}
               </div>
-              <p className="text-ink-subtle text-xs text-center">Keep this page open. Translation can take several minutes (up to 10). Tokens are refunded automatically if it fails.</p>
+              <p className="text-ink-subtle text-xs text-center">{t("vt.keepOpen")}</p>
             </div>
           )}
 
           {vtStep === "done" && vtVideoUrl && (
             <div className="bg-surface border border-line rounded-2xl p-5 space-y-5">
               <div className="flex items-center gap-2">
-                <span className="text-emerald-400 font-semibold">Done!</span>
-                <h3 className="font-semibold">Your {vtTargetLang} Video is Ready</h3>
+                <span className="text-emerald-400 font-semibold">{t("done")}</span>
+                <h3 className="font-semibold">{t("vt.ready", { language: vtLabel(vtTargetLang) })}</h3>
               </div>
               <video src={vtVideoUrl} controls playsInline className="w-full rounded-xl" />
-              <p className="text-ink-subtle text-xs">Saved to your Gallery.</p>
+              <p className="text-ink-subtle text-xs">{t("savedToGallery")}</p>
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => handleDownload(vtVideoUrl)} className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-xl transition text-sm">Save Video</button>
-                <button onClick={() => { setVtStep("input"); setVtVideoUrl(null); setVtElapsed(0); }} className="bg-raised hover:bg-raised-hover border border-line text-white font-semibold py-3 rounded-xl transition text-sm">Translate Another</button>
+                <button onClick={() => handleDownload(vtVideoUrl)} className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-xl transition text-sm">{t("saveVideo")}</button>
+                <button onClick={() => { setVtStep("input"); setVtVideoUrl(null); setVtElapsed(0); }} className="bg-raised hover:bg-raised-hover border border-line text-white font-semibold py-3 rounded-xl transition text-sm">{t("vt.another")}</button>
               </div>
             </div>
           )}
@@ -1259,30 +1281,42 @@ function Studio() {
         />
       )}
 
-      {activeModule && !isPromptModule && !isScriptModule && !isS2VModule && !isVTModule && !isRemixModule && !isSwapModule && !isClonerModule && !loading && !videoUrl && (
+      {isReelsModule && (
+        <FacelessReels
+          tokenBalance={tokenBalance}
+          setTokenBalance={setTokenBalance}
+          tokenPricing={tokenPricing}
+          enabledKeys={enabledKeys}
+          settingsLoaded={settingsLoaded}
+          onBack={goBackToModules}
+          onBusyChange={setReelsBusy}
+        />
+      )}
+
+      {activeModule && !isPromptModule && !isScriptModule && !isS2VModule && !isVTModule && !isRemixModule && !isSwapModule && !isClonerModule && !isReelsModule && !loading && !videoUrl && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <button onClick={goBackToModules} className="inline-flex items-center gap-1 h-9 pl-2 pr-3 rounded-lg border border-line bg-raised text-ink text-sm hover:border-line-strong transition-colors"><ChevronLeft size={16} aria-hidden /> All tools</button>
+            <button onClick={goBackToModules} className="inline-flex items-center gap-1 h-9 ps-2 pe-3 rounded-lg border border-line bg-raised text-ink text-sm hover:border-line-strong transition-colors"><ChevronLeft size={16} className="rtl:-scale-x-100" aria-hidden /> {c("allTools")}</button>
             <h2 className="font-semibold text-base">{modules.find((m) => m.id === activeModule)?.title}</h2>
           </div>
           <div className="bg-surface border border-line rounded-2xl p-5 space-y-5">
             {needsImage && (
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <button onClick={() => setUseUrl(false)} className={"px-3 py-1.5 rounded-xl text-xs font-semibold transition " + (!useUrl ? "bg-purple-600 text-white" : "bg-raised text-ink-muted")}>Upload Image</button>
-                  <button onClick={() => setUseUrl(true)} className={"px-3 py-1.5 rounded-xl text-xs font-semibold transition " + (useUrl ? "bg-purple-600 text-white" : "bg-raised text-ink-muted")}>Use URL</button>
+                  <button onClick={() => setUseUrl(false)} className={"px-3 py-1.5 rounded-xl text-xs font-semibold transition " + (!useUrl ? "bg-purple-600 text-white" : "bg-raised text-ink-muted")}>{t("gen.uploadImage")}</button>
+                  <button onClick={() => setUseUrl(true)} className={"px-3 py-1.5 rounded-xl text-xs font-semibold transition " + (useUrl ? "bg-purple-600 text-white" : "bg-raised text-ink-muted")}>{t("gen.useUrl")}</button>
                 </div>
                 {!useUrl ? (
                   <div>
                     <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageFile} className="hidden" />
                     <div onClick={() => fileInputRef.current?.click()} className="border border-dashed border-line-strong hover:border-accent/60 bg-canvas rounded-xl p-6 text-center cursor-pointer transition">
-                      {imagePreview ? <img src={imagePreview} alt="Preview" className="max-h-40 mx-auto rounded-lg object-contain" /> : <div><p className="text-ink-muted text-sm font-semibold mb-1">Click to upload image</p><p className="text-ink-subtle text-xs">JPG, PNG, WebP up to 10MB</p></div>}
+                      {imagePreview ? <img src={imagePreview} alt={t("gen.preview")} className="max-h-40 mx-auto rounded-lg object-contain" /> : <div><p className="text-ink-muted text-sm font-semibold mb-1">{t("gen.clickUpload")}</p><p className="text-ink-subtle text-xs">{t("gen.uploadHint")}</p></div>}
                     </div>
-                    {imageFile && <p className="text-emerald-400 text-xs">{imageFile.name} ready</p>}
+                    {imageFile && <p className="text-emerald-400 text-xs">{t("gen.fileReady", { name: imageFile.name })}</p>}
                   </div>
                 ) : (
                   <div>
-                    <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Image URL</label>
+                    <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">{t("gen.imageUrl")}</label>
                     <input type="url" placeholder="https://example.com/image.jpg" value={imageUrlInput} onChange={(e) => setImageUrlInput(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-3 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm" />
                   </div>
                 )}
@@ -1290,46 +1324,53 @@ function Studio() {
             )}
             {activeModule === "ugc_ad" && (
               <div className="bg-accent/[0.07] border border-accent/25 rounded-xl p-3.5">
-                <p className="text-accent-text text-xs font-semibold mb-1">UGC Ad Mode</p>
-                <p className="text-ink-muted text-xs">Upload a photo of your avatar for the most realistic AI UGC ads.</p>
+                <p className="text-accent-text text-xs font-semibold mb-1">{t("gen.ugcMode")}</p>
+                <p className="text-ink-muted text-xs">{t("gen.ugcModeDesc")}</p>
               </div>
             )}
             {isImageModule && (
               <>
                 <div className="bg-accent/[0.07] border border-accent/25 rounded-xl p-3.5">
-                  <p className="text-accent-text text-xs font-semibold mb-1">Reference Image (Optional)</p>
-                  <p className="text-ink-muted text-xs">Upload a reference image to generate variations or repurpose existing visuals.</p>
+                  <p className="text-accent-text text-xs font-semibold mb-1">{isImageAd ? t("gen.productPhoto") : t("gen.referenceImage")}</p>
+                  <p className="text-ink-muted text-xs">{isImageAd ? t("gen.productPhotoDesc") : t("gen.referenceDesc")}</p>
                 </div>
                 <div>
-                  <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Aspect Ratio</label>
+                  <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">{t("gen.aspect")}</label>
                   <select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
-                    <option value="16:9">16:9 Landscape</option>
-                    <option value="9:16">9:16 Portrait / Reels</option>
-                    <option value="1:1">1:1 Square</option>
+                    <option value="16:9">{t("gen.landscape")}</option>
+                    <option value="9:16">{t("gen.portrait")}</option>
+                    <option value="1:1">{t("gen.square")}</option>
                   </select>
                 </div>
               </>
             )}
             <div>
               <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">
-                {activeModule === "ugc_ad" ? "Describe the UGC ad scenario" : activeModule === "text_to_image" ? "Describe the image you want" : "Describe your video"}
+                {activeModule === "ugc_ad" ? t("gen.describeUgc") : isImageAd ? t("gen.describeAd") : activeModule === "text_to_image" ? t("gen.describeImage") : t("gen.describeVideo")}
               </label>
               <textarea
-                placeholder={activeModule === "ugc_ad" ? "Woman in kitchen holding product, smiling, authentic testimonial style..." : activeModule === "text_to_image" ? "A photorealistic portrait of a woman in golden hour light, cinematic, sharp details..." : "A luxury watch rotating slowly on a marble surface, golden hour lighting, cinematic 4K..."}
+                placeholder={activeModule === "ugc_ad" ? t("gen.placeholderUgc") : isImageAd ? t("gen.placeholderAd") : activeModule === "text_to_image" ? t("gen.placeholderImage") : t("gen.placeholderVideo")}
                 value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={4}
                 className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-3 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm resize-none"
               />
             </div>
+            {isImageAd && (
+              <div>
+                <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">{t("gen.headline")}</label>
+                <input type="text" maxLength={80} value={adHeadline} onChange={(e) => setAdHeadline(e.target.value)} placeholder={t("gen.headlinePlaceholder")} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-3 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm" />
+                <p className="text-ink-subtle text-xs mt-1">{t("gen.headlineHint")}</p>
+              </div>
+            )}
             <PromptTranslateBanner text={prompt} onTextChange={setPrompt} target={outputLang} />
-            <LanguageAccentSelector label="Output Language & Accent" value={outputLang} onChange={setOutputLang} />
+            <LanguageAccentSelector label={t("outputLanguage")} value={outputLang} onChange={setOutputLang} />
             {showModels && (
               <>
                 <div>
-                  <label className="text-ink-muted text-[13px] font-medium mb-2 block">AI Model</label>
+                  <label className="text-ink-muted text-[13px] font-medium mb-2 block">{t("gen.model")}</label>
                   <div className="grid grid-cols-2 gap-2">
                     {visibleModels.map((model) => (
                       <button key={model.id} onClick={() => model.available && setSelectedModel(model.id)} disabled={!model.available}
-                        className={"p-3 rounded-xl border text-left transition " + (selectedModel === model.id ? "border-accent bg-accent/10" : model.available ? "border-line bg-surface hover:border-line-strong" : "border-line/60 opacity-40 cursor-not-allowed")}
+                        className={"p-3 rounded-xl border text-start transition " + (selectedModel === model.id ? "border-accent bg-accent/10" : model.available ? "border-line bg-surface hover:border-line-strong" : "border-line/60 opacity-40 cursor-not-allowed")}
                       >
                         <div className="flex flex-wrap gap-1 mb-1">
                           {(modelBadges[model.id] ? modelBadges[model.id].split(",").map(b => b.trim()).filter(Boolean) : model.badges ?? (model.badge ? [model.badge] : [])).map((b, bi) => (
@@ -1337,41 +1378,41 @@ function Studio() {
                           ))}
                         </div>
                         <div className="font-semibold text-xs mb-0.5">{modelLabels[model.id] || model.name}</div>
-                        <div className="text-ink-subtle text-xs">{tokenPricing[model.id] ?? model.tokens} tokens — {modelDescs[model.id] || model.desc}</div>
+                        <div className="text-ink-subtle text-xs">{t("gen.modelCost", { count: tokenPricing[model.id] ?? model.tokens, desc: modelDescs[model.id] || model.desc })}</div>
                       </button>
                     ))}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Duration</label>
+                    <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">{t("gen.duration")}</label>
                     <select value={duration} onChange={(e) => setDuration(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
-                      <option value="5">5 seconds</option>
-                      <option value="8">8 seconds</option>
-                      <option value="10">10 seconds</option>
-                      {(selectedModel === "kling-v3-std" || selectedModel === "kling-v3-pro") && <option value="15">15 seconds</option>}
+                      <option value="5">{t("sec5")}</option>
+                      <option value="8">{t("sec8")}</option>
+                      <option value="10">{t("sec10")}</option>
+                      {(selectedModel === "kling-v3-std" || selectedModel === "kling-v3-pro") && <option value="15">{t("sec15")}</option>}
                     </select>
                   </div>
                   <div>
-                    <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Aspect Ratio</label>
+                    <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">{t("gen.aspect")}</label>
                     <select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
-                      <option value="16:9">16:9 YouTube</option>
-                      <option value="9:16">9:16 TikTok / Reels</option>
-                      <option value="1:1">1:1 Feed</option>
+                      <option value="16:9">{t("s2v.formatWide")}</option>
+                      <option value="9:16">{t("gen.tiktok")}</option>
+                      <option value="1:1">{t("gen.feed")}</option>
                     </select>
                   </div>
                 </div>
                 {currentModel?.hasSound && (
                   <div className="bg-emerald-500/[0.07] border border-emerald-500/25 rounded-xl px-4 py-3">
-                    <p className="text-emerald-400 text-xs font-semibold">Native audio included with {currentModel.name}</p>
-                    <p className="text-ink-subtle text-xs">Sound, dialogue and ambient audio generated automatically</p>
+                    <p className="text-emerald-400 text-xs font-semibold">{t("gen.nativeAudio", { model: currentModel.name })}</p>
+                    <p className="text-ink-subtle text-xs">{t("gen.nativeAudioDesc")}</p>
                   </div>
                 )}
               </>
             )}
             {error && <p className="text-red-400 text-sm">{error}</p>}
             <button onClick={handleGenerate} disabled={loading} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition">
-              {isImageModule ? `Generate Image — ${tokenPricing["text_to_image"] ?? 2} tokens` : `Generate — ${tokenCost} tokens`}
+              {isImageModule ? t(isImageAd ? "gen.generateAdCost" : "gen.generateImageCost", { count: tokenPricing["text_to_image"] ?? 2 }) : t("gen.generateCost", { count: tokenCost })}
             </button>
           </div>
         </div>
@@ -1380,13 +1421,13 @@ function Studio() {
       {loading && (
         <div className="bg-surface border border-line rounded-2xl p-6 space-y-5">
           <div className="text-center">
-            <h3 className="font-semibold mb-1">{isImageModule ? "Generating Your Image" : "Generating Your Video"}</h3>
+            <h3 className="font-semibold mb-1">{isImageModule ? t("gen.generatingImage") : t("gen.generatingVideo")}</h3>
             <p className="text-ink-muted text-sm">{getStatusMsg(elapsedTime)}</p>
           </div>
           <div>
             <div className="flex items-center justify-between text-xs text-ink-subtle mb-2">
-              <span>{Math.round(progress)}% complete</span>
-              <span>{formatTime(elapsedTime)} elapsed</span>
+              <span>{t("percentComplete", { percent: Math.round(progress) })}</span>
+              <span>{t("elapsed", { time: formatTime(elapsedTime) })}</span>
             </div>
             <div className="w-full h-2 bg-white/[0.07] rounded-full overflow-hidden">
               <div className="h-full bg-accent rounded-full transition-all duration-1000" style={{ width: progress + "%" }} />
@@ -1394,11 +1435,11 @@ function Studio() {
           </div>
           <div className="space-y-2">
             {[
-              { label: "AI models initialized", done: elapsedTime >= 10 },
-              { label: "Prompt analyzed", done: elapsedTime >= 30 },
-              { label: isImageModule ? "Image frames generated" : "Video frames generated", done: elapsedTime >= 60 },
-              { label: "Details rendered", done: elapsedTime >= 120 },
-              { label: isImageModule ? "Image finalized" : "Video finalized", done: !!videoUrl },
+              { label: t("steps.initialized"), done: elapsedTime >= 10 },
+              { label: t("steps.analyzed"), done: elapsedTime >= 30 },
+              { label: isImageModule ? t("steps.imageFrames") : t("steps.videoFrames"), done: elapsedTime >= 60 },
+              { label: t("steps.details"), done: elapsedTime >= 120 },
+              { label: isImageModule ? t("steps.imageFinal") : t("steps.videoFinal"), done: !!videoUrl },
             ].map((step, i) => (
               <div key={i} className="flex items-center gap-2 text-xs">
                 <span className={step.done ? "text-emerald-400" : "text-ink-subtle"}>{step.done ? <CheckCircle2 size={15} aria-hidden /> : <Circle size={15} aria-hidden />}</span>
@@ -1407,7 +1448,7 @@ function Studio() {
             ))}
           </div>
           <p className="text-ink-subtle text-xs text-center">
-            {isImageModule ? "Keep this page open. Image generation may take several minutes." : "Keep this page open. Average: 1-3 minutes."}
+            {isImageModule ? t("gen.keepOpenImage") : t("gen.keepOpenVideo")}
           </p>
         </div>
       )}
@@ -1415,17 +1456,17 @@ function Studio() {
       {videoUrl && (
         <div className="bg-surface border border-line rounded-2xl p-5 space-y-5">
           <div className="flex items-center gap-2">
-            <span className="text-emerald-400 font-semibold">Done!</span>
-            <h3 className="font-semibold">{isImageModule ? "Your Image is Ready" : "Your Video is Ready"}</h3>
+            <span className="text-emerald-400 font-semibold">{t("done")}</span>
+            <h3 className="font-semibold">{isImageModule ? t("result.imageReady") : t("result.videoReady")}</h3>
           </div>
-          {isImageModule ? <img src={videoUrl} alt="Generated image" className="w-full rounded-xl" /> : <video src={videoUrl} controls playsInline className="w-full rounded-xl" />}
+          {isImageModule ? <img src={videoUrl} alt={t("result.generatedImage")} className="w-full rounded-xl" /> : <video src={videoUrl} controls playsInline className="w-full rounded-xl" />}
           <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => handleDownload(videoUrl, isImageModule)} className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-xl transition text-sm">{isImageModule ? "Save Image" : "Save Video"}</button>
-            <button onClick={goBackToModules} className="bg-raised hover:bg-raised-hover border border-line text-white font-semibold py-3 rounded-xl transition text-sm">Generate Another</button>
+            <button onClick={() => handleDownload(videoUrl, isImageModule)} className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-xl transition text-sm">{isImageModule ? t("result.saveImage") : t("saveVideo")}</button>
+            <button onClick={goBackToModules} className="bg-raised hover:bg-raised-hover border border-line text-white font-semibold py-3 rounded-xl transition text-sm">{t("result.another")}</button>
           </div>
           <div className="bg-raised border border-line rounded-xl p-3.5">
-            <p className="text-ink text-xs font-semibold mb-1">iPhone users</p>
-            <p className="text-ink-muted text-xs">Tap and hold the {isImageModule ? "image" : "video"}, then select Save to Photos.</p>
+            <p className="text-ink text-xs font-semibold mb-1">{t("result.iphone")}</p>
+            <p className="text-ink-muted text-xs">{isImageModule ? t("result.iphoneImage") : t("result.iphoneVideo")}</p>
           </div>
         </div>
       )}

@@ -1,39 +1,46 @@
 'use client';
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
 import { Activity, ArrowRight, Bot, Clapperboard, Coins, CreditCard, Image as ImageIcon, Images, Radar, Send, Sparkles, type LucideIcon } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { Badge, ButtonLink, EmptyState, PageHeader, SectionTitle, StatCard, cardClass } from "../components/ui";
 
 export default function Dashboard() {
+  const t = useTranslations("overview");
+  const nav = useTranslations("nav");
+  const locale = useLocale();
   const [user, setUser] = useState<any>(null);
   const [tokens, setTokens] = useState(25);
-  const [stats, setStats] = useState<{ icon: LucideIcon; label: string; value: number; sub: string }[]>([
-    { icon: Clapperboard, label: "Videos generated", value: 0, sub: "0 completed" },
-    { icon: ImageIcon, label: "Images generated", value: 0, sub: "0 completed" },
-    { icon: Send, label: "Posts published", value: 0, sub: "0 this week" },
-    { icon: Radar, label: "Ads spied", value: 0, sub: "0 saved" },
-  ]);
+  const [counts, setCounts] = useState({ videos: 0, images: 0 });
+
+  const stats: { icon: LucideIcon; label: string; value: number; sub: string }[] = [
+    { icon: Clapperboard, label: t("videosGenerated"), value: counts.videos, sub: t("completed", { count: counts.videos }) },
+    { icon: ImageIcon, label: t("imagesGenerated"), value: counts.images, sub: t("completed", { count: counts.images }) },
+    { icon: Send, label: t("postsPublished"), value: 0, sub: t("thisWeek", { count: 0 }) },
+    { icon: Radar, label: t("adsSpied"), value: 0, sub: t("saved", { count: 0 }) },
+  ];
 
   const quickActions: { icon: LucideIcon; title: string; desc: string; href: string }[] = [
-    { icon: Sparkles, title: "Open Studio", desc: "Text to video, image to video, UGC ads and more", href: "/dashboard/studio" },
-    { icon: Radar, title: "Spy on ads", desc: "Find winning Facebook ads in your niche", href: "/dashboard/ad-spy" },
-    { icon: Bot, title: "Set up Autopilot", desc: "Auto-post to TikTok, IG, YouTube, Facebook and X", href: "/dashboard/autopilot" },
-    { icon: CreditCard, title: "Top up tokens", desc: "Get more credits from $5", href: "/dashboard/billing" },
-    { icon: Images, title: "Gallery", desc: "All your generated videos and images", href: "/dashboard/gallery" },
-    { icon: Activity, title: "Activity", desc: "Full history of your generations", href: "/dashboard/activity" },
+    { icon: Sparkles, title: t("openStudio"), desc: t("openStudioDesc"), href: "/dashboard/studio" },
+    { icon: Radar, title: t("spyAds"), desc: t("spyAdsDesc"), href: "/dashboard/ad-spy" },
+    { icon: Bot, title: t("setupAutopilot"), desc: t("setupAutopilotDesc"), href: "/dashboard/autopilot" },
+    { icon: CreditCard, title: t("topUpTokens"), desc: t("topUpTokensDesc"), href: "/dashboard/billing" },
+    { icon: Images, title: nav("gallery"), desc: t("galleryDesc"), href: "/dashboard/gallery" },
+    { icon: Activity, title: nav("activity"), desc: t("activityDesc"), href: "/dashboard/activity" },
   ];
 
   const taskBreakdown = [
-    { label: "Text to Video", count: 0, credits: 0 },
-    { label: "Image to Video", count: 0, credits: 0 },
-    { label: "AI Actor Generator", count: 0, credits: 0 },
-    { label: "Voice Generation", count: 0, credits: 0 },
-    { label: "Ad Spy", count: 0, credits: 0 },
+    { label: t("taskTextToVideo"), count: 0, credits: 0 },
+    { label: t("taskImageToVideo"), count: 0, credits: 0 },
+    { label: t("taskActor"), count: 0, credits: 0 },
+    { label: t("taskVoice"), count: 0, credits: 0 },
+    { label: nav("adSpy"), count: 0, credits: 0 },
   ];
 
   const weeklyUsage = [0, 0, 0, 0, 0, 0, 0];
-  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  // Monday-first weekday names in the interface language
+  const days = Array.from({ length: 7 }, (_, i) => new Date(Date.UTC(2024, 0, 1 + i)).toLocaleDateString(locale, { weekday: "short", timeZone: "UTC" }));
   const maxUsage = Math.max(...weeklyUsage, 1);
 
   useEffect(() => {
@@ -58,15 +65,10 @@ export default function Dashboard() {
         });
         const genData = await genRes.json();
         const generations = genData.generations || [];
-        const videos = generations.filter((g: any) => g.type?.includes('video')).length;
-        const images = generations.filter((g: any) => g.type?.includes('image')).length;
-
-        setStats([
-          { icon: Clapperboard, label: "Videos generated", value: videos, sub: `${videos} completed` },
-          { icon: ImageIcon, label: "Images generated", value: images, sub: `${images} completed` },
-          { icon: Send, label: "Posts published", value: 0, sub: "0 this week" },
-          { icon: Radar, label: "Ads spied", value: 0, sub: "0 saved" },
-        ]);
+        setCounts({
+          videos: generations.filter((g: any) => g.type?.includes('video')).length,
+          images: generations.filter((g: any) => g.type?.includes('image')).length,
+        });
       } catch (e) {
         console.error('Generations fetch error:', e);
       }
@@ -77,9 +79,9 @@ export default function Dashboard() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader
-        title="Welcome back"
-        description={new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        actions={<ButtonLink href="/dashboard/studio" variant="primary"><Sparkles size={16} aria-hidden /> Create</ButtonLink>}
+        title={t("welcome")}
+        description={new Date().toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        actions={<ButtonLink href="/dashboard/studio" variant="primary"><Sparkles size={16} aria-hidden /> {nav("create")}</ButtonLink>}
       />
 
       {/* TOKENS */}
@@ -87,21 +89,21 @@ export default function Dashboard() {
         <div className="flex items-center gap-4">
           <span className="grid h-11 w-11 place-items-center rounded-xl bg-accent/15 text-accent-text"><Coins size={20} aria-hidden /></span>
           <div>
-            <p className="text-2xl font-semibold tracking-tight">{tokens} <span className="text-base font-normal text-ink-muted">tokens</span></p>
-            <p className="text-sm text-ink-subtle">Available balance</p>
+            <p className="text-2xl font-semibold tracking-tight">{tokens} <span className="text-base font-normal text-ink-muted">{t("tokensUnit")}</span></p>
+            <p className="text-sm text-ink-subtle">{t("availableBalance")}</p>
           </div>
         </div>
-        <ButtonLink href="/dashboard/billing" variant="secondary">Top up</ButtonLink>
+        <ButtonLink href="/dashboard/billing" variant="secondary">{t("topUp")}</ButtonLink>
       </div>
 
       {/* FREE TRIAL BANNER */}
       {tokens === 25 && (
         <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-accent/30 bg-accent/[0.08] p-5 md:flex-row md:items-center">
           <div>
-            <div className="mb-1 flex flex-wrap items-center gap-2"><Badge tone="accent">Free trial</Badge><h3 className="font-semibold">You have 25 free tokens</h3></div>
-            <p className="text-sm text-ink-muted">Generate your first 2 AI videos for free. No credit card needed.</p>
+            <div className="mb-1 flex flex-wrap items-center gap-2"><Badge tone="accent">{t("freeTrial")}</Badge><h3 className="font-semibold">{t("freeTrialTitle")}</h3></div>
+            <p className="text-sm text-ink-muted">{t("freeTrialDesc")}</p>
           </div>
-          <ButtonLink href="/dashboard/studio" variant="primary">Generate your first video <ArrowRight size={16} aria-hidden /></ButtonLink>
+          <ButtonLink href="/dashboard/studio" variant="primary">{t("firstVideo")} <ArrowRight size={16} className="rtl:-scale-x-100" aria-hidden /></ButtonLink>
         </div>
       )}
 
@@ -109,10 +111,10 @@ export default function Dashboard() {
       {tokens <= 10 && tokens < 25 && (
         <div className="flex flex-col items-start justify-between gap-3 rounded-2xl border border-red-500/25 bg-red-500/[0.08] p-4 sm:flex-row sm:items-center">
           <div>
-            <p className="text-sm font-semibold text-red-300">Low balance: {tokens} tokens left</p>
-            <p className="text-xs text-ink-muted">Top up from $5 to keep generating.</p>
+            <p className="text-sm font-semibold text-red-300">{t("lowBalance", { count: tokens })}</p>
+            <p className="text-xs text-ink-muted">{t("lowBalanceDesc")}</p>
           </div>
-          <ButtonLink href="/dashboard/billing" variant="primary" size="sm">Top up now</ButtonLink>
+          <ButtonLink href="/dashboard/billing" variant="primary" size="sm">{t("topUpNow")}</ButtonLink>
         </div>
       )}
 
@@ -126,10 +128,10 @@ export default function Dashboard() {
       {/* CHARTS ROW */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className={`${cardClass} p-5 md:p-6`}>
-          <SectionTitle description="Successful tasks only">Credits spent (7 days)</SectionTitle>
+          <SectionTitle description={t("successfulOnly")}>{t("creditsSpent")}</SectionTitle>
           {weeklyUsage.every(v => v === 0) ? (
             <div className="flex h-32 items-center justify-center rounded-xl border border-dashed border-line text-sm text-ink-subtle">
-              No activity yet
+              {t("noActivity")}
             </div>
           ) : (
             <div className="flex h-32 items-end gap-2">
@@ -144,7 +146,7 @@ export default function Dashboard() {
         </div>
 
         <div className={`${cardClass} p-5 md:p-6`}>
-          <SectionTitle description="Credits used per feature">Task breakdown</SectionTitle>
+          <SectionTitle description={t("perFeature")}>{t("taskBreakdown")}</SectionTitle>
           <div className="space-y-3.5">
             {taskBreakdown.map((task) => (
               <div key={task.label} className="flex items-center justify-between gap-3">
@@ -153,7 +155,7 @@ export default function Dashboard() {
                   <div className="h-1.5 w-24 overflow-hidden rounded-full bg-white/[0.07]">
                     <div className="h-full rounded-full bg-accent" style={{ width: task.credits > 0 ? `${(task.credits / 100) * 100}%` : '0%' }} />
                   </div>
-                  <span className="w-16 text-right text-xs tabular-nums text-ink-subtle">{task.count} · {task.credits} cr</span>
+                  <span className="w-16 text-end text-xs tabular-nums text-ink-subtle">{t("taskCount", { count: task.count, credits: task.credits })}</span>
                 </div>
               </div>
             ))}
@@ -163,7 +165,7 @@ export default function Dashboard() {
 
       {/* QUICK ACTIONS */}
       <div>
-        <SectionTitle>Quick actions</SectionTitle>
+        <SectionTitle>{t("quickActions")}</SectionTitle>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 md:gap-4">
           {quickActions.map((action) => {
             const Icon = action.icon;
@@ -182,12 +184,12 @@ export default function Dashboard() {
 
       {/* RECENT ACTIVITY */}
       <div>
-        <SectionTitle action={<Link href="/dashboard/activity" className="text-sm font-medium text-accent-text hover:text-ink">View all</Link>}>Recent activity</SectionTitle>
+        <SectionTitle action={<Link href="/dashboard/activity" className="text-sm font-medium text-accent-text hover:text-ink">{t("viewAll")}</Link>}>{t("recentActivity")}</SectionTitle>
         <EmptyState
           icon={Clapperboard}
-          title="Nothing here yet"
-          description="Generate your first AI video and it will show up here."
-          action={<ButtonLink href="/dashboard/studio" variant="primary">Start creating</ButtonLink>}
+          title={t("emptyTitle")}
+          description={t("emptyDesc")}
+          action={<ButtonLink href="/dashboard/studio" variant="primary">{t("startCreating")}</ButtonLink>}
         />
       </div>
     </div>

@@ -2,11 +2,16 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { supabase } from "../lib/supabase";
 import AuthShell, { AuthDivider, GoogleButton, PasswordInput } from "../components/AuthShell";
 import { Alert, Button, Field, Input, Spinner, labelClass } from "../components/ui";
+import { useAuthErrorMessage } from "../lib/auth-errors";
 
 export default function Login() {
+  const t = useTranslations("login");
+  const a = useTranslations("authForm");
+  const authError = useAuthErrorMessage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -23,7 +28,7 @@ export default function Login() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      setError("Please fill in all fields.");
+      setError(a("fillAll"));
       return;
     }
 
@@ -31,20 +36,20 @@ export default function Login() {
     setError("");
 
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password
       });
 
-      if (authError) {
-        setError(authError.message);
+      if (signInError) {
+        setError(authError(signInError.message));
         return;
       }
 
       router.push('/dashboard');
 
     } catch (err) {
-      setError('Something went wrong. Please try again.');
+      setError(a("genericError"));
     } finally {
       setLoading(false);
     }
@@ -60,26 +65,26 @@ export default function Login() {
 
   return (
     <AuthShell
-      title="Welcome back"
-      subtitle="Sign in to your KlipflowAI account."
-      footer={<>Don&apos;t have an account? <Link href="/signup" className="font-medium text-accent-text hover:text-ink">Sign up free</Link></>}
+      title={t("title")}
+      subtitle={t("subtitle")}
+      footer={<>{t("noAccount")} <Link href="/signup" className="font-medium text-accent-text hover:text-ink">{t("signUpFree")}</Link></>}
     >
       <GoogleButton onClick={signInWithGoogle} />
       <AuthDivider />
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleLogin(); }}>
-        <Field label="Email">
-          <Input type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="h-11" />
+        <Field label={a("email")}>
+          <Input type="email" autoComplete="email" placeholder={a("emailPlaceholder")} value={email} onChange={(e) => setEmail(e.target.value)} className="h-11" />
         </Field>
         <div>
           <div className="mb-1.5 flex items-center justify-between">
-            <label className={labelClass + " mb-0"}>Password</label>
-            <Link href="/reset-password" className="text-xs font-medium text-accent-text hover:text-ink">Forgot password?</Link>
+            <label className={labelClass + " mb-0"}>{a("password")}</label>
+            <Link href="/reset-password" className="text-xs font-medium text-accent-text hover:text-ink">{t("forgot")}</Link>
           </div>
-          <PasswordInput autoComplete="current-password" placeholder="Your password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <PasswordInput autoComplete="current-password" placeholder={t("passwordPlaceholder")} value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
         {error && <Alert>{error}</Alert>}
         <Button type="submit" variant="primary" size="lg" disabled={loading} className="w-full">
-          {loading ? <><Spinner size={17} /> Signing in…</> : "Sign in"}
+          {loading ? <><Spinner size={17} /> {t("signingIn")}</> : t("submit")}
         </Button>
       </form>
     </AuthShell>

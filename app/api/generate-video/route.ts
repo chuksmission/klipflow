@@ -246,15 +246,12 @@ export async function POST(req: NextRequest) {
       if (isImageMode && image_url) kieInput.image_urls = [image_url];
     }
 
-    else if (model === "seedance-2") {
-      kieModelString = "bytedance/seedance-2";
-      kieInput = { prompt, generate_audio: false };
-      if (isImageMode && image_url) kieInput.first_frame_url = image_url;
-    }
-
-    else if (model === "seedance-2-fast") {
-      kieModelString = "bytedance/seedance-2-fast";
-      kieInput = { prompt, generate_audio: false };
+    // Seedance 2.0 generates native audio (Kie default true; the UI lists these
+    // models "With Audio"). Duration is an integer 4-15s.
+    else if (model === "seedance-2" || model === "seedance-2-fast") {
+      kieModelString = model === "seedance-2" ? "bytedance/seedance-2" : "bytedance/seedance-2-fast";
+      const seconds = Math.min(15, Math.max(4, parseInt(String(duration), 10) || 5));
+      kieInput = { prompt, generate_audio: true, duration: seconds, aspect_ratio };
       if (isImageMode && image_url) kieInput.first_frame_url = image_url;
     }
 

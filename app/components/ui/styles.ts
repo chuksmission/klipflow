@@ -10,13 +10,13 @@ const fieldBase =
 
 export const inputClass = `${fieldBase} h-10 px-3.5`;
 export const textareaClass = `${fieldBase} px-3.5 py-2.5 resize-none leading-relaxed`;
-export const selectClass = `${fieldBase} h-10 pl-3 pr-8`;
+export const selectClass = `${fieldBase} h-10 ps-3 pe-8`;
 
 export const cardClass = "rounded-2xl border border-line bg-surface";
 export const cardPadded = `${cardClass} p-5 md:p-6`;
 
 export const tableWrapClass = "overflow-x-auto rounded-2xl border border-line bg-surface";
-export const tableClass = "w-full text-left text-sm";
+export const tableClass = "w-full text-start text-sm";
 export const thClass = "whitespace-nowrap border-b border-line px-4 py-3 text-xs font-medium text-ink-subtle";
 export const tdClass = "border-b border-line/60 px-4 py-3 text-ink-muted";
 export const trClass = "transition-colors hover:bg-white/[0.02] [&:last-child>td]:border-b-0";

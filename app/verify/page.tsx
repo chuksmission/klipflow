@@ -2,11 +2,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Coins } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { supabase } from "../lib/supabase";
 import AuthShell from "../components/AuthShell";
 import { ButtonLink, Spinner } from "../components/ui";
 
 export default function Verify() {
+  const t = useTranslations("verify");
+  const c = useTranslations("common");
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
 
   useEffect(() => {
@@ -27,7 +30,7 @@ export default function Verify() {
 
   if (status === 'loading') {
     return (
-      <AuthShell title="Verifying your account" subtitle="This only takes a moment.">
+      <AuthShell title={t("loadingTitle")} subtitle={t("loadingSubtitle")}>
         <div className="flex justify-center py-6"><Spinner size={26} className="text-accent-text" /></div>
       </AuthShell>
     );
@@ -35,26 +38,26 @@ export default function Verify() {
 
   if (status === 'success') {
     return (
-      <AuthShell title="You're verified" subtitle="Your account is confirmed and your free tokens are ready.">
+      <AuthShell title={t("successTitle")} subtitle={t("successSubtitle")}>
         <div className="mb-6 flex items-center gap-4 rounded-xl border border-accent/30 bg-accent/10 p-4">
           <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl bg-accent text-white"><Coins size={20} aria-hidden /></span>
           <div>
-            <p className="text-lg font-semibold text-ink">25 free tokens</p>
-            <p className="text-sm text-ink-muted">Enough to generate 2 full AI videos.</p>
+            <p className="text-lg font-semibold text-ink">{t("freeTokens")}</p>
+            <p className="text-sm text-ink-muted">{t("freeTokensHint")}</p>
           </div>
         </div>
-        <ButtonLink href="/dashboard" variant="primary" size="lg" className="w-full">Go to dashboard <ArrowRight size={17} aria-hidden /></ButtonLink>
+        <ButtonLink href="/dashboard" variant="primary" size="lg" className="w-full">{c("goToDashboard")} <ArrowRight size={17} className="rtl:-scale-x-100" aria-hidden /></ButtonLink>
       </AuthShell>
     );
   }
 
   return (
     <AuthShell
-      title="Verification failed"
-      subtitle="The verification link may have expired. Try signing up again or contact support."
-      footer={<>Need help? <Link href="/contact" className="font-medium text-accent-text hover:text-ink">Contact support</Link></>}
+      title={t("failedTitle")}
+      subtitle={t("failedSubtitle")}
+      footer={<>{t("needHelp")} <Link href="/contact" className="font-medium text-accent-text hover:text-ink">{t("contactSupport")}</Link></>}
     >
-      <ButtonLink href="/signup" variant="primary" size="lg" className="w-full">Try again</ButtonLink>
+      <ButtonLink href="/signup" variant="primary" size="lg" className="w-full">{c("tryAgain")}</ButtonLink>
     </AuthShell>
   );
 }

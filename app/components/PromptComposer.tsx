@@ -1,29 +1,22 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { STUDIO_MODULES, type StudioModuleId } from "./catalog";
 
 export const COMPOSER_MODES: StudioModuleId[] = [
   "text_to_video", "ugc_ad", "image_to_video", "text_to_image", "script_to_video", "video_translator",
 ];
 
-const EXAMPLES = [
-  "A barista pours latte art in slow motion, warm morning light",
-  "Woman unboxing a skincare serum, talking to camera, UGC style",
-  "Sneaker floating over a neon city at night, cinematic 4K",
-  "Faceless reel: 3 habits of self-made millionaires",
-  "Drone shot over a tropical beach resort at golden hour",
-];
-
 // Cycles example prompts in the placeholder with a typing effect.
-function useTypewriter(active: boolean) {
+function useTypewriter(active: boolean, examples: string[]) {
   const [text, setText] = useState("");
   useEffect(() => {
     if (!active) return;
     let example = 0, chars = 0, deleting = false;
     let timer: ReturnType<typeof setTimeout>;
     const tick = () => {
-      const full = EXAMPLES[example];
+      const full = examples[example];
       if (!deleting) {
         chars++;
         setText(full.slice(0, chars));
@@ -32,13 +25,13 @@ function useTypewriter(active: boolean) {
       } else {
         chars--;
         setText(full.slice(0, chars));
-        if (chars === 0) { deleting = false; example = (example + 1) % EXAMPLES.length; timer = setTimeout(tick, 300); return; }
+        if (chars === 0) { deleting = false; example = (example + 1) % examples.length; timer = setTimeout(tick, 300); return; }
         timer = setTimeout(tick, 18);
       }
     };
     timer = setTimeout(tick, 400);
     return () => clearTimeout(timer);
-  }, [active]);
+  }, [active, examples]);
   return text;
 }
 
@@ -52,10 +45,13 @@ interface Props {
 }
 
 export default function PromptComposer({ value, onChange, mode, onModeChange, onSubmit, variant = "hero" }: Props) {
+  const t = useTranslations("composer");
+  const m = useTranslations("modules");
   const [focused, setFocused] = useState(false);
-  const typed = useTypewriter(!focused && !value);
+  const examples = t.raw("examples") as string[];
+  const typed = useTypewriter(!focused && !value, examples);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const placeholder = typed || (mode === "video_translator" ? "Upload your video in the next step…" : "Describe what you want to create…");
+  const placeholder = typed || (mode === "video_translator" ? t("placeholderUpload") : t("placeholder"));
 
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSubmit(); }
@@ -63,7 +59,7 @@ export default function PromptComposer({ value, onChange, mode, onModeChange, on
 
   if (variant === "bar") {
     return (
-      <div className="flex items-center gap-2 rounded-2xl border border-line-strong bg-raised/95 p-2 pl-4 shadow-2xl shadow-black/50 backdrop-blur-md">
+      <div className="flex items-center gap-2 rounded-2xl border border-line-strong bg-raised/95 p-2 ps-4 shadow-2xl shadow-black/50 backdrop-blur-md">
         <input
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -71,10 +67,10 @@ export default function PromptComposer({ value, onChange, mode, onModeChange, on
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholder={placeholder}
-          aria-label="Describe what you want to create"
+          aria-label={t("ariaPrompt")}
           className="min-w-0 flex-1 bg-transparent text-[15px] text-ink placeholder:text-ink-subtle focus:outline-none"
         />
-        <button onClick={onSubmit} aria-label="Start creating" className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl bg-accent text-white transition-colors hover:bg-accent-hover">
+        <button onClick={onSubmit} aria-label={t("start")} className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl bg-accent text-white transition-colors hover:bg-accent-hover">
           <ArrowUp size={18} aria-hidden />
         </button>
       </div>
@@ -91,20 +87,19 @@ export default function PromptComposer({ value, onChange, mode, onModeChange, on
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         placeholder={placeholder}
-        aria-label="Describe what you want to create"
+        aria-label={t("ariaPrompt")}
         rows={3}
         className="w-full resize-none bg-transparent px-3 pt-2 text-base text-ink placeholder:text-ink-subtle focus:outline-none md:text-lg"
       />
       <div className="flex items-end justify-between gap-3">
         <div
-          className="no-scrollbar flex min-w-0 gap-1.5 overflow-x-auto pr-6"
-          style={{ maskImage: "linear-gradient(to right, black calc(100% - 32px), transparent)", WebkitMaskImage: "linear-gradient(to right, black calc(100% - 32px), transparent)" }}
+          className="no-scrollbar flex min-w-0 gap-1.5 overflow-x-auto pe-6 [mask-image:linear-gradient(to_right,black_calc(100%-32px),transparent)] rtl:[mask-image:linear-gradient(to_left,black_calc(100%-32px),transparent)]"
           role="radiogroup"
-          aria-label="What to create"
+          aria-label={t("whatToCreate")}
         >
           {COMPOSER_MODES.map((id) => {
-            const m = STUDIO_MODULES.find((x) => x.id === id)!;
-            const Icon = m.icon;
+            const mod = STUDIO_MODULES.find((x) => x.id === id)!;
+            const Icon = mod.icon;
             const active = id === mode;
             return (
               <button
@@ -118,12 +113,12 @@ export default function PromptComposer({ value, onChange, mode, onModeChange, on
                 }
               >
                 <Icon size={15} aria-hidden className={active ? "text-accent-text" : ""} />
-                {m.title}
+                {m(`${id}.title`)}
               </button>
             );
           })}
         </div>
-        <button onClick={onSubmit} aria-label="Start creating" className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-full bg-accent text-white transition-colors hover:bg-accent-hover">
+        <button onClick={onSubmit} aria-label={t("start")} className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-full bg-accent text-white transition-colors hover:bg-accent-hover">
           <ArrowUp size={20} aria-hidden />
         </button>
       </div>

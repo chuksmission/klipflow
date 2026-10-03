@@ -71,6 +71,28 @@ export default function AdminGenerations() {
     }
   };
 
+  // What the public showcase card reveals (prompt / source image)
+  const saveVisibility = async (gen: { id: number | string; show_prompt?: boolean; show_source_image?: boolean }, patch: { show_prompt?: boolean; show_source_image?: boolean }) => {
+    setSavingId(gen.id); setError("");
+    updateLocal(gen.id, patch);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch("/api/admin/generations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
+        body: JSON.stringify({ id: gen.id, ...patch }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        updateLocal(gen.id, { show_prompt: gen.show_prompt, show_source_image: gen.show_source_image });
+        setError(/show_prompt|show_source_image/.test(String(data.error ?? "")) ? "Run supabase/showcase_details.sql first to add the visibility columns." : (data.error ?? "Couldn't save."));
+      }
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -85,7 +107,7 @@ export default function AdminGenerations() {
       </div>
 
       <div className="bg-accent/[0.08] border border-accent/25 rounded-xl p-4 text-sm text-ink">
-        Feature your best outputs to show them on the homepage. Visitors can click <span className="text-white font-medium">Use this</span> to open the Studio with the same prompt and model. Only feature content you have the rights to show publicly.
+        Feature your best outputs to show them on the homepage. Visitors can click <span className="text-white font-medium">Try it yourself</span> to open the Studio with the same module, prompt and model. Untick &quot;Show prompt publicly&quot; to hide a prompt (it&apos;s then not carried over either); prompts from upload tools like Video Remix are never shown. Only feature content you have the rights to show publicly.
       </div>
 
       {error && <p className="text-red-400 text-sm">{error}</p>}
@@ -145,6 +167,18 @@ export default function AdminGenerations() {
                           onBlur={(e) => { const v = parseInt(e.target.value, 10) || 0; if (v !== (gen.featured_sort ?? 0)) saveFeature(gen, { is_featured: true, featured_sort: v }); }}
                           className="w-20 bg-canvas border border-line hover:border-line-strong rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
                         />
+                      )}
+                      <label className="flex items-center gap-1.5 text-xs text-ink">
+                        <input type="checkbox" checked={gen.show_prompt !== false} disabled={savingId === gen.id}
+                          onChange={(e) => saveVisibility(gen, { show_prompt: e.target.checked })} className="accent-purple-600" />
+                        Show prompt publicly
+                      </label>
+                      {gen.source_image_url && (
+                        <label className="flex items-center gap-1.5 text-xs text-ink">
+                          <input type="checkbox" checked={gen.show_source_image !== false} disabled={savingId === gen.id}
+                            onChange={(e) => saveVisibility(gen, { show_source_image: e.target.checked })} className="accent-purple-600" />
+                          Show source image publicly
+                        </label>
                       )}
                     </div>
                   )}

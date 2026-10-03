@@ -37,6 +37,8 @@ export async function POST(req: NextRequest) {
     charge_id?: string;
     language?: string;
     accent?: string;
+    purpose?: string;
+    headline?: string;
   } = { prompt: "" };
 
   try {
@@ -54,7 +56,17 @@ export async function POST(req: NextRequest) {
     }
     // Text drawn into the image follows the output language (English needs no note)
     const outputLanguage = parseOutputLanguage(body.language, body.accent);
-    const prompt = outputLanguage && outputLanguage.code !== "en" ? `${rawPrompt}\n\n${imageTextInstruction(outputLanguage)}` : rawPrompt;
+    const notes: string[] = [];
+    // Image Ad: a static social ad, optionally with a headline rendered as ad typography
+    if (body.purpose === "ad") {
+      notes.push("Static advertising image for social media: scroll-stopping composition, the product or offer as the clear hero, clean uncluttered background, premium commercial lighting, crisp detail.");
+      const headline = typeof body.headline === "string" ? body.headline.trim().slice(0, 80) : "";
+      notes.push(headline
+        ? `Include this headline exactly, in bold, highly legible modern ad typography with strong contrast: "${headline.replace(/"/g, "'")}". No other text.`
+        : "Leave clear empty space for a headline; do not add any text, logos or watermarks.");
+    }
+    if (outputLanguage && outputLanguage.code !== "en") notes.push(imageTextInstruction(outputLanguage));
+    const prompt = notes.length ? `${rawPrompt}\n\n${notes.join(" ")}` : rawPrompt;
 
     // Payment: a paid, unused charge that covers this generation, or an admin
     // (admin tools spend the separate showcase balance)

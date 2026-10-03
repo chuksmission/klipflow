@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from "lucide-react";
 
 /*
@@ -49,6 +50,8 @@ const toneIcon = {
 };
 
 export function FeedbackHost() {
+  const tr = useTranslations("toast");
+  const c = useTranslations("common");
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [confirmReq, setConfirmReq] = useState<ConfirmRequest | null>(null);
   const confirmBtnRef = useRef<HTMLButtonElement>(null);
@@ -81,14 +84,14 @@ export function FeedbackHost() {
 
   return (
     <>
-      <div className="pointer-events-none fixed right-4 top-4 z-[100] flex w-[min(380px,calc(100%-2rem))] flex-col gap-2" aria-live="polite">
+      <div className="pointer-events-none fixed end-4 top-4 z-[100] flex w-[min(380px,calc(100%-2rem))] flex-col gap-2" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} role={t.tone === "error" ? "alert" : "status"}
             className="pointer-events-auto flex items-start gap-3 rounded-xl border border-line-strong bg-raised px-4 py-3 text-sm text-ink shadow-2xl shadow-black/50">
             <span className="mt-0.5 flex-shrink-0">{toneIcon[t.tone]}</span>
             <p className="min-w-0 flex-1 leading-relaxed">{t.message}</p>
-            <button onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))} aria-label="Dismiss"
-              className="-mr-1 grid h-6 w-6 flex-shrink-0 place-items-center rounded-md text-ink-subtle hover:bg-white/5 hover:text-ink">
+            <button onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))} aria-label={tr("dismiss")}
+              className="-me-1 grid h-6 w-6 flex-shrink-0 place-items-center rounded-md text-ink-subtle hover:bg-white/5 hover:text-ink">
               <X size={14} aria-hidden />
             </button>
           </div>
@@ -103,11 +106,11 @@ export function FeedbackHost() {
             {confirmReq.description && <p className="mt-2 text-sm leading-relaxed text-ink-muted">{confirmReq.description}</p>}
             <div className="mt-6 flex justify-end gap-2">
               <button onClick={() => close(false)} className="h-10 rounded-xl border border-line bg-raised px-4 text-sm font-medium text-ink transition-colors hover:border-line-strong">
-                {confirmReq.cancelLabel ?? "Cancel"}
+                {confirmReq.cancelLabel ?? c("cancel")}
               </button>
               <button ref={confirmBtnRef} onClick={() => close(true)}
                 className={"h-10 rounded-xl px-4 text-sm font-medium text-white transition-colors " + (confirmReq.destructive ? "bg-red-600 hover:bg-red-500" : "bg-accent hover:bg-accent-hover")}>
-                {confirmReq.confirmLabel ?? "Confirm"}
+                {confirmReq.confirmLabel ?? tr("confirm")}
               </button>
             </div>
           </div>

@@ -2,6 +2,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Check, Coins, CreditCard, Lock } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { supabase } from "../../lib/supabase";
 import { Alert, Badge, Button, EmptyState, PageHeader, Skeleton, Spinner, Toggle, cardClass } from "../../components/ui";
 
@@ -14,6 +15,8 @@ const TOKEN_PACKS = [
 ];
 
 function BillingContent() {
+  const t = useTranslations("billing");
+  const c = useTranslations("common");
   const [plans, setPlans] = useState<any[]>([]);
   const [tokenBalance, setTokenBalance] = useState(0);
   const [currentPlan, setCurrentPlan] = useState<string>("Free Trial");
@@ -31,8 +34,8 @@ function BillingContent() {
     fetchCurrentPlan();
     const success = searchParams.get("success");
     const cancelled = searchParams.get("cancelled");
-    if (success) { setMessage("Payment successful! Your account has been updated."); setMessageType("success"); }
-    if (cancelled) { setMessage("Payment cancelled. No charges were made."); setMessageType("warning"); }
+    if (success) { setMessage(t("paymentSuccess")); setMessageType("success"); }
+    if (cancelled) { setMessage(t("paymentCancelled")); setMessageType("warning"); }
     if (success || cancelled) setTimeout(() => setMessage(""), 5000);
   }, []);
 
@@ -88,14 +91,14 @@ function BillingContent() {
       : plan.stripe_price_id_yearly;
 
     if (!priceId) {
-      showMessage("Stripe not connected yet. Please check back soon or contact support.", "warning");
+      showMessage(t("stripeNotConnected"), "warning");
       return;
     }
 
     setCheckoutLoading(plan.id);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { showMessage("Please log in to subscribe."); return; }
+      if (!session) { showMessage(t("loginToSubscribe")); return; }
 
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
@@ -109,10 +112,10 @@ function BillingContent() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        showMessage(data.error || "Something went wrong. Please try again.");
+        showMessage(data.error || t("genericError"));
       }
     } catch (err) {
-      showMessage("Something went wrong. Please try again.");
+      showMessage(t("genericError"));
     } finally {
       setCheckoutLoading("");
     }
@@ -122,7 +125,7 @@ function BillingContent() {
     setCheckoutLoading("pack-" + pack.tokens);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { showMessage("Please log in to top up."); return; }
+      if (!session) { showMessage(t("loginToTopUp")); return; }
 
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
@@ -136,10 +139,10 @@ function BillingContent() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        showMessage(data.error || "Stripe is not configured yet. Please check back soon.", "warning");
+        showMessage(data.error || t("stripeNotConfigured"), "warning");
       }
     } catch (err) {
-      showMessage("Something went wrong. Please try again.");
+      showMessage(t("genericError"));
     } finally {
       setCheckoutLoading("");
     }
@@ -149,7 +152,7 @@ function BillingContent() {
 
   const openTopUp = () => {
     if (!isSubscriber) {
-      showMessage("Token top-up is available for subscribers only. Please subscribe to a plan first.", "warning");
+      showMessage(t("subscribersOnly"), "warning");
       setTab("plans");
       return;
     }
@@ -158,7 +161,7 @@ function BillingContent() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <PageHeader title="Billing and credits" description="Manage your plan and top up your tokens." />
+      <PageHeader title={t("title")} description={t("description")} />
 
       {message && <Alert tone={alertTone}>{message}</Alert>}
 
@@ -167,21 +170,21 @@ function BillingContent() {
         <div className={`${cardClass} p-5`}>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[13px] text-ink-muted">Current plan</p>
-              <p className="mt-1 text-xl font-semibold capitalize tracking-tight">{currentPlan}</p>
+              <p className="text-[13px] text-ink-muted">{t("currentPlan")}</p>
+              <p className="mt-1 text-xl font-semibold capitalize tracking-tight">{currentPlan === "Free Trial" ? t("freeTrial") : currentPlan === "Admin" ? t("admin") : currentPlan}</p>
             </div>
-            <Badge tone={currentPlan === "Free Trial" ? "neutral" : "accent"}>{currentPlan === "Free Trial" ? "Trial" : "Active"}</Badge>
+            <Badge tone={currentPlan === "Free Trial" ? "neutral" : "accent"}>{currentPlan === "Free Trial" ? t("trial") : t("active")}</Badge>
           </div>
         </div>
         <div className={`${cardClass} flex items-center justify-between gap-3 p-5`}>
           <div className="flex items-center gap-3">
             <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent/15 text-accent-text"><Coins size={19} aria-hidden /></span>
             <div>
-              <p className="text-[13px] text-ink-muted">Token balance</p>
+              <p className="text-[13px] text-ink-muted">{t("tokenBalance")}</p>
               <p className="text-xl font-semibold tabular-nums tracking-tight">{tokenBalance}</p>
             </div>
           </div>
-          <Button variant="secondary" size="sm" onClick={openTopUp}>Top up</Button>
+          <Button variant="secondary" size="sm" onClick={openTopUp}>{t("topUp")}</Button>
         </div>
       </div>
 
@@ -189,11 +192,11 @@ function BillingContent() {
       <div className="inline-flex rounded-xl border border-line bg-surface p-1" role="tablist">
         <button role="tab" aria-selected={tab === "plans"} onClick={() => setTab("plans")}
           className={"h-9 rounded-lg px-4 text-sm font-medium transition-colors " + (tab === "plans" ? "bg-raised text-ink" : "text-ink-muted hover:text-ink")}>
-          Plans
+          {t("plans")}
         </button>
         <button role="tab" aria-selected={tab === "topup"} onClick={openTopUp}
           className={"inline-flex h-9 items-center gap-1.5 rounded-lg px-4 text-sm font-medium transition-colors " + (tab === "topup" ? "bg-raised text-ink" : "text-ink-muted hover:text-ink")}>
-          Top up tokens {!isSubscriber && <Lock size={13} aria-label="Subscribers only" />}
+          {t("topUpTokens")} {!isSubscriber && <Lock size={13} aria-label={t("subscribersOnlyShort")} />}
         </button>
       </div>
 
@@ -201,9 +204,9 @@ function BillingContent() {
       {tab === "plans" && (
         <div className="space-y-6">
           <div className="flex items-center gap-3">
-            <Toggle checked={billing === "yearly"} onChange={() => setBilling(billing === "monthly" ? "yearly" : "monthly")} label="Bill yearly" />
-            <span className="text-sm text-ink">Bill yearly</span>
-            <Badge tone="success">Save 20%</Badge>
+            <Toggle checked={billing === "yearly"} onChange={() => setBilling(billing === "monthly" ? "yearly" : "monthly")} label={t("billYearly")} />
+            <span className="text-sm text-ink">{t("billYearly")}</span>
+            <Badge tone="success">{t("save20")}</Badge>
           </div>
 
           {plansLoading ? (
@@ -211,22 +214,22 @@ function BillingContent() {
               {[0, 1, 2].map((i) => <Skeleton key={i} className="h-80 rounded-2xl" />)}
             </div>
           ) : plans.length === 0 ? (
-            <EmptyState icon={CreditCard} title="No plans available yet" description="Check back soon." />
+            <EmptyState icon={CreditCard} title={t("noPlans")} description={t("checkBack")} />
           ) : (
             <div className="grid gap-4 md:grid-cols-3">
               {plans.map((plan) => (
                 <div key={plan.id} className={"relative flex flex-col rounded-2xl border p-6 " + (plan.is_popular ? "border-accent bg-accent/[0.07]" : "border-line bg-surface")}>
                   {plan.is_popular && (
-                    <span className="absolute -top-3 left-6 rounded-full bg-accent px-3 py-0.5 text-xs font-medium text-white">Popular</span>
+                    <span className="absolute -top-3 start-6 rounded-full bg-accent px-3 py-0.5 text-xs font-medium text-white">{t("popular")}</span>
                   )}
                   <h3 className="font-semibold">{plan.name}</h3>
                   {plan.description && <p className="mt-1 text-xs text-ink-muted">{plan.description}</p>}
                   <div className="mt-4 flex items-baseline gap-1">
                     <span className="text-3xl font-semibold tracking-tight">${billing === "monthly" ? plan.price_monthly : plan.price_yearly}</span>
-                    <span className="text-sm text-ink-muted">/mo</span>
+                    <span className="text-sm text-ink-muted">{t("perMonth")}</span>
                   </div>
-                  {billing === "yearly" && <p className="mt-1 text-xs text-ink-subtle">Billed annually</p>}
-                  <p className="mt-3 text-sm font-medium text-accent-text">{plan.tokens_per_month} tokens / month</p>
+                  {billing === "yearly" && <p className="mt-1 text-xs text-ink-subtle">{t("billedAnnually")}</p>}
+                  <p className="mt-3 text-sm font-medium text-accent-text">{t("tokensPerMonth", { count: plan.tokens_per_month })}</p>
                   {Array.isArray(plan.features) && plan.features.length > 0 && (
                     <ul className="mt-4 space-y-2">
                       {plan.features.map((feature: string, j: number) => (
@@ -243,7 +246,7 @@ function BillingContent() {
                     variant={plan.is_popular ? "primary" : "secondary"}
                     className="mt-6 w-full"
                   >
-                    {checkoutLoading === plan.id ? <><Spinner size={16} /> Processing…</> : "Get started"}
+                    {checkoutLoading === plan.id ? <><Spinner size={16} /> {t("processing")}</> : t("getStarted")}
                   </Button>
                 </div>
               ))}
@@ -255,16 +258,16 @@ function BillingContent() {
       {/* Top up tab */}
       {tab === "topup" && (
         <div className="space-y-4">
-          <p className="text-sm text-ink-muted">Tokens never expire. Use them any time for any AI generation.</p>
+          <p className="text-sm text-ink-muted">{t("neverExpire")}</p>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-5 md:gap-4">
             {TOKEN_PACKS.map((pack, i) => (
               <div key={i} className={"relative flex flex-col rounded-2xl border p-5 text-center " + ((pack as any).popular ? "border-accent bg-accent/[0.07]" : "border-line bg-surface")}>
                 {(pack as any).popular && (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-accent px-3 py-0.5 text-xs font-medium text-white">Best value</span>
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-accent px-3 py-0.5 text-xs font-medium text-white">{t("bestValue")}</span>
                 )}
                 <p className="text-2xl font-semibold tracking-tight">${pack.price}</p>
-                <p className="mt-1 text-sm font-medium text-accent-text">{pack.tokens} tokens</p>
-                <p className="mt-1 text-xs text-ink-subtle">${(pack.price / pack.tokens * 10).toFixed(1)} per 10 tokens</p>
+                <p className="mt-1 text-sm font-medium text-accent-text">{c("tokens", { count: pack.tokens })}</p>
+                <p className="mt-1 text-xs text-ink-subtle">{t("per10", { price: (pack.price / pack.tokens * 10).toFixed(1) })}</p>
                 <Button
                   onClick={() => handleTopUp(pack)}
                   disabled={checkoutLoading === "pack-" + pack.tokens}
@@ -272,14 +275,14 @@ function BillingContent() {
                   size="sm"
                   className="mt-4 w-full"
                 >
-                  {checkoutLoading === "pack-" + pack.tokens ? <Spinner size={14} /> : "Buy now"}
+                  {checkoutLoading === "pack-" + pack.tokens ? <Spinner size={14} /> : t("buyNow")}
                 </Button>
               </div>
             ))}
           </div>
           <div className={`${cardClass} p-5`}>
-            <h3 className="text-sm font-semibold">Invoice history</h3>
-            <p className="mt-1 text-sm text-ink-muted">No invoices yet. Your billing history will appear here after your first purchase.</p>
+            <h3 className="text-sm font-semibold">{t("invoiceHistory")}</h3>
+            <p className="mt-1 text-sm text-ink-muted">{t("noInvoices")}</p>
           </div>
         </div>
       )}

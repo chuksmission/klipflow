@@ -56,3 +56,30 @@ export async function speak(key: string, text: string, lang: string, accent: str
   if (!res.ok) { const e = await safeJson(res); throw new Error(e.detail?.message ?? (typeof e.detail === "string" ? e.detail : "Voice generation failed.")); }
   return new Uint8Array(await res.arrayBuffer());
 }
+
+export interface SpeechAlignment { characters: string[]; starts: number[]; ends: number[] }
+
+/** Like speak(), plus per-character timings (used to time captions to the voice). */
+export async function speakWithTimestamps(key: string, text: string, lang: string, accent: string | null, gender: VoiceGender): Promise<{ audio: Uint8Array; alignment: SpeechAlignment | null }> {
+  const voice = await pickVoice(key, lang, accent, gender);
+  const call = (voiceId: string) => fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps?output_format=mp3_44100_128`, {
+    method: "POST",
+    headers: { "xi-api-key": key, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ text, model_id: ELEVEN_V2_LANGS.has(lang) ? "eleven_multilingual_v2" : "eleven_v3" }),
+  });
+  let res = await call(voice.voice_id);
+  if (!res.ok && voice.owner) {
+    const add = await fetch(`https://api.elevenlabs.io/v1/voices/add/${voice.owner}/${voice.voice_id}`, {
+      method: "POST", headers: { "xi-api-key": key, "Content-Type": "application/json" }, body: JSON.stringify({ new_name: `KF ${voice.name}`.slice(0, 40) }),
+    });
+    const added = await safeJson(add);
+    res = await call(added.voice_id ?? voice.voice_id);
+  }
+  const data = await safeJson(res);
+  if (!res.ok || !data.audio_base64) throw new Error(data.detail?.message ?? (typeof data.detail === "string" ? data.detail : "Voice generation failed."));
+  const a = data.alignment ?? data.normalized_alignment;
+  return {
+    audio: new Uint8Array(Buffer.from(data.audio_base64, "base64")),
+    alignment: a?.characters ? { characters: a.characters, starts: a.character_start_times_seconds, ends: a.character_end_times_seconds } : null,
+  };
+}

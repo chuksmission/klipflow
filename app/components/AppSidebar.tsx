@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { House, LogOut, Sparkles } from "lucide-react";
+import { useTranslations } from "next-intl";
+import LanguageSwitcher from "./LanguageSwitcher";
 import {
   ACCOUNT_LINKS, LEARN_LINKS, LIBRARY_LINKS, STUDIO_MODULES, TOOL_LINKS,
   savePendingGeneration, studioHref, type NavLink, type StudioModuleId,
@@ -11,7 +13,7 @@ import { ButtonLink } from "./ui/Button";
 
 const CREATE_GRID: StudioModuleId[] = [
   "text_to_video", "image_to_video", "ugc_ad", "script_to_video",
-  "video_translator", "video_remix", "ai_actor_swap", "series_cloner", "ai_actor", "text_to_image", "image_ad",
+  "video_translator", "video_remix", "ai_actor_swap", "series_cloner", "faceless_reels", "ai_actor", "text_to_image", "image_ad",
 ];
 const ASSIST_LIST: StudioModuleId[] = ["script", "prompt", "voice"];
 
@@ -27,6 +29,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 function NavRow({ link, active, href, onClick }: { link: NavLink; active: boolean; href: string; onClick?: () => void }) {
+  const t = useTranslations("nav");
   const Icon = link.icon;
   return (
     <Link
@@ -39,12 +42,15 @@ function NavRow({ link, active, href, onClick }: { link: NavLink; active: boolea
       }
     >
       <Icon size={18} className={active ? "text-accent-text" : ""} aria-hidden />
-      {link.label}
+      {link.key ? t(link.key) : link.label}
     </Link>
   );
 }
 
 function ModuleLinks({ loggedIn, onNavigate }: { loggedIn: boolean; onNavigate?: () => void }) {
+  const t = useTranslations("nav");
+  const m = useTranslations("modules");
+  const c = useTranslations("common");
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const activeModule = pathname === "/dashboard/studio" ? searchParams.get("module") : null;
@@ -57,7 +63,7 @@ function ModuleLinks({ loggedIn, onNavigate }: { loggedIn: boolean; onNavigate?:
 
   return (
     <>
-      <SectionLabel>Create</SectionLabel>
+      <SectionLabel>{t("create")}</SectionLabel>
       <div className="grid grid-cols-2 gap-1.5 px-1">
         {CREATE_GRID.map((id) => {
           const mod = STUDIO_MODULES.find((m) => m.id === id)!;
@@ -70,29 +76,29 @@ function ModuleLinks({ loggedIn, onNavigate }: { loggedIn: boolean; onNavigate?:
               onClick={() => go(id)}
               aria-current={active ? "page" : undefined}
               className={
-                "relative flex flex-col items-start gap-2 rounded-xl border p-2.5 text-[13px] leading-tight transition-colors " +
+                "relative flex flex-col items-start gap-2 rounded-xl border p-2.5 text-start text-[13px] leading-tight transition-colors " +
                 (active
                   ? "border-accent/60 bg-accent/10 text-ink"
                   : "border-line bg-surface text-ink-muted hover:text-ink hover:border-line-strong")
               }
             >
               <Icon size={18} className={active ? "text-accent-text" : "text-ink"} aria-hidden />
-              <span className="font-medium">{mod.title}</span>
+              <span className="font-medium">{m(`${id}.title`)}</span>
               {mod.badge === "New" && (
-                <span className="absolute top-2 right-2 rounded-full bg-signal/15 px-1.5 text-[10px] font-medium text-signal">New</span>
+                <span className="absolute top-2 end-2 rounded-full bg-signal/15 px-1.5 text-[10px] font-medium text-signal">{c("new")}</span>
               )}
             </Link>
           );
         })}
       </div>
 
-      <SectionLabel>Write and voice</SectionLabel>
+      <SectionLabel>{t("writeVoice")}</SectionLabel>
       {ASSIST_LIST.map((id) => {
         const mod = STUDIO_MODULES.find((m) => m.id === id)!;
         return (
           <NavRow
             key={id}
-            link={{ href: hrefFor(id), label: mod.title, icon: mod.icon }}
+            link={{ href: hrefFor(id), label: m(`${id}.title`), icon: mod.icon }}
             href={hrefFor(id)}
             active={activeModule === id}
             onClick={() => go(id)}
@@ -104,6 +110,8 @@ function ModuleLinks({ loggedIn, onNavigate }: { loggedIn: boolean; onNavigate?:
 }
 
 export default function AppSidebar({ loggedIn, email, onNavigate, onSignOut }: Props) {
+  const t = useTranslations("nav");
+  const c = useTranslations("common");
   const pathname = usePathname();
   const linkHref = (l: NavLink) => (loggedIn || !l.href.startsWith("/dashboard") ? l.href : "/signup");
 
@@ -118,52 +126,53 @@ export default function AppSidebar({ loggedIn, email, onNavigate, onSignOut }: P
         </Link>
       </div>
 
-      <nav className="no-scrollbar flex-1 overflow-y-auto px-3 pb-4" aria-label="Main">
-        <NavRow link={{ href: "/", label: "Home", icon: House }} href="/" active={pathname === "/"} onClick={onNavigate} />
+      <nav className="no-scrollbar flex-1 overflow-y-auto px-3 pb-4" aria-label={c("mainNav")}>
+        <NavRow link={{ href: "/", label: "Home", key: "home", icon: House }} href="/" active={pathname === "/"} onClick={onNavigate} />
 
         <Suspense fallback={null}>
           <ModuleLinks loggedIn={loggedIn} onNavigate={onNavigate} />
         </Suspense>
 
-        <SectionLabel>Grow</SectionLabel>
+        <SectionLabel>{t("grow")}</SectionLabel>
         {TOOL_LINKS.map((l) => (
           <NavRow key={l.href} link={l} href={linkHref(l)} active={pathname === l.href} onClick={onNavigate} />
         ))}
 
         {loggedIn && (
           <>
-            <SectionLabel>Library</SectionLabel>
+            <SectionLabel>{t("library")}</SectionLabel>
             {LIBRARY_LINKS.map((l) => (
               <NavRow key={l.href} link={l} href={l.href} active={pathname === l.href} onClick={onNavigate} />
             ))}
-            <SectionLabel>Account</SectionLabel>
+            <SectionLabel>{t("account")}</SectionLabel>
             {ACCOUNT_LINKS.map((l) => (
               <NavRow key={l.href} link={l} href={l.href} active={pathname === l.href} onClick={onNavigate} />
             ))}
           </>
         )}
 
-        <SectionLabel>Learn</SectionLabel>
+        <SectionLabel>{t("learn")}</SectionLabel>
         {LEARN_LINKS.map((l) => (
           <NavRow key={l.href} link={l} href={l.href} active={pathname.startsWith(l.href)} onClick={onNavigate} />
         ))}
       </nav>
 
-      <div className="border-t border-line p-4">
+      <div className="space-y-3 border-t border-line p-4">
+        <LanguageSwitcher up block />
         {loggedIn ? (
           <div className="flex items-center justify-between gap-2">
             <span className="truncate text-xs text-ink-subtle">{email}</span>
             {onSignOut && (
               <button onClick={onSignOut} className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-ink-muted transition-colors hover:bg-white/5 hover:text-ink">
-                <LogOut size={14} aria-hidden /> Sign out
+                <LogOut size={14} className="rtl:-scale-x-100" aria-hidden /> {t("signOut")}
               </button>
             )}
           </div>
         ) : (
           <div className="rounded-xl border border-line bg-surface p-3">
-            <p className="text-sm font-medium text-ink">25 free tokens</p>
-            <p className="mb-3 text-xs text-ink-muted">No credit card required.</p>
-            <ButtonLink href="/signup" variant="primary" size="sm" className="w-full" onClick={onNavigate}>Start for free</ButtonLink>
+            <p className="text-sm font-medium text-ink">{t("freeTokens")}</p>
+            <p className="mb-3 text-xs text-ink-muted">{t("noCard")}</p>
+            <ButtonLink href="/signup" variant="primary" size="sm" className="w-full" onClick={onNavigate}>{c("startFree")}</ButtonLink>
           </div>
         )}
       </div>

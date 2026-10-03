@@ -1,5 +1,7 @@
 "use client";
+import type { SavedGeneration } from "../../lib/saved-generation";
 import { useRef, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import {
   CheckCircle2, ChevronDown, Circle, Clapperboard, Copy, Download, FileText, Film, Images, Loader2, Save, UserRound, XCircle,
 } from "lucide-react";
@@ -38,27 +40,41 @@ interface Props {
   onBusyChange: (busy: boolean) => void;
   onEpisode: (ep: EpisodeView) => void;
   onProfileSaved: (p: CharacterProfile) => void;
+  onSaved?: (g: SavedGeneration) => void;
 }
 
-const languageName = (code: string) => ACTOR_SWAP_LANGUAGES.find((l) => l.code === code)?.name ?? "English";
+// Language name in the interface language (falls back to the English name)
+function useLanguageName() {
+  const locale = useLocale();
+  const names = typeof Intl.DisplayNames === "function" ? new Intl.DisplayNames([locale], { type: "language" }) : null;
+  return (code: string) => {
+    const name = names?.of(code) ?? ACTOR_SWAP_LANGUAGES.find((l) => l.code === code)?.name ?? code;
+    return name.charAt(0).toLocaleUpperCase(locale) + name.slice(1);
+  };
+}
 
-function scriptAsText(ep: EpisodeView): string {
+type Translate = ReturnType<typeof useTranslations>;
+
+function scriptAsText(ep: EpisodeView, t: Translate): string {
   if (!ep.script) return "";
   return [
     ep.script.title,
     ...ep.script.scenes.map((s, i) => [
-      `\nScene ${i + 1}`,
-      s.on_screen_text && `On screen: ${s.on_screen_text}`,
-      s.dialogue && `${s.speaker || "Voice"}: ${s.dialogue}`,
-      `Visual: ${s.visual_prompt}`,
+      `\n${t("scene", { number: i + 1 })}`,
+      s.on_screen_text && t("onScreen", { text: s.on_screen_text }),
+      s.dialogue && `${s.speaker || t("voice")}: ${s.dialogue}`,
+      t("visual", { text: s.visual_prompt }),
     ].filter(Boolean).join("\n")),
-    `\nCaption: ${ep.script.caption}`,
+    `\n${t("caption", { text: ep.script.caption })}`,
   ].join("\n");
 }
 
 export default function SeriesEpisode({
-  formula, idea, ideaIndex, label, episodes, prices, tokenPricing, tokenBalance, setTokenBalance, enabledKeys, busy, onBusyChange, onEpisode, onProfileSaved,
+  formula, idea, ideaIndex, label, episodes, prices, tokenPricing, tokenBalance, setTokenBalance, enabledKeys, busy, onBusyChange, onEpisode, onProfileSaved, onSaved,
 }: Props) {
+  const t = useTranslations("episode");
+  const c = useTranslations("common");
+  const languageName = useLanguageName();
   const [open, setOpen] = useState(ideaIndex === 0);
   const [output, setOutput] = useState<OutputType>("storyboard");
   const [aspect, setAspect] = useState<Aspect>("9:16");
@@ -93,11 +109,12 @@ export default function SeriesEpisode({
     if (!model || !ep.script) return;
     const frames = [...ep.frames].sort((a, b) => a.index - b.index);
     if (tokenBalance < scenePrice * frames.length) {
-      setError(`Animating ${frames.length} scenes with ${model.name} costs ${scenePrice * frames.length} tokens; you have ${tokenBalance}. Your storyboard is saved, so you can animate it after topping up.`);
+      setError(t("errors.animateCost", { count: frames.length, model: model.name, cost: scenePrice * frames.length, balance: tokenBalance }));
       return;
     }
     setPhase("animating"); setCounter({ done: 0, total: frames.length });
-    const lang = languageName(ep.settings.language_code);
+    // The video model is instructed in English, so it gets the English language name
+    const lang = ACTOR_SWAP_LANGUAGES.find((l) => l.code === ep.settings.language_code)?.name ?? "English";
     const clips: (string | null)[] = new Array(frames.length).fill(null);
     let spent = 0;
 
@@ -125,7 +142,7 @@ export default function SeriesEpisode({
     }));
 
     const ready = clips.filter((c): c is string => !!c);
-    if (!ready.length) { setError("None of the scenes could be animated, so their tokens were refunded. Your storyboard is saved; try another model."); return; }
+    if (!ready.length) { setError(t("errors.noneAnimated")); return; }
 
     setPhase("joining");
     let finalUrl: string | null = null;
@@ -136,18 +153,19 @@ export default function SeriesEpisode({
     if (!finalUrl) {
       // Joining failed in this browser: deliver the first clip, keep the rest downloadable
       finalUrl = ready[0];
-      setNotice(`Your browser couldn't join the clips, so they're saved separately in your Gallery.`);
+      setNotice(t("notices.joinFailed"));
       for (const c of ready.slice(1)) {
-        await authedPost("/api/generations", { type: "series_cloner", prompt: `${ep.script.title} (scene)`, video_url: c, output_type: "video", status: "completed", tokens_used: scenePrice, duration: "5", aspect_ratio: ep.settings.aspect, model: `Series Cloner · ${model.name}` });
+        await authedPost("/api/generations", { type: "series_cloner", settings: { mode: formula.mode }, prompt: `${ep.script.title} (scene)`, video_url: c, output_type: "video", status: "completed", tokens_used: scenePrice, duration: "5", aspect_ratio: ep.settings.aspect, model: `Series Cloner · ${model.name}` });
       }
     }
     setPhase("saving");
     await seriesApi("video_done", { episode_id: ep.id, video_url: finalUrl });
-    await authedPost("/api/generations", {
-      type: "series_cloner", prompt: ep.script.title, video_url: finalUrl, output_type: "video", status: "completed",
+    const saved = await authedPost<{ generation?: { id: number | string } }>("/api/generations", {
+      type: "series_cloner", settings: { mode: formula.mode }, prompt: ep.script.title, video_url: finalUrl, output_type: "video", status: "completed",
       tokens_used: spent + ep.cost, duration: String(ready.length * 5), aspect_ratio: ep.settings.aspect, model: `Series Cloner · ${model.name}`,
     });
-    if (ready.length < frames.length) setNotice((n) => n || `${frames.length - ready.length} scene${frames.length - ready.length > 1 ? "s" : ""} couldn't be animated and ${frames.length - ready.length > 1 ? "were" : "was"} refunded.`);
+    if (saved.data.generation?.id != null) onSaved?.({ id: saved.data.generation.id, url: finalUrl, outputType: "video" });
+    if (ready.length < frames.length) setNotice((n) => n || t("notices.scenesRefunded", { count: frames.length - ready.length }));
     onEpisode({ ...ep, status: "done", video_url: finalUrl });
   };
 
@@ -156,7 +174,7 @@ export default function SeriesEpisode({
     if (busy || running) return;
     if (!outputAvailable(output)) return;
     const upfront = base + (output === "video" ? scenePrice * sceneEstimate : 0);
-    if (tokenBalance < upfront) { setError(`Not enough tokens: this needs about ${upfront} and you have ${tokenBalance}.`); return; }
+    if (tokenBalance < upfront) { setError(t("errors.notEnough", { cost: upfront, balance: tokenBalance })); return; }
     start(); setRunOutput(output); setPhase("charging"); setCounter({ done: 0, total: 0 });
 
     const charge = await chargeTokens(base, `series_cloner_${output}`);
@@ -170,7 +188,7 @@ export default function SeriesEpisode({
       if (!s.ok || !s.data.episode) {
         const r = await refundCharge(charge.chargeId);
         if (r.balance !== undefined) setTokenBalance(() => r.balance!);
-        setError((s.data.error ?? "Couldn't write the script.") + (r.ok ? " Tokens refunded." : ""));
+        setError((s.data.error ?? t("errors.script")) + (r.ok ? ` ${t("refunded")}` : ""));
         stop(); return;
       }
       let ep = s.data.episode;
@@ -183,7 +201,7 @@ export default function SeriesEpisode({
         if (f.data.episode) {
           const refunded = credit(ep.refunded, f.data.episode);
           onEpisode(f.data.episode);
-          setError(`${reason} Your script is saved${refunded ? `, and ${refunded} tokens were refunded` : ""}.`);
+          setError(`${reason} ${refunded ? t("scriptSavedRefunded", { count: refunded }) : t("scriptSaved")}`);
         } else {
           setError(`${reason} ${f.data.error ?? ""}`.trim());
         }
@@ -192,35 +210,36 @@ export default function SeriesEpisode({
       if (output === "avatar") {
         setPhase("presenter");
         const prep = await seriesApi<{ task_id?: string }>("avatar_prepare", { episode_id: ep.id });
-        if (!prep.ok || !prep.data.task_id) { await settleFailed("avatar_failed", prep.data.error ?? "Couldn't create the presenter."); stop(); return; }
+        if (!prep.ok || !prep.data.task_id) { await settleFailed("avatar_failed", prep.data.error ?? t("errors.presenter")); stop(); return; }
         const portrait = await pollTask(prep.data.task_id, "kie", () => cancelled.current);
-        if (!portrait.url) { await settleFailed("avatar_failed", `The presenter image failed: ${portrait.reason}`); stop(); return; }
+        if (!portrait.url) { await settleFailed("avatar_failed", t("errors.portrait", { reason: portrait.reason })); stop(); return; }
         setPhase("rendering");
         const av = await seriesApi<{ task_id?: string }>("avatar_start", { episode_id: ep.id });
-        if (!av.ok || !av.data.task_id) { await settleFailed("avatar_failed", av.data.error ?? "Couldn't start the avatar video."); stop(); return; }
+        if (!av.ok || !av.data.task_id) { await settleFailed("avatar_failed", av.data.error ?? t("errors.avatarStart")); stop(); return; }
         const video = await pollTask(av.data.task_id, "heygen_v3", () => false);
-        if (!video.url) { await settleFailed("avatar_failed", `The avatar video failed: ${video.reason}`); stop(); return; }
+        if (!video.url) { await settleFailed("avatar_failed", t("errors.avatar", { reason: video.reason })); stop(); return; }
         setPhase("saving");
         const done = await seriesApi<{ episode?: EpisodeView }>("avatar_done", { episode_id: ep.id });
         ep = done.data.episode ?? { ...ep, status: "done", video_url: video.url };
-        await authedPost("/api/generations", {
-          type: "series_cloner", prompt: ep.script?.title ?? idea.title, video_url: ep.video_url, output_type: "video", status: "completed",
+        const saved = await authedPost<{ generation?: { id: number | string } }>("/api/generations", {
+          type: "series_cloner", settings: { mode: formula.mode }, prompt: ep.script?.title ?? idea.title, video_url: ep.video_url, output_type: "video", status: "completed",
           tokens_used: ep.cost, aspect_ratio: ep.settings.aspect, model: "Series Cloner · Avatar",
         });
+        if (saved.data.generation?.id != null && ep.video_url) onSaved?.({ id: saved.data.generation.id, url: ep.video_url, outputType: "video" });
         onEpisode(ep); stop(); return;
       }
 
       // 2. Storyboard: a character sheet first, then every scene drawn from it
       setPhase("characters");
       const sheet = await seriesApi<{ task_id?: string | null }>("storyboard_sheet", { episode_id: ep.id });
-      if (!sheet.ok) { await settleFailed("storyboard_failed", sheet.data.error ?? "Couldn't design the characters."); stop(); return; }
+      if (!sheet.ok) { await settleFailed("storyboard_failed", sheet.data.error ?? t("errors.design")); stop(); return; }
       if (sheet.data.task_id) {
         const sh = await pollTask(sheet.data.task_id, "kie", () => false);
-        if (!sh.url) { await settleFailed("storyboard_failed", `The character sheet failed: ${sh.reason}`); stop(); return; }
+        if (!sh.url) { await settleFailed("storyboard_failed", t("errors.sheet", { reason: sh.reason })); stop(); return; }
       }
       setPhase("frames");
       const sc = await seriesApi<{ task_ids?: string[] }>("storyboard_scenes", { episode_id: ep.id });
-      if (!sc.ok || !sc.data.task_ids) { await settleFailed("storyboard_failed", sc.data.error ?? "Couldn't draw the scenes."); stop(); return; }
+      if (!sc.ok || !sc.data.task_ids) { await settleFailed("storyboard_failed", sc.data.error ?? t("errors.draw")); stop(); return; }
       const ids = sc.data.task_ids;
       setCounter({ done: 0, total: ids.filter(Boolean).length });
       await Promise.all(ids.filter(Boolean).map(async (id) => {
@@ -230,26 +249,26 @@ export default function SeriesEpisode({
       // For videos "saving" comes after the clips are joined
       if (output !== "video") setPhase("saving");
       const fin = await seriesApi<{ episode?: EpisodeView }>("storyboard_done", { episode_id: ep.id, give_up: true });
-      if (!fin.data.episode) { setError(fin.data.error ?? "Couldn't save the storyboard."); stop(); return; }
+      if (!fin.data.episode) { setError(fin.data.error ?? t("errors.saveStoryboard")); stop(); return; }
       const before = ep.refunded;
       ep = fin.data.episode;
       credit(before, ep);
       onEpisode(ep);
-      if (!ep.frames.length) { setError("The storyboard images couldn't be created. Your script is saved and the rest was refunded."); stop(); return; }
+      if (!ep.frames.length) { setError(t("errors.noImages")); stop(); return; }
       for (const fr of ep.frames) {
         await authedPost("/api/generations", {
-          type: "series_cloner", prompt: `${ep.script?.title ?? idea.title}, scene ${fr.index + 1}`, image_url: fr.url, output_type: "image", status: "completed",
+          type: "series_cloner", settings: { mode: formula.mode }, prompt: `${ep.script?.title ?? idea.title}, scene ${fr.index + 1}`, image_url: fr.url, output_type: "image", status: "completed",
           tokens_used: 0, aspect_ratio: ep.settings.aspect, model: "Series Cloner · Storyboard",
         });
       }
-      if (ep.frames.length < (ep.script?.scenes.length ?? 0)) setNotice(`${(ep.script?.scenes.length ?? 0) - ep.frames.length} scene image(s) couldn't be drawn.`);
+      if (ep.frames.length < (ep.script?.scenes.length ?? 0)) setNotice(t("notices.framesMissing", { count: (ep.script?.scenes.length ?? 0) - ep.frames.length }));
 
       // 3. Full video
       if (output === "video") await animate(ep);
       stop();
     } catch (e) {
       console.error("Series episode error:", e);
-      setError("Something went wrong. Anything that didn't finish is refunded automatically.");
+      setError(t("errors.generic"));
       stop();
     }
   };
@@ -263,25 +282,25 @@ export default function SeriesEpisode({
   // ---------------------------------------------------------------- render
 
   const stepList: { key: Phase; label: string }[] = runOutput === "avatar"
-    ? [{ key: "charging", label: "Tokens reserved" }, { key: "script", label: "Writing the script" }, { key: "presenter", label: "Creating the presenter and voice" }, { key: "rendering", label: "Rendering the avatar video (a few minutes)" }, { key: "saving", label: "Saving to your gallery" }]
+    ? [{ key: "charging", label: t("steps.reserved") }, { key: "script", label: t("steps.script") }, { key: "presenter", label: t("steps.presenter") }, { key: "rendering", label: t("steps.rendering") }, { key: "saving", label: t("steps.saving") }]
     : [
-        { key: "charging", label: "Tokens reserved" }, { key: "script", label: "Writing the script" },
+        { key: "charging", label: t("steps.reserved") }, { key: "script", label: t("steps.script") },
         ...(runOutput === "script" ? [] : [
-          { key: "characters" as Phase, label: "Designing the characters" },
-          { key: "frames" as Phase, label: `Drawing the scenes${phase === "frames" && counter.total ? ` (${counter.done}/${counter.total})` : ""}` },
+          { key: "characters" as Phase, label: t("steps.characters") },
+          { key: "frames" as Phase, label: t("steps.drawing") + (phase === "frames" && counter.total ? ` (${counter.done}/${counter.total})` : "") },
         ]),
         ...(runOutput === "video" ? [
-          { key: "animating" as Phase, label: `Animating the scenes${phase === "animating" ? ` (${counter.done}/${counter.total})` : ""}` },
-          { key: "joining" as Phase, label: "Joining the episode" },
+          { key: "animating" as Phase, label: t("steps.animating") + (phase === "animating" ? ` (${counter.done}/${counter.total})` : "") },
+          { key: "joining" as Phase, label: t("steps.joining") },
         ] : []),
-        ...(runOutput === "script" ? [] : [{ key: "saving" as Phase, label: "Saving to your gallery" }]),
+        ...(runOutput === "script" ? [] : [{ key: "saving" as Phase, label: t("steps.saving") }]),
       ];
   const activeIdx = stepList.findIndex((st) => st.key === phase);
   const progress = Math.max(5, Math.min(95, ((activeIdx + (counter.total ? counter.done / counter.total : 0.3)) / stepList.length) * 100));
 
   return (
     <div className={`${cardClass} overflow-hidden`}>
-      <button onClick={() => setOpen(!open)} className="flex w-full items-start gap-3 p-4 text-left sm:p-5" aria-expanded={open}>
+      <button onClick={() => setOpen(!open)} className="flex w-full items-start gap-3 p-4 text-start sm:p-5" aria-expanded={open}>
         <Badge tone={ideaIndex === 0 && formula.mode === "single" ? "accent" : "neutral"}>{label}</Badge>
         <span className="min-w-0 flex-1">
           <span className="block font-semibold text-ink">{idea.title}</span>
@@ -303,12 +322,12 @@ export default function SeriesEpisode({
             ))}
           </ol>
           <div className="grid gap-3 text-sm sm:grid-cols-2">
-            <div><p className="mb-1 text-xs font-medium text-ink-subtle">Character direction</p><p className="text-ink-muted">{idea.character_direction}</p></div>
-            <div><p className="mb-1 text-xs font-medium text-ink-subtle">Ending</p><p className="text-ink-muted">{idea.ending}</p></div>
+            <div><p className="mb-1 text-xs font-medium text-ink-subtle">{t("direction")}</p><p className="text-ink-muted">{idea.character_direction}</p></div>
+            <div><p className="mb-1 text-xs font-medium text-ink-subtle">{t("ending")}</p><p className="text-ink-muted">{idea.ending}</p></div>
           </div>
           {idea.text_overlays.length > 0 && (
             <div>
-              <p className="mb-1.5 text-xs font-medium text-ink-subtle">Text overlays</p>
+              <p className="mb-1.5 text-xs font-medium text-ink-subtle">{t("overlays")}</p>
               <div className="flex flex-wrap gap-1.5">{idea.text_overlays.map((t, i) => <Badge key={i}>{t}</Badge>)}</div>
             </div>
           )}
@@ -323,25 +342,25 @@ export default function SeriesEpisode({
                   const price = episodeBasePrice(o.id, prices);
                   return (
                     <button key={o.id} onClick={() => available && setOutput(o.id)} disabled={!available} aria-pressed={output === o.id}
-                      className={"rounded-lg border p-2.5 text-left transition-colors " + (!available ? "cursor-not-allowed opacity-50 border-line" : output === o.id ? "border-accent bg-accent/10" : "border-line hover:border-line-strong")}>
-                      <span className="flex items-center gap-1.5 text-sm font-medium text-ink"><Icon size={15} aria-hidden /> {o.label}</span>
-                      <span className="block text-[11px] text-ink-subtle">{!available ? "Unavailable" : o.id === "video" ? `${price} + clips` : `${price} tokens`} · {o.desc}</span>
+                      className={"rounded-lg border p-2.5 text-start transition-colors " + (!available ? "cursor-not-allowed opacity-50 border-line" : output === o.id ? "border-accent bg-accent/10" : "border-line hover:border-line-strong")}>
+                      <span className="flex items-center gap-1.5 text-sm font-medium text-ink"><Icon size={15} aria-hidden /> {t(`outputs.${o.id}.label`)}</span>
+                      <span className="block text-[11px] text-ink-subtle">{!available ? t("unavailable") : o.id === "video" ? t("plusClips", { count: price }) : c("tokens", { count: price })} · {t(`outputs.${o.id}.desc`)}</span>
                     </button>
                   );
                 })}
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Format">
+                <Field label={t("format")}>
                   <Select value={aspect} onChange={(e) => setAspect(e.target.value as Aspect)}>
-                    <option value="9:16">Vertical 9:16</option>
-                    <option value="16:9">Landscape 16:9</option>
-                    <option value="1:1">Square 1:1</option>
+                    <option value="9:16">{t("vertical")}</option>
+                    <option value="16:9">{t("landscape")}</option>
+                    <option value="1:1">{t("square")}</option>
                   </Select>
                 </Field>
                 {output === "video" && (
-                  <Field label="Video model">
+                  <Field label={t("videoModel")}>
                     <Select value={model?.id ?? ""} onChange={(e) => setModelId(e.target.value)}>
-                      {models.map((m) => <option key={m.id} value={m.id}>{m.name} · {tokenPricing[m.id] ?? m.tokens}/scene{m.hasSound ? " · speaks" : ""}</option>)}
+                      {models.map((m) => <option key={m.id} value={m.id}>{t("modelOption", { model: m.name, count: tokenPricing[m.id] ?? m.tokens })}{m.hasSound ? ` · ${t("speaks")}` : ""}</option>)}
                     </Select>
                   </Field>
                 )}
@@ -349,11 +368,11 @@ export default function SeriesEpisode({
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs text-ink-subtle">
                   {output === "video"
-                    ? `${base} for script + storyboard, then ${scenePrice} per scene (about ${sceneEstimate} scenes ≈ ${base + scenePrice * sceneEstimate} tokens). Failed scenes are refunded.`
-                    : `${base} tokens${output === "avatar" ? " (script + avatar video)" : output === "storyboard" ? " (script + storyboard)" : ""}. Anything that fails is refunded.`}
-                  {output === "video" && model && !model.hasSound ? " This model is silent; pick one marked “speaks” for dialogue." : ""}
+                    ? t("costVideo", { base, scene: scenePrice, scenes: sceneEstimate, total: base + scenePrice * sceneEstimate })
+                    : output === "avatar" ? t("costAvatar", { count: base }) : output === "storyboard" ? t("costStoryboard", { count: base }) : t("costScript", { count: base })}
+                  {output === "video" && model && !model.hasSound ? ` ${t("silentModel")}` : ""}
                 </p>
-                <Button variant="primary" onClick={generate} disabled={busy}><Clapperboard size={16} aria-hidden /> Generate</Button>
+                <Button variant="primary" onClick={generate} disabled={busy}><Clapperboard size={16} aria-hidden /> {t("generate")}</Button>
               </div>
             </div>
           )}
@@ -371,7 +390,7 @@ export default function SeriesEpisode({
                   </li>
                 ))}
               </ul>
-              <p className="text-xs text-ink-subtle">Keep this page open. Image and video providers can&apos;t be stopped once started; anything that fails is refunded.</p>
+              <p className="text-xs text-ink-subtle">{t("keepOpen")}</p>
             </div>
           )}
 
@@ -392,6 +411,10 @@ export default function SeriesEpisode({
 function EpisodeResult({ ep, formula, busy, onAnimate, onProfileSaved }: {
   ep: EpisodeView; formula: FormulaView; busy: boolean; onAnimate: () => void; onProfileSaved: (p: CharacterProfile) => void;
 }) {
+  const t = useTranslations("episode");
+  const c = useTranslations("common");
+  const languageName = useLanguageName();
+  const locale = useLocale();
   const [showScript, setShowScript] = useState(ep.output_type === "script");
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState<null | { source: "sheet" | "frame"; index: number }>(null);
@@ -402,7 +425,7 @@ function EpisodeResult({ ep, formula, busy, onAnimate, onProfileSaved }: {
   const [saveMsg, setSaveMsg] = useState("");
 
   const copy = async () => {
-    try { await navigator.clipboard.writeText(scriptAsText(ep)); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* clipboard blocked */ }
+    try { await navigator.clipboard.writeText(scriptAsText(ep, t)); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* clipboard blocked */ }
   };
 
   const saveProfile = async () => {
@@ -411,36 +434,36 @@ function EpisodeResult({ ep, formula, busy, onAnimate, onProfileSaved }: {
       episode_id: ep.id, source: saving.source, frame_index: saving.index, name: name.trim(), style_description: styleDesc,
       character_type: formula.result?.detection.summary_label ?? null,
     });
-    if (r.data.profile) { onProfileSaved(r.data.profile); setSaveMsg(`Saved "${r.data.profile.name}". Choose it under Characters to use it in future episodes.`); setSaving(null); }
-    else setSaveMsg(r.data.error ?? "Couldn't save.");
+    if (r.data.profile) { onProfileSaved(r.data.profile); setSaveMsg(t("profileSaved", { name: r.data.profile.name })); setSaving(null); }
+    else setSaveMsg(r.data.error ?? t("saveFailed"));
   };
 
-  const typeLabel = { script: "Script", storyboard: "Storyboard", video: "Full video", avatar: "Avatar video" }[ep.output_type];
+  const typeLabel = t(`outputs.${ep.output_type}.label`);
   const inProgress = !["done", "partial", "failed", "animating"].includes(ep.status);
 
   return (
     <div className="space-y-3 rounded-xl border border-line p-3.5">
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone="accent">{typeLabel}</Badge>
-        {ep.status === "partial" && <Badge tone="warning">Partly finished</Badge>}
-        {ep.status === "failed" && <Badge tone="danger">Failed</Badge>}
-        {inProgress && <Badge>In progress</Badge>}
-        <span className="text-xs text-ink-subtle">{languageName(ep.settings.language_code)}{ep.settings.accent ? ` · ${ep.settings.accent}` : ""} · {new Date(ep.created_at).toLocaleString()}</span>
+        {ep.status === "partial" && <Badge tone="warning">{t("partly")}</Badge>}
+        {ep.status === "failed" && <Badge tone="danger">{t("failed")}</Badge>}
+        {inProgress && <Badge>{t("inProgress")}</Badge>}
+        <span className="text-xs text-ink-subtle">{languageName(ep.settings.language_code)}{ep.settings.accent ? ` · ${ep.settings.accent}` : ""} · {new Date(ep.created_at).toLocaleString(locale)}</span>
       </div>
-      {ep.status === "partial" && ep.error && <p className="text-xs text-amber-300">{ep.error} {ep.refunded > 0 ? `${ep.refunded} tokens refunded.` : ""}</p>}
+      {ep.status === "partial" && ep.error && <p className="text-xs text-amber-300">{ep.error} {ep.refunded > 0 ? t("tokensRefunded", { count: ep.refunded }) : ""}</p>}
 
       {ep.video_url && (
         <div className="space-y-2">
           <video src={ep.video_url} controls playsInline className="max-h-[60vh] w-full rounded-lg border border-line bg-black" />
-          <Button variant="secondary" size="sm" onClick={() => downloadUrl(ep.video_url!, `klipflowai-episode-${Date.now()}.mp4`)}><Download size={15} aria-hidden /> Save video</Button>
+          <Button variant="secondary" size="sm" onClick={() => downloadUrl(ep.video_url!, `klipflowai-episode-${Date.now()}.mp4`)}><Download size={15} aria-hidden /> {t("saveVideo")}</Button>
         </div>
       )}
 
       {ep.output_type === "video" && ep.status === "animating" && !ep.video_url && ep.frames.length > 0 && (
         <Alert tone="info">
           <span className="flex flex-wrap items-center justify-between gap-2">
-            <span>The storyboard is ready but the scenes weren&apos;t animated yet.</span>
-            <Button variant="secondary" size="sm" onClick={onAnimate} disabled={busy}><Film size={15} aria-hidden /> Animate scenes</Button>
+            <span>{t("notAnimated")}</span>
+            <Button variant="secondary" size="sm" onClick={onAnimate} disabled={busy}><Film size={15} aria-hidden /> {t("animate")}</Button>
           </span>
         </Alert>
       )}
@@ -450,10 +473,10 @@ function EpisodeResult({ ep, formula, busy, onAnimate, onProfileSaved }: {
           {ep.sheet_url && (
             <figure className="space-y-1">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={ep.sheet_url} alt="Character sheet" className="aspect-square w-full rounded-lg border border-line object-cover" />
+              <img src={ep.sheet_url} alt={t("sheetAlt")} className="aspect-square w-full rounded-lg border border-line object-cover" />
               <figcaption className="flex items-center justify-between gap-1 text-[11px] text-ink-subtle">
-                Characters
-                <button onClick={() => setSaving({ source: "sheet", index: 0 })} className="inline-flex items-center gap-1 text-accent-text hover:underline"><Save size={12} aria-hidden /> Save</button>
+                {t("characters")}
+                <button onClick={() => setSaving({ source: "sheet", index: 0 })} className="inline-flex items-center gap-1 text-accent-text hover:underline"><Save size={12} aria-hidden /> {t("save")}</button>
               </figcaption>
             </figure>
           )}
@@ -461,11 +484,11 @@ function EpisodeResult({ ep, formula, busy, onAnimate, onProfileSaved }: {
             <figure key={fr.index} className="space-y-1">
               <a href={fr.url} target="_blank" rel="noreferrer">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={fr.url} alt={`Scene ${fr.index + 1}`} className="aspect-square w-full rounded-lg border border-line object-cover" />
+                <img src={fr.url} alt={t("scene", { number: fr.index + 1 })} className="aspect-square w-full rounded-lg border border-line object-cover" />
               </a>
               <figcaption className="flex items-center justify-between gap-1 text-[11px] text-ink-subtle">
-                Scene {fr.index + 1}
-                {!ep.sheet_url && <button onClick={() => setSaving({ source: "frame", index: fr.index })} className="inline-flex items-center gap-1 text-accent-text hover:underline"><Save size={12} aria-hidden /> Save</button>}
+                {t("scene", { number: fr.index + 1 })}
+                {!ep.sheet_url && <button onClick={() => setSaving({ source: "frame", index: fr.index })} className="inline-flex items-center gap-1 text-accent-text hover:underline"><Save size={12} aria-hidden /> {t("save")}</button>}
               </figcaption>
             </figure>
           ))}
@@ -474,14 +497,14 @@ function EpisodeResult({ ep, formula, busy, onAnimate, onProfileSaved }: {
 
       {saving && (
         <div className="space-y-3 rounded-lg border border-accent/40 bg-accent/5 p-3">
-          <p className="text-sm font-medium text-ink">Save as a character profile</p>
-          <Field label="Name"><Input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} placeholder="The Fruit Family" /></Field>
-          <Field label="Style description" hint="Used in every future episode with this character.">
+          <p className="text-sm font-medium text-ink">{t("saveProfileTitle")}</p>
+          <Field label={t("name")}><Input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} placeholder={t("namePlaceholder")} /></Field>
+          <Field label={t("styleDesc")} hint={t("styleHint")}>
             <Textarea rows={3} maxLength={1200} value={styleDesc} onChange={(e) => setStyleDesc(e.target.value)} />
           </Field>
           <div className="flex gap-2">
-            <Button variant="primary" size="sm" onClick={saveProfile} disabled={!name.trim()}><Save size={15} aria-hidden /> Save character</Button>
-            <Button variant="ghost" size="sm" onClick={() => setSaving(null)}>Cancel</Button>
+            <Button variant="primary" size="sm" onClick={saveProfile} disabled={!name.trim()}><Save size={15} aria-hidden /> {t("saveCharacter")}</Button>
+            <Button variant="ghost" size="sm" onClick={() => setSaving(null)}>{t("cancel")}</Button>
           </div>
         </div>
       )}
@@ -490,24 +513,24 @@ function EpisodeResult({ ep, formula, busy, onAnimate, onProfileSaved }: {
       {ep.script && (
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setShowScript(!showScript)}><FileText size={15} aria-hidden /> {showScript ? "Hide script" : "Show script"}</Button>
-            <Button variant="ghost" size="sm" onClick={copy}>{copied ? <CheckCircle2 size={15} aria-hidden /> : <Copy size={15} aria-hidden />} {copied ? "Copied" : "Copy script"}</Button>
+            <Button variant="ghost" size="sm" onClick={() => setShowScript(!showScript)}><FileText size={15} aria-hidden /> {showScript ? t("hideScript") : t("showScript")}</Button>
+            <Button variant="ghost" size="sm" onClick={copy}>{copied ? <CheckCircle2 size={15} aria-hidden /> : <Copy size={15} aria-hidden />} {copied ? c("copied") : t("copyScript")}</Button>
           </div>
           {showScript && (
             <div className="mt-2 space-y-2">
               {ep.script.scenes.map((s, i) => (
                 <div key={i} className="rounded-lg bg-canvas p-3 text-sm">
-                  <p className="text-xs font-medium text-ink-subtle">Scene {i + 1}{s.on_screen_text ? ` · On screen: ${s.on_screen_text}` : ""}</p>
-                  {s.dialogue && <p className="mt-1 text-ink"><span className="text-accent-text">{s.speaker || "Voice"}:</span> {s.dialogue}</p>}
+                  <p className="text-xs font-medium text-ink-subtle">{t("scene", { number: i + 1 })}{s.on_screen_text ? ` · ${t("onScreen", { text: s.on_screen_text })}` : ""}</p>
+                  {s.dialogue && <p className="mt-1 text-ink"><span className="text-accent-text">{s.speaker || t("voice")}:</span> {s.dialogue}</p>}
                   <p className="mt-1 text-xs text-ink-muted">{s.visual_prompt}</p>
                 </div>
               ))}
-              <p className="text-xs text-ink-muted"><span className="font-medium text-ink-subtle">Caption:</span> {ep.script.caption}</p>
+              <p className="text-xs text-ink-muted"><span className="font-medium text-ink-subtle">{t("captionLabel")}</span> {ep.script.caption}</p>
             </div>
           )}
         </div>
       )}
-      {ep.status === "failed" && <p className="flex items-center gap-1.5 text-xs text-red-400"><XCircle size={13} aria-hidden /> {ep.error ?? "This episode failed."}</p>}
+      {ep.status === "failed" && <p className="flex items-center gap-1.5 text-xs text-red-400"><XCircle size={13} aria-hidden /> {ep.error ?? t("episodeFailed")}</p>}
     </div>
   );
 }

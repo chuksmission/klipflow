@@ -50,30 +50,38 @@ export async function PATCH(req: NextRequest) {
       .single();
     if (!profile?.is_admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    const { id, is_featured, featured_category, featured_title, featured_sort } = await req.json() as {
+    const { id, is_featured, featured_category, featured_title, featured_sort, show_prompt, show_source_image } = await req.json() as {
       id?: number | string;
       is_featured?: boolean;
       featured_category?: string | null;
       featured_title?: string | null;
       featured_sort?: number;
+      show_prompt?: boolean;
+      show_source_image?: boolean;
     };
     if (id === undefined || id === null) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
-    const update: Record<string, unknown> = {
-      is_featured: !!is_featured,
-      featured_category: is_featured ? (featured_category || null) : null,
-      featured_title: is_featured ? (featured_title?.trim() || null) : null,
-    };
-    // Only sent once supabase/showcase_studio.sql has added the column
-    if (featured_sort !== undefined && Number.isFinite(Number(featured_sort))) {
-      update.featured_sort = is_featured ? Math.round(Number(featured_sort)) : 0;
+    const update: Record<string, unknown> = {};
+    // Visibility-only changes leave the featured fields alone
+    if (is_featured !== undefined) {
+      update.is_featured = !!is_featured;
+      update.featured_category = is_featured ? (featured_category || null) : null;
+      update.featured_title = is_featured ? (featured_title?.trim() || null) : null;
+      // Only sent once supabase/showcase_studio.sql has added the column
+      if (featured_sort !== undefined && Number.isFinite(Number(featured_sort))) {
+        update.featured_sort = is_featured ? Math.round(Number(featured_sort)) : 0;
+      }
     }
+    // What the public showcase card reveals (supabase/showcase_details.sql)
+    if (typeof show_prompt === "boolean") update.show_prompt = show_prompt;
+    if (typeof show_source_image === "boolean") update.show_source_image = show_source_image;
+    if (Object.keys(update).length === 0) return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
 
     const { data, error } = await supabase
       .from("generations")
       .update(update)
       .eq("id", id)
-      .select("id, is_featured, featured_category, featured_title")
+      .select("id")
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

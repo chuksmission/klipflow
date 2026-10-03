@@ -1,6 +1,8 @@
 "use client";
+import type { SavedGeneration } from "../../lib/saved-generation";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   ArrowRight, Ban, CheckCircle2, ChevronLeft, Circle, Download, FileText, ImagePlus, Link2, Loader2, Package,
   Palette, Repeat2, Upload, UsersRound, type LucideIcon,
@@ -47,9 +49,8 @@ const MAX_WAIT_SECONDS = 600;
 // Actor Swap uploads longer than Runway's 30s limit are trimmed in the browser
 const RUNWAY_MAX_SECONDS = 30;
 const TRIM_SOURCE_MAX_SECONDS = 600;
-const TRIM_MESSAGE = "Runway Actor Swap supports up to 30 seconds. Select your best 30 seconds.";
 
-type Stage = "charging" | "trimming" | "uploading" | "transcribing" | "rewriting" | "generating" | "saving";
+type Stage = "charging" | "trimming" | "uploading" | "transcribing" | "rewriting" | "placing" | "generating" | "restoring" | "saving";
 interface RewriteResult {
   original: { hook: string; structure: string[]; style: string };
   title: string;
@@ -66,6 +67,8 @@ interface Props {
   settingsLoaded: boolean;
   onBack: () => void;
   onBusyChange: (busy: boolean) => void;
+  /** Called once a result is saved to the gallery (Showcase Studio features it) */
+  onSaved?: (g: SavedGeneration) => void;
 }
 
 // ---------------------------------------------------------------- helpers
@@ -137,8 +140,12 @@ const aspectFromDims = (w: number, h: number) => (w > h * 1.2 ? "16:9" : h > w *
 
 // ---------------------------------------------------------------- component
 
-export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing, enabledKeys, settingsLoaded, onBack, onBusyChange }: Props) {
+export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing, enabledKeys, settingsLoaded, onBack, onBusyChange, onSaved }: Props) {
+  const t = useTranslations("remix");
+  const c = useTranslations("common");
   const router = useRouter();
+  const modeText = (m: Mode, field: "title" | "tagline" | "desc") => t(`modes.${m.id}.${field}`);
+  const trimMessage = t("trimMessage");
   const [modeId, setModeId] = useState<ModeId | null>(null);
 
   // Source
@@ -159,6 +166,8 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
   const [performerPreview, setPerformerPreview] = useState("");
   const [bodyControl, setBodyControl] = useState(true);
   const [intensity, setIntensity] = useState(3);
+  const [preserveBg, setPreserveBg] = useState(true);
+  const [notice, setNotice] = useState("");
 
   // Run state
   const [running, setRunning] = useState(false);
@@ -181,7 +190,13 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
   const activeModel = models.some((m) => m.id === model) ? model : (models[0]?.id ?? model);
   const modelInfo = VIDEO_MODELS.find((m) => m.id === activeModel);
 
-  const rate = mode ? (tokenPricing[mode.pricingKey] ?? mode.defaultRate) : 0;
+  const baseRate = mode ? (tokenPricing[mode.pricingKey] ?? mode.defaultRate) : 0;
+  // Actor Swap can keep the source's background: needs an uploaded video and a performer photo
+  const bgRate = tokenPricing["video_remix_bg_preserve"] ?? 20;
+  const bgAvailable = mode?.id === "actor_swap" && enabledKeys["remix_bg_preserve_enabled"] === true;
+  const bgEligible = bgAvailable && sourceKind === "upload" && (!performer || performer.type.startsWith("image/"));
+  const bgOn = bgEligible && preserveBg;
+  const rate = baseRate + (bgOn ? bgRate : 0);
   const needsTrim = mode?.id === "actor_swap" && sourceKind === "upload" && !!sourceMeta && sourceMeta.seconds > RUNWAY_MAX_SECONDS + 0.5;
   const billedSeconds = sourceMeta ? (needsTrim ? RUNWAY_MAX_SECONDS : sourceMeta.seconds) : null;
   // Runway modes bill per second (15s minimum); Recreate keeps a one-minute minimum
@@ -203,11 +218,11 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
   const validateDuration = (seconds: number, kind: "upload" | "url" = sourceKind) => {
     if (!mode) return "";
     if (mode.id === "actor_swap" && kind === "upload") {
-      if (seconds > TRIM_SOURCE_MAX_SECONDS + 0.5) return `Upload a video up to ${TRIM_SOURCE_MAX_SECONDS / 60} minutes; you'll then pick the 30 seconds to use.`;
+      if (seconds > TRIM_SOURCE_MAX_SECONDS + 0.5) return t("errors.trimSourceTooLong", { minutes: TRIM_SOURCE_MAX_SECONDS / 60 });
     } else if (mode.id === "actor_swap" && seconds > mode.maxSeconds + 0.5) {
-      return `${TRIM_MESSAGE} This link is ${Math.round(seconds)}s: upload the file instead to choose which 30 seconds to use.`;
-    } else if (seconds > mode.maxSeconds + 0.5) return `${mode.title} supports videos up to ${mode.maxSeconds} seconds. This one is ${Math.round(seconds)}s. Trim it first.`;
-    if (seconds < mode.minSeconds) return `${mode.title} needs a video of at least ${mode.minSeconds} seconds.`;
+      return `${trimMessage} ${t("errors.linkTooLong", { seconds: Math.round(seconds) })}`;
+    } else if (seconds > mode.maxSeconds + 0.5) return t("errors.tooLong", { mode: modeText(mode, "title"), max: mode.maxSeconds, seconds: Math.round(seconds) });
+    if (seconds < mode.minSeconds) return t("errors.tooShort", { mode: modeText(mode, "title"), min: mode.minSeconds });
     return "";
   };
 
@@ -218,8 +233,8 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
     if (!f || !mode) return;
     const ext = f.name.split(".").pop()?.toLowerCase() ?? "";
     const allowed = mode.id === "recreate" ? ["mp4", "webm"] : ["mp4", "mov", "webm"];
-    if (!allowed.includes(ext)) { setError(mode.id === "recreate" ? "Upload an MP4 or WebM video (MOV can't be transcribed)." : "Upload an MP4, MOV or WebM video."); return; }
-    if (f.size > mode.maxBytes) { setError(`Video must be under ${Math.round(mode.maxBytes / 1024 / 1024)}MB.`); return; }
+    if (!allowed.includes(ext)) { setError(mode.id === "recreate" ? t("errors.formatRecreate") : t("errors.format")); return; }
+    if (f.size > mode.maxBytes) { setError(t("errors.videoTooBig", { mb: Math.round(mode.maxBytes / 1024 / 1024) })); return; }
     const url = URL.createObjectURL(f);
     try {
       const meta = await probeVideo(url);
@@ -227,7 +242,7 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
       if (problem) { setError(problem); return; }
       setSourceFile(f); setSourceMeta(meta); setTrimStart(0); setError("");
     } catch {
-      setError("Couldn't read this video. Try converting it to MP4.");
+      setError(t("errors.unreadable"));
     } finally {
       URL.revokeObjectURL(url);
     }
@@ -235,7 +250,7 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
 
   const checkSourceUrl = async () => {
     const url = sourceUrl.trim();
-    if (!/^https:\/\/.+/i.test(url)) { setError("Paste a direct https:// link to a video file."); return; }
+    if (!/^https:\/\/.+/i.test(url)) { setError(t("errors.badLink")); return; }
     setProbing(true); setError("");
     try {
       const meta = await probeVideo(url);
@@ -243,7 +258,7 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
       if (problem) { setError(problem); setSourceMeta(null); return; }
       setSourceMeta(meta);
     } catch {
-      setError("Couldn't load a video from that link. Use a direct link to an .mp4 file (TikTok and YouTube page links won't work).");
+      setError(t("errors.linkLoad"));
       setSourceMeta(null);
     } finally {
       setProbing(false);
@@ -256,14 +271,14 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
     if (!f) return;
     const isImage = f.type.startsWith("image/");
     const isVideo = f.type.startsWith("video/");
-    if (!isImage && !isVideo) { setError("Upload a photo or short video of the new performer."); return; }
-    if (f.size > (isImage ? 10 : 100) * 1024 * 1024) { setError(isImage ? "Photo must be under 10MB." : "Video must be under 100MB."); return; }
+    if (!isImage && !isVideo) { setError(t("errors.performerType")); return; }
+    if (f.size > (isImage ? 10 : 100) * 1024 * 1024) { setError(isImage ? t("errors.photoSize") : t("errors.videoSize")); return; }
     if (isVideo) {
       const url = URL.createObjectURL(f);
       try {
         const meta = await probeVideo(url);
-        if (meta.seconds > 30.5) { setError("The performer video must be 30 seconds or shorter."); return; }
-      } catch { setError("Couldn't read that video."); return; }
+        if (meta.seconds > 30.5) { setError(t("errors.performerLength")); return; }
+      } catch { setError(t("errors.unreadableThat")); return; }
       finally { URL.revokeObjectURL(url); }
       setPerformerPreview("");
     } else {
@@ -279,13 +294,13 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
     new Promise((resolve) => {
       const started = Date.now();
       const timer = setInterval(async () => {
-        if (cancelRef.current) { clearInterval(timer); resolve({ url: null, reason: "Cancelled." }); return; }
-        if (Date.now() - started > MAX_WAIT_SECONDS * 1000) { clearInterval(timer); resolve({ url: null, reason: "This took longer than 10 minutes, so it was stopped." }); return; }
+        if (cancelRef.current) { clearInterval(timer); resolve({ url: null, reason: t("errors.cancelled") }); return; }
+        if (Date.now() - started > MAX_WAIT_SECONDS * 1000) { clearInterval(timer); resolve({ url: null, reason: t("errors.timeout") }); return; }
         try {
           const res = await fetch(`/api/video-status?task_id=${encodeURIComponent(taskId)}&provider=${provider}`);
           const sd = await res.json();
           if (sd.completed && sd.video_url) { clearInterval(timer); resolve({ url: sd.video_url, reason: "" }); }
-          else if (sd.failed) { clearInterval(timer); resolve({ url: null, reason: sd.fail_reason ?? "Generation failed." }); }
+          else if (sd.failed) { clearInterval(timer); resolve({ url: null, reason: sd.fail_reason ?? t("errors.generationFailed") }); }
         } catch { /* keep polling */ }
       }, provider === "runway" ? 6000 : 5000);
     });
@@ -299,16 +314,16 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
   const run = async () => {
     if (!mode || !modeAvailable(mode)) return;
     const hasSource = sourceKind === "upload" ? !!sourceFile : !!sourceMeta;
-    if (!hasSource || !sourceMeta) { setError(sourceKind === "url" ? "Check the video link first." : "Upload a source video."); return; }
-    if (mode.id === "restyle" && !style.trim()) { setError("Describe the new style."); return; }
-    if (mode.id === "actor_swap" && !performer) { setError("Upload a photo or video of the new performer."); return; }
-    if (tokenBalance < cost) { setError(`Not enough tokens: this costs ${cost} and you have ${tokenBalance}.`); return; }
+    if (!hasSource || !sourceMeta) { setError(sourceKind === "url" ? t("errors.checkLink") : t("errors.uploadSource")); return; }
+    if (mode.id === "restyle" && !style.trim()) { setError(t("errors.describeStyle")); return; }
+    if (mode.id === "actor_swap" && !performer) { setError(t("errors.uploadPerformer")); return; }
+    if (tokenBalance < cost) { setError(t("errors.notEnough", { cost, balance: tokenBalance })); return; }
 
     const s = await session();
-    if (!s) { setError("Please sign in."); return; }
+    if (!s) { setError(t("errors.signIn")); return; }
 
     cancelRef.current = false;
-    setError(""); setResult(null); setRewrite(null); setRunwayTask(null); setElapsed(0); setRunning(true); setStage("charging");
+    setError(""); setNotice(""); setResult(null); setRewrite(null); setRunwayTask(null); setElapsed(0); setRunning(true); setStage("charging");
     const amount = cost;
     chargeRef.current = null;
 
@@ -337,43 +352,62 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
           uploadFile = new File([clip], "clip.mp4", { type: "video/mp4" });
         } catch (e) {
           console.error("Trim error:", e);
-          await fail("Couldn't trim the video in your browser. Trim it to 30 seconds and upload again.");
+          await fail(t("errors.trimFailed"));
           return;
         }
-        if (cancelRef.current) { await fail("Cancelled."); return; }
+        if (cancelRef.current) { await fail(t("errors.cancelled")); return; }
       }
 
       setStage("uploading");
       let videoUrl = sourceUrl.trim();
       if (sourceKind === "upload" && uploadFile) {
         const up = await upload(uploadFile);
-        if (!up) { await fail("Video upload failed."); return; }
+        if (!up) { await fail(t("errors.uploadFailed")); return; }
         videoUrl = up;
       }
-      if (cancelRef.current) { await fail("Cancelled."); return; }
+      if (cancelRef.current) { await fail(t("errors.cancelled")); return; }
 
       let start: { task_id?: string; provider?: string; error?: string } = {};
       let savedPrompt = "";
+      let preservedBg = false;
+      let bgRefund = 0;
       const aspect = aspectFromDims(sourceMeta.width, sourceMeta.height);
 
       if (mode.id === "restyle") {
         setStage("generating");
         savedPrompt = style.trim();
         const r = await authed("/api/video-remix", { action: "restyle", video_url: videoUrl, prompt: savedPrompt, duration: billedSeconds, charge_id: chargeId });
-        if (!r.ok) { await fail(r.data.error ?? "Couldn't start the restyle."); return; }
+        if (!r.ok) { await fail(r.data.error ?? t("errors.restyleStart")); return; }
         start = r.data;
         setRunwayTask(r.data.task_id);
       } else if (mode.id === "actor_swap") {
         const performerUrl = await upload(performer!);
-        if (!performerUrl) { await fail("Performer upload failed."); return; }
-        setStage("generating");
+        if (!performerUrl) { await fail(t("errors.performerUpload")); return; }
+        // Last point a cancel can still refund in full (placing can't be stopped)
+        if (cancelRef.current) { await fail(t("errors.cancelled")); return; }
         savedPrompt = "Actor swap";
-        const r = await authed("/api/video-remix", {
-          action: "actor_swap", video_url: videoUrl, character_url: performerUrl, charge_id: chargeId, duration: billedSeconds,
+        const swapBody = {
+          video_url: videoUrl, character_url: performerUrl, charge_id: chargeId, duration: billedSeconds,
           character_type: performer!.type.startsWith("video/") ? "video" : "image",
           ratio: actRatio(sourceMeta.width, sourceMeta.height), body_control: bodyControl, expression_intensity: intensity,
-        });
-        if (!r.ok) { await fail(r.data.error ?? "Couldn't start the actor swap."); return; }
+          width: sourceMeta.width, height: sourceMeta.height,
+        };
+        setStage(bgOn ? "placing" : "generating");
+        let r = await authed("/api/video-remix", { action: "actor_swap", ...swapBody, preserve_background: bgOn });
+        if (!r.ok) { await fail(r.data.error ?? t("errors.swapStart")); return; }
+        // Original background: the performer is first placed into the video's own opening frame
+        if (r.data.stage === "placing") {
+          const placed = await poll(r.data.task_id, "kie");
+          if (cancelRef.current) { await fail(t("errors.cancelled")); return; }
+          r = await authed("/api/video-remix", { action: "actor_swap_start", ...swapBody, task_id: r.data.task_id, bg_price: r.data.bg_price, preserve_background: !!placed.url });
+          if (!r.ok) { await fail(r.data.error ?? t("errors.swapStart")); return; }
+        }
+        if (bgOn && r.data.preserved === false) {
+          if (r.data.bg_refunded > 0) { bgRefund = r.data.bg_refunded; setTokenBalance((b) => b + r.data.bg_refunded); }
+          setNotice(t("bgFallback"));
+        }
+        preservedBg = r.data.preserved === true;
+        setStage("generating");
         start = r.data;
         setRunwayTask(r.data.task_id);
       } else {
@@ -381,17 +415,17 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
         setStage("transcribing");
         const frames = sourceFile ? await extractFrames(sourceFile, sourceMeta.seconds) : [];
         const tr = await authed("/api/video-remix", { action: "transcribe", video_url: videoUrl, charge_id: chargeId });
-        if (!tr.ok) { await fail(tr.data.error ?? "Transcription failed."); return; }
-        if (cancelRef.current) { await fail("Cancelled."); return; }
+        if (!tr.ok) { await fail(tr.data.error ?? t("errors.transcription")); return; }
+        if (cancelRef.current) { await fail(t("errors.cancelled")); return; }
 
         setStage("rewriting");
         const rw = await authed("/api/video-remix", {
           action: "rewrite", charge_id: chargeId, transcript: tr.data.text, segments: tr.data.segments, frames, duration: sourceMeta.seconds, topic,
         });
-        if (!rw.ok) { await fail(rw.data.error ?? "Couldn't write the new video."); return; }
+        if (!rw.ok) { await fail(rw.data.error ?? t("errors.rewrite")); return; }
         const rewritten: RewriteResult = rw.data.result;
         setRewrite(rewritten);
-        if (cancelRef.current) { await fail("Cancelled."); return; }
+        if (cancelRef.current) { await fail(t("errors.cancelled")); return; }
 
         setStage("generating");
         const line = rewritten.scenes?.[0]?.voiceover?.trim();
@@ -401,34 +435,51 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
           body: JSON.stringify({ prompt: savedPrompt, mode: "text_to_video", duration, aspect_ratio: aspect, model: activeModel, with_audio: modelInfo?.hasSound === true, charge_id: chargeId }),
         });
         start = await res.json();
-        if (!res.ok || !start.task_id) { await fail(start.error ?? "Couldn't start generation."); return; }
+        if (!res.ok || !start.task_id) { await fail(start.error ?? t("errors.genStart")); return; }
       }
 
       const outcome = await poll(start.task_id!, start.provider ?? "kie");
       setRunwayTask(null);
       if (!outcome.url) { await fail(outcome.reason); return; }
+      let finalUrl: string = outcome.url;
+
+      // Put the source's real, moving background back behind the new performer.
+      // If that can't finish, the swap already kept the setting from the opening frame.
+      if (preservedBg && sourceKind === "upload") {
+        setStage("restoring");
+        let bgState: Record<string, unknown> = {};
+        for (let i = 0; i < 120; i++) {
+          const rs = await authed("/api/video-remix", { action: "bg_restore", charge_id: chargeId, video_url: videoUrl, result_url: outcome.url, bg_state: bgState });
+          if (!rs.ok) break;
+          if (rs.data.done) { if (rs.data.url) finalUrl = rs.data.url; break; }
+          bgState = rs.data.bg_state ?? bgState;
+          await new Promise((res) => setTimeout(res, 6000));
+        }
+      }
 
       // 3. Save to the gallery
       setStage("saving");
       const save = await authed("/api/generations", {
         type: "video_remix",
         prompt: savedPrompt,
-        video_url: outcome.url,
+        video_url: finalUrl,
         output_type: "video",
         status: "completed",
-        tokens_used: amount,
+        tokens_used: amount - bgRefund,
         duration: String(mode.id === "recreate" ? duration : Math.round(billedSeconds ?? sourceMeta.seconds)),
         aspect_ratio: aspect,
         model: `Video Remix - ${mode.title}`,
+        settings: { mode: mode.id },
         charge_id: chargeId,
         provider: start.provider ?? null,
       });
       if (!save.ok) console.error("Gallery save failed:", save.data.error);
-      setResult({ url: outcome.url, cost: amount });
+      else if (save.data.generation?.id != null) onSaved?.({ id: save.data.generation.id, url: finalUrl, outputType: "video" });
+      setResult({ url: finalUrl, cost: amount - bgRefund });
       setRunning(false);
     } catch (e) {
       console.error("Video remix error:", e);
-      await fail("Something went wrong.");
+      await fail(t("errors.generic"));
     }
   };
 
@@ -453,19 +504,22 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
 
   const stepsFor: Record<string, { key: Stage; label: string }[]> = {
     restyle: [
-      { key: "charging", label: "Tokens reserved" }, { key: "uploading", label: "Uploading video" },
-      { key: "generating", label: "Restyling every frame" }, { key: "saving", label: "Saving to your gallery" },
+      { key: "charging", label: t("steps.reserved") }, { key: "uploading", label: t("steps.uploading") },
+      { key: "generating", label: t("steps.restyling") }, { key: "saving", label: t("steps.saving") },
     ],
     recreate: [
-      { key: "charging", label: "Tokens reserved" }, { key: "uploading", label: "Uploading video" },
-      { key: "transcribing", label: "Transcribing speech" }, { key: "rewriting", label: "Writing a new script" },
-      { key: "generating", label: "Generating your video" }, { key: "saving", label: "Saving to your gallery" },
+      { key: "charging", label: t("steps.reserved") }, { key: "uploading", label: t("steps.uploading") },
+      { key: "transcribing", label: t("steps.transcribing") }, { key: "rewriting", label: t("steps.rewriting") },
+      { key: "generating", label: t("steps.generating") }, { key: "saving", label: t("steps.saving") },
     ],
     actor_swap: [
-      { key: "charging", label: "Tokens reserved" },
-      ...(needsTrim ? [{ key: "trimming" as Stage, label: `Trimming your 30-second clip${stage === "trimming" ? ` (${Math.round(trimProgress * 100)}%)` : ""}` }] : []),
-      { key: "uploading", label: "Uploading video and performer" },
-      { key: "generating", label: "Transferring the performance" }, { key: "saving", label: "Saving to your gallery" },
+      { key: "charging", label: t("steps.reserved") },
+      ...(needsTrim ? [{ key: "trimming" as Stage, label: stage === "trimming" ? t("steps.trimmingProgress", { percent: Math.round(trimProgress * 100) }) : t("steps.trimming") }] : []),
+      { key: "uploading", label: t("steps.uploadingBoth") },
+      ...(bgOn ? [{ key: "placing" as Stage, label: t("steps.placing") }] : []),
+      { key: "generating", label: t("steps.transferring") },
+      ...(bgOn ? [{ key: "restoring" as Stage, label: t("steps.restoring") }] : []),
+      { key: "saving", label: t("steps.saving") },
     ],
   };
   const steps = mode ? stepsFor[mode.id] ?? [] : [];
@@ -476,11 +530,11 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
     <div className="flex items-center gap-2">
       {!running && (
         <button onClick={mode && !result ? () => { setModeId(null); setError(""); } : onBack}
-          className="inline-flex h-9 items-center gap-1 rounded-lg border border-line bg-raised pl-2 pr-3 text-sm text-ink transition-colors hover:border-line-strong">
-          <ChevronLeft size={16} aria-hidden /> {mode && !result ? "Modes" : "All tools"}
+          className="inline-flex h-9 items-center gap-1 rounded-lg border border-line bg-raised ps-2 pe-3 text-sm text-ink transition-colors hover:border-line-strong">
+          <ChevronLeft size={16} className="rtl:-scale-x-100" aria-hidden /> {mode && !result ? t("modesBack") : c("allTools")}
         </button>
       )}
-      <h2 className="text-base font-semibold">Video Remix{mode ? ` · ${mode.title}` : ""}</h2>
+      <h2 className="text-base font-semibold">{t("title")}{mode ? ` · ${modeText(mode, "title")}` : ""}</h2>
     </div>
   );
 
@@ -489,8 +543,8 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
       <div className="space-y-4">
         {header}
         <div className={`${cardClass} p-6 text-center`}>
-          <p className="mb-1 font-medium text-ink">Video Remix isn&apos;t available yet</p>
-          <p className="text-sm text-ink-muted">It&apos;s coming soon. In the meantime, try another tool.</p>
+          <p className="mb-1 font-medium text-ink">{t("unavailable")}</p>
+          <p className="text-sm text-ink-muted">{t("unavailableDesc")}</p>
         </div>
       </div>
     );
@@ -501,7 +555,7 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
     return (
       <div className="space-y-4">
         {header}
-        <p className="text-sm text-ink-muted">Upload a video, choose how to remix it, and get back a unique version.</p>
+        <p className="text-sm text-ink-muted">{t("intro")}</p>
         <div className="grid gap-3 sm:grid-cols-2">
           {MODES.map((m) => {
             const Icon = m.icon;
@@ -509,14 +563,14 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
             const r = tokenPricing[m.pricingKey] ?? m.defaultRate;
             return (
               <button key={m.id} onClick={() => available && pickMode(m.id)} disabled={!available}
-                className={"rounded-2xl border p-5 text-left transition-colors " + (available ? "border-line bg-surface hover:border-line-strong hover:bg-raised" : "cursor-not-allowed border-line bg-surface opacity-60")}>
+                className={"rounded-2xl border p-5 text-start transition-colors " + (available ? "border-line bg-surface hover:border-line-strong hover:bg-raised" : "cursor-not-allowed border-line bg-surface opacity-60")}>
                 <div className="mb-3 flex items-start justify-between gap-2">
                   <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent/15 text-accent-text"><Icon size={20} aria-hidden /></span>
-                  {m.comingSoon ? <Badge tone="signal">Coming soon</Badge> : !available ? <Badge>Unavailable</Badge> : <Badge>{r} tokens/min</Badge>}
+                  {m.comingSoon ? <Badge tone="signal">{t("comingSoon")}</Badge> : !available ? <Badge>{t("unavailableMode")}</Badge> : <Badge>{t("perMin", { count: r })}</Badge>}
                 </div>
-                <p className="text-[15px] font-semibold text-ink">{m.title}</p>
-                <p className="text-sm text-accent-text">{m.tagline}</p>
-                <p className="mt-1.5 text-xs leading-relaxed text-ink-muted">{m.desc}</p>
+                <p className="text-[15px] font-semibold text-ink">{modeText(m, "title")}</p>
+                <p className="text-sm text-accent-text">{modeText(m, "tagline")}</p>
+                <p className="mt-1.5 text-xs leading-relaxed text-ink-muted">{modeText(m, "desc")}</p>
               </button>
             );
           })}
@@ -535,21 +589,22 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
           <section className={`${cardClass} space-y-4 p-5`}>
             <div className="flex items-center gap-2">
               <CheckCircle2 size={18} className="text-emerald-400" aria-hidden />
-              <h3 className="font-semibold">Your remix is ready</h3>
-              <Badge>{result.cost} tokens</Badge>
+              <h3 className="font-semibold">{t("ready")}</h3>
+              <Badge>{c("tokens", { count: result.cost })}</Badge>
             </div>
             <video src={result.url} controls playsInline className="max-h-[70vh] w-full rounded-xl border border-line bg-black" />
             <div className="grid grid-cols-2 gap-3">
-              <Button variant="primary" onClick={() => download(result.url)}><Download size={16} aria-hidden /> Save video</Button>
-              <Button variant="secondary" onClick={() => { setResult(null); setRewrite(null); resetSource(); }}>Remix another</Button>
+              <Button variant="primary" onClick={() => download(result.url)}><Download size={16} aria-hidden /> {t("saveVideo")}</Button>
+              <Button variant="secondary" onClick={() => { setResult(null); setRewrite(null); resetSource(); }}>{t("another")}</Button>
             </div>
-            <p className="text-xs text-ink-subtle">Saved to your Gallery.</p>
+            {notice && <Alert tone="warning">{notice}</Alert>}
+            <p className="text-xs text-ink-subtle">{t("saved")}</p>
           </section>
           {rewrite && (
             <section className={`${cardClass} space-y-3 p-5`}>
               <div className="flex items-center gap-2"><FileText size={17} className="text-accent-text" aria-hidden /><h3 className="font-semibold">{rewrite.title}</h3></div>
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-muted">{rewrite.script}</p>
-              <Button variant="secondary" onClick={openInScriptToVideo}>Turn the full script into a multi-scene video <ArrowRight size={16} aria-hidden /></Button>
+              <Button variant="secondary" onClick={openInScriptToVideo}>{t("toMultiScene")} <ArrowRight size={16} className="rtl:-scale-x-100" aria-hidden /></Button>
             </section>
           )}
         </div>
@@ -559,8 +614,8 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
       {running && (
         <section className={`${cardClass} space-y-5 p-6`}>
           <div className="text-center">
-            <h3 className="font-semibold">Remixing your video</h3>
-            <p className="mt-1 text-sm text-ink-muted">{mode.title} · {fmt(elapsed)} elapsed · keep this page open</p>
+            <h3 className="font-semibold">{t("remixing")}</h3>
+            <p className="mt-1 text-sm text-ink-muted">{t("progressLine", { mode: modeText(mode, "title"), time: fmt(elapsed) })}</p>
           </div>
           <Progress value={progress} />
           <ul className="space-y-2">
@@ -579,14 +634,14 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
           </ul>
           {rewrite && mode.id === "recreate" && (
             <div className="rounded-xl border border-line bg-canvas p-4">
-              <p className="mb-1 text-xs font-medium text-ink-subtle">New script</p>
+              <p className="mb-1 text-xs font-medium text-ink-subtle">{t("newScript")}</p>
               <p className="line-clamp-4 text-sm text-ink-muted">{rewrite.script}</p>
             </div>
           )}
           {/* Cancel only where it actually stops the work: before generation, or a Runway task */}
           {(runwayTask || ["charging", "trimming", "uploading", "transcribing", "rewriting"].includes(stage)) && (
             <div className="flex justify-center">
-              <Button variant="ghost" size="sm" onClick={cancel}><Ban size={15} aria-hidden /> Cancel and refund</Button>
+              <Button variant="ghost" size="sm" onClick={cancel}><Ban size={15} aria-hidden /> {t("cancelRefund")}</Button>
             </div>
           )}
         </section>
@@ -597,13 +652,13 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
         <div className="space-y-4">
           <section className={`${cardClass} space-y-4 p-5`}>
             <div className="flex items-center justify-between gap-3">
-              <h3 className="font-semibold">Source video</h3>
+              <h3 className="font-semibold">{t("source")}</h3>
               {mode.allowUrl && (
                 <div className="inline-flex rounded-lg border border-line p-0.5" role="tablist">
                   {(["upload", "url"] as const).map((k) => (
                     <button key={k} role="tab" aria-selected={sourceKind === k} onClick={() => { setSourceKind(k); resetSource(); setError(""); }}
                       className={"h-8 rounded-md px-3 text-xs font-medium transition-colors " + (sourceKind === k ? "bg-raised text-ink" : "text-ink-muted hover:text-ink")}>
-                      {k === "upload" ? "Upload" : "Paste link"}
+                      {k === "upload" ? t("upload") : t("pasteLink")}
                     </button>
                   ))}
                 </div>
@@ -618,18 +673,18 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
                   {sourceFile && sourceMeta
                     ? <span className="text-sm font-medium text-ink">{sourceFile.name} · {fmt(sourceMeta.seconds)}</span>
                     : <span className="text-sm text-ink-muted">{mode.id === "actor_swap"
-                        ? `Upload a video up to ${Math.round(mode.maxBytes / 1024 / 1024)}MB. Longer than 30 seconds? You'll pick your best 30 seconds next.`
-                        : `Upload a video up to ${mode.maxSeconds >= 60 ? `${mode.maxSeconds / 60} minutes` : `${mode.maxSeconds} seconds`} and ${Math.round(mode.maxBytes / 1024 / 1024)}MB`}</span>}
+                        ? t("uploadHintTrim", { mb: Math.round(mode.maxBytes / 1024 / 1024) })
+                        : mode.maxSeconds >= 60 ? t("uploadHintMinutes", { minutes: mode.maxSeconds / 60, mb: Math.round(mode.maxBytes / 1024 / 1024) }) : t("uploadHintSeconds", { seconds: mode.maxSeconds, mb: Math.round(mode.maxBytes / 1024 / 1024) })}</span>}
                 </button>
                 {needsTrim && sourceFile && sourceMeta && (
-                  <VideoTrimmer file={sourceFile} duration={sourceMeta.seconds} windowSeconds={RUNWAY_MAX_SECONDS} start={trimStart} onChange={setTrimStart} message={TRIM_MESSAGE} />
+                  <VideoTrimmer file={sourceFile} duration={sourceMeta.seconds} windowSeconds={RUNWAY_MAX_SECONDS} start={trimStart} onChange={setTrimStart} message={trimMessage} />
                 )}
               </>
             ) : (
               <div className="flex flex-col gap-2 sm:flex-row">
-                <Input type="url" value={sourceUrl} onChange={(e) => { setSourceUrl(e.target.value); setSourceMeta(null); }} placeholder="https://example.com/video.mp4" aria-label="Video link" />
+                <Input type="url" value={sourceUrl} onChange={(e) => { setSourceUrl(e.target.value); setSourceMeta(null); }} placeholder="https://example.com/video.mp4" aria-label={t("videoLink")} />
                 <Button variant="secondary" onClick={checkSourceUrl} disabled={probing || !sourceUrl.trim()}>
-                  {probing ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Link2 size={16} aria-hidden />} {sourceMeta ? `Loaded · ${fmt(sourceMeta.seconds)}` : "Check link"}
+                  {probing ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Link2 size={16} aria-hidden />} {sourceMeta ? t("loaded", { time: fmt(sourceMeta.seconds) }) : t("checkLink")}
                 </Button>
               </div>
             )}
@@ -637,62 +692,71 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
 
           {mode.id === "restyle" && (
             <section className={`${cardClass} space-y-4 p-5`}>
-              <h3 className="font-semibold">New style</h3>
+              <h3 className="font-semibold">{t("newStyle")}</h3>
               <div className="flex flex-wrap gap-2">
-                {STYLE_PRESETS.map((p) => (
-                  <button key={p} onClick={() => setStyle(p)} className={"h-8 rounded-full border px-3 text-xs transition-colors " + (style === p ? "border-accent bg-accent/15 text-ink" : "border-line text-ink-muted hover:border-line-strong hover:text-ink")}>{p}</button>
+                {STYLE_PRESETS.map((p, i) => (
+                  <button key={p} onClick={() => setStyle(p)} className={"h-8 rounded-full border px-3 text-xs transition-colors " + (style === p ? "border-accent bg-accent/15 text-ink" : "border-line text-ink-muted hover:border-line-strong hover:text-ink")}>{t(`stylePresets.${i}`)}</button>
                 ))}
               </div>
-              <Field label="Describe the look" hint="Describe the visual style, not the action; the motion comes from your video.">
-                <Textarea rows={3} value={style} onChange={(e) => setStyle(e.target.value)} placeholder="Hand-painted watercolor with soft paper texture and pastel colors" />
+              <Field label={t("describeLook")} hint={t("describeLookHint")}>
+                <Textarea rows={3} value={style} onChange={(e) => setStyle(e.target.value)} placeholder={t("lookPlaceholder")} />
               </Field>
             </section>
           )}
 
           {mode.id === "recreate" && (
             <section className={`${cardClass} space-y-4 p-5`}>
-              <h3 className="font-semibold">Your version</h3>
-              <Field label="Topic or product (optional)" hint="Leave blank and AI picks a fresh topic in the same niche.">
-                <Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="My vegan protein bar for busy parents" />
+              <h3 className="font-semibold">{t("yourVersion")}</h3>
+              <Field label={t("topic")} hint={t("topicHint")}>
+                <Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder={t("topicPlaceholder")} />
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Video model">
+                <Field label={t("videoModel")}>
                   <Select value={activeModel} onChange={(e) => setModel(e.target.value)}>
-                    {models.map((m) => <option key={m.id} value={m.id}>{m.name}{m.hasSound ? " · audio" : ""}</option>)}
+                    {models.map((m) => <option key={m.id} value={m.id}>{m.name}{m.hasSound ? ` · ${t("audio")}` : ""}</option>)}
                   </Select>
                 </Field>
-                <Field label="Clip length">
+                <Field label={t("clipLength")}>
                   <Select value={duration} onChange={(e) => setDuration(e.target.value)}>
-                    <option value="5">5 seconds</option>
-                    <option value="10">10 seconds</option>
+                    <option value="5">{t("sec5")}</option>
+                    <option value="10">{t("sec10")}</option>
                   </Select>
                 </Field>
               </div>
-              <p className="text-xs text-ink-subtle">You&apos;ll get the new script plus one clip. Send the full script to Script to Video afterwards for every scene.</p>
+              <p className="text-xs text-ink-subtle">{t("recreateNote")}</p>
             </section>
           )}
 
           {mode.id === "actor_swap" && (
             <section className={`${cardClass} space-y-4 p-5`}>
-              <h3 className="font-semibold">New performer</h3>
+              <h3 className="font-semibold">{t("newPerformer")}</h3>
               <input ref={performerRef} type="file" accept="image/*,video/mp4,video/quicktime,video/webm" onChange={onPerformer} className="hidden" />
-              <button onClick={() => performerRef.current?.click()} className="flex w-full items-center gap-4 rounded-xl border border-dashed border-line-strong bg-canvas p-4 text-left transition-colors hover:border-accent/60">
+              <button onClick={() => performerRef.current?.click()} className="flex w-full items-center gap-4 rounded-xl border border-dashed border-line-strong bg-canvas p-4 text-start transition-colors hover:border-accent/60">
                 {performerPreview
-                  ? <img src={performerPreview} alt="New performer" className="h-16 w-16 rounded-lg object-cover" />
+                  ? <img src={performerPreview} alt={t("newPerformer")} className="h-16 w-16 rounded-lg object-cover" />
                   : <span className="grid h-16 w-16 place-items-center rounded-lg bg-white/[0.04] text-ink-subtle"><ImagePlus size={20} aria-hidden /></span>}
-                <span className="text-sm text-ink-muted">{performer ? performer.name : "Upload a clear, front-facing photo (or a short video) of the new performer. Use someone you have permission to use."}</span>
+                <span className="text-sm text-ink-muted">{performer ? performer.name : t("performerHint")}</span>
               </button>
               <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-canvas p-3.5">
                 <div>
-                  <p className="text-sm font-medium">Copy body movement</p>
-                  <p className="text-xs text-ink-subtle">Transfer gestures too, not just facial expressions</p>
+                  <p className="text-sm font-medium">{t("bodyMovement")}</p>
+                  <p className="text-xs text-ink-subtle">{t("bodyMovementDesc")}</p>
                 </div>
-                <Toggle checked={bodyControl} onChange={() => setBodyControl(!bodyControl)} label="Copy body movement" />
+                <Toggle checked={bodyControl} onChange={() => setBodyControl(!bodyControl)} label={t("bodyMovement")} />
               </div>
-              <Field label={`Expression intensity: ${intensity}`}>
-                <input type="range" min={1} max={5} step={1} value={intensity} onChange={(e) => setIntensity(Number(e.target.value))} className="w-full accent-[var(--kf-accent)]" aria-label="Expression intensity" />
+              <Field label={t("intensity", { value: intensity })}>
+                <input type="range" min={1} max={5} step={1} value={intensity} onChange={(e) => setIntensity(Number(e.target.value))} className="w-full accent-[var(--kf-accent)]" aria-label={t("intensityAria")} />
               </Field>
-              <p className="text-xs text-ink-subtle">The new performer appears in their own photo&apos;s setting, performing what the person in your video does.</p>
+              {bgAvailable && (
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-canvas p-3.5">
+                  <div>
+                    <p className="text-sm font-medium">{t("bgPreserve")}</p>
+                    <p className="text-xs text-ink-subtle">{bgEligible ? t("bgPreserveDesc", { rate: bgRate }) : t("bgPreserveNeeds")}</p>
+                  </div>
+                  <Toggle checked={bgOn} onChange={() => bgEligible && setPreserveBg(!preserveBg)} label={t("bgPreserve")} />
+                </div>
+              )}
+              <p className="text-xs text-ink-subtle">{bgOn ? t("performerNoteKept") : t("performerNote")}</p>
             </section>
           )}
 
@@ -700,15 +764,18 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
 
           <div className={`${cardClass} flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between`}>
             {perSecond ? (
-              <CostSummary cost={cost} ratePerMinute={rate} seconds={billedSeconds} balance={tokenBalance} rateLabel={needsTrim ? "your selected 30s" : undefined} />
+              <div className="space-y-1">
+                <CostSummary cost={cost} ratePerMinute={rate} seconds={billedSeconds} balance={tokenBalance} rateLabel={needsTrim ? t("selected30") : undefined} />
+                {bgOn && <p className="text-xs text-ink-subtle">{t("bgBreakdown", { swap: baseRate, bg: bgRate })}</p>}
+              </div>
             ) : (
               <p className="text-sm text-ink-muted">
-                Cost: <span className="font-semibold text-ink">{cost} tokens</span>
-                <span className="text-ink-subtle"> · {rate}/min{sourceMeta ? `, ${fmt(sourceMeta.seconds)} video` : ", minimum 1 minute"} · you have {tokenBalance}</span>
+                {t.rich("costLine", { cost, strong: (chunks) => <span className="font-semibold text-ink">{chunks}</span> })}
+                <span className="text-ink-subtle"> · {sourceMeta ? t("costDetailVideo", { rate, time: fmt(sourceMeta.seconds), balance: tokenBalance }) : t("costDetailMin", { rate, balance: tokenBalance })}</span>
               </p>
             )}
             <Button variant="primary" size="lg" onClick={run} disabled={!sourceMeta}>
-              <Repeat2 size={17} aria-hidden /> Remix video
+              <Repeat2 size={17} aria-hidden /> {t("submit")}
             </Button>
           </div>
         </div>

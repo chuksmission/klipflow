@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createCharge } from '../../lib/charges';
+import { createCharge, createShowcaseCharge } from '../../lib/charges';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { amount, feature } = await req.json() as { amount?: number; feature?: string };
+    const { amount, feature, pool } = await req.json() as { amount?: number; feature?: string; pool?: string };
     const value = Math.round(Number(amount));
     if (!Number.isFinite(value) || value <= 0) {
       return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
@@ -55,7 +55,14 @@ export async function POST(req: NextRequest) {
 
     // Atomic deduction + charge record (supabase/token_charges.sql). The returned
     // charge_id is what generation routes and refunds are tied to.
-    const result = await createCharge(user.id, value, feature ?? null);
+    // Admin tools pay from the separate showcase balance
+    if (pool === 'showcase') {
+      const { data: profile } = await supabase.from('user_profiles').select('is_admin').eq('id', user.id).single();
+      if (!profile?.is_admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    const result = pool === 'showcase'
+      ? await createShowcaseCharge(user.id, value, feature ?? null)
+      : await createCharge(user.id, value, feature ?? null);
     if ('error' in result) return NextResponse.json({ error: result.error }, { status: result.status });
 
     return NextResponse.json({ balance: result.balance, total_used: result.totalUsed, charge_id: result.chargeId });

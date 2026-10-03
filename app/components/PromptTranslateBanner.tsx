@@ -6,7 +6,9 @@ import { Languages, Loader2 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { detectLanguage } from "../lib/language-detect";
 import { ACTOR_SWAP_LANGUAGES } from "../lib/actor-swap";
-import { languageName, type LanguageChoice } from "./LanguageAccentSelector";
+import { useTranslations } from "next-intl";
+import { type LanguageChoice } from "./LanguageAccentSelector";
+import { useLanguageLabels } from "../lib/use-language-labels";
 
 const KNOWN = new Set(ACTOR_SWAP_LANGUAGES.map((l) => l.code));
 // AI detections already made this session (only used when the local check is unsure)
@@ -35,6 +37,8 @@ interface Props {
 }
 
 export default function PromptTranslateBanner({ text, onTextChange, target }: Props) {
+  const t = useTranslations("translateBanner");
+  const labels = useLanguageLabels();
   const [detected, setDetected] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [translating, setTranslating] = useState(false);
@@ -65,7 +69,7 @@ export default function PromptTranslateBanner({ text, onTextChange, target }: Pr
     const r = await post({ action: "translate", text, language: target.language, accent: target.accent });
     setTranslating(false);
     if (r?.text) { onTextChange(r.text); setDetected(target.language); }
-    else setError(r?.error ?? "Couldn't translate right now. Try again.");
+    else setError(r?.error ?? t("failed"));
   };
 
   return (
@@ -73,18 +77,21 @@ export default function PromptTranslateBanner({ text, onTextChange, target }: Pr
       <p className="flex items-start gap-2 text-ink-muted">
         <Languages size={14} className="mt-0.5 shrink-0 text-accent-text" aria-hidden />
         <span>
-          Your prompt appears to be in {languageName(detected!)} but output language is set to {languageName(target.language)}. Auto-translate prompt before generating?
+          {detected === "en"
+            // English prompts work best with the video models; the output language is applied separately
+            ? t("englishPrompt")
+            : t("mismatch", { from: labels.language(detected!), to: labels.language(target.language) })}
           {error && <span className="block text-red-400">{error}</span>}
         </span>
       </p>
       <div className="flex shrink-0 gap-2">
         <button onClick={translate} disabled={translating}
           className="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent px-3 font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-60">
-          {translating && <Loader2 size={13} className="animate-spin" aria-hidden />} Yes, translate
+          {translating && <Loader2 size={13} className="animate-spin" aria-hidden />} {t("yes")}
         </button>
         <button onClick={() => setDismissed(pairKey)} disabled={translating}
           className="h-8 rounded-md border border-line px-3 text-ink-muted transition-colors hover:border-line-strong hover:text-ink">
-          No, keep as-is
+          {t("no")}
         </button>
       </div>
     </div>

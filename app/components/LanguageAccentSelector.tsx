@@ -1,7 +1,9 @@
 "use client";
 // Two-step output language → accent picker (the AI Actor Swap list), shared by
 // the Studio modules, AI Actor Swap and the admin Showcase Studio.
+import { useTranslations } from "next-intl";
 import { ACTOR_SWAP_LANGUAGES } from "../lib/actor-swap";
+import { useLanguageLabels } from "../lib/use-language-labels";
 import { Field, Select } from "./ui";
 
 export interface LanguageChoice { language: string; accent: string }
@@ -25,21 +27,23 @@ interface Props {
 }
 
 export default function LanguageAccentSelector({
-  value, onChange, label, languageLabel = "Language", accentLabel = "Accent", allowEmpty = false,
+  value, onChange, label, languageLabel, accentLabel, allowEmpty = false,
 }: Props) {
+  const t = useTranslations("languageSelector");
+  const labels = useLanguageLabels();
   const language = ACTOR_SWAP_LANGUAGES.find((l) => l.code === value.language) ?? null;
   const fields = (
     <div className="grid gap-3 sm:grid-cols-2">
-      <Field label={languageLabel}>
+      <Field label={languageLabel ?? t("language")}>
         <Select value={value.language} onChange={(e) => onChange({ language: e.target.value, accent: defaultAccent(e.target.value) })}>
-          {allowEmpty && <option value="" disabled>Choose a language</option>}
-          {ACTOR_SWAP_LANGUAGES.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
+          {allowEmpty && <option value="" disabled>{t("choose")}</option>}
+          {ACTOR_SWAP_LANGUAGES.map((l) => <option key={l.code} value={l.code}>{labels.language(l.code)}</option>)}
         </Select>
       </Field>
-      <Field label={accentLabel}>
+      <Field label={accentLabel ?? t("accent")}>
         <Select value={value.accent} onChange={(e) => onChange({ ...value, accent: e.target.value })} disabled={!language}>
-          {!language && <option value="">Choose a language first</option>}
-          {language?.accents.map((a) => <option key={a} value={a}>{a}</option>)}
+          {!language && <option value="">{t("chooseFirst")}</option>}
+          {language?.accents.map((a) => <option key={a} value={a}>{labels.accent(a)}</option>)}
         </Select>
       </Field>
     </div>

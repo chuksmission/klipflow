@@ -2,11 +2,16 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { useAuthErrorMessage } from "../lib/auth-errors";
 import { supabase } from "../lib/supabase";
 import AuthShell, { PasswordInput } from "../components/AuthShell";
 import { Alert, Button, Field, Spinner } from "../components/ui";
 
 export default function UpdatePassword() {
+  const t = useTranslations("updatePassword");
+  const a = useTranslations("authForm");
+  const authError = useAuthErrorMessage();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -35,12 +40,12 @@ export default function UpdatePassword() {
             refresh_token: refreshToken || '',
           });
           if (!error) setReady(true);
-          else setError('Invalid or expired reset link. Please request a new one.');
+          else setError(t("expiredLink"));
         } else {
-          setError('Invalid reset link. Please request a new one.');
+          setError(t("invalidLink"));
         }
       } else {
-        setError('Invalid reset link. Please request a new one.');
+        setError(t("invalidLink"));
       }
     };
 
@@ -49,15 +54,15 @@ export default function UpdatePassword() {
 
   const handleUpdate = async () => {
     if (!password || !confirmPassword) {
-      setError("Please fill in all fields.");
+      setError(a("fillAll"));
       return;
     }
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      setError(a("mismatch"));
       return;
     }
     if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+      setError(a("tooShort"));
       return;
     }
 
@@ -67,7 +72,7 @@ export default function UpdatePassword() {
     const { error: updateError } = await supabase.auth.updateUser({ password });
 
     if (updateError) {
-      setError(updateError.message);
+      setError(authError(updateError.message));
       setLoading(false);
       return;
     }
@@ -76,11 +81,11 @@ export default function UpdatePassword() {
   };
 
   return (
-    <AuthShell title="Choose a new password" subtitle="Use at least 8 characters.">
+    <AuthShell title={t("title")} subtitle={t("subtitle")}>
       {!ready && !error && (
         <div className="flex flex-col items-center py-8 text-center">
           <Spinner size={24} className="text-accent-text" />
-          <p className="mt-3 text-sm text-ink-muted">Verifying your reset link…</p>
+          <p className="mt-3 text-sm text-ink-muted">{t("verifying")}</p>
         </div>
       )}
 
@@ -88,21 +93,21 @@ export default function UpdatePassword() {
         <div className="flex flex-col items-center py-4 text-center">
           <span className="mb-3 grid h-11 w-11 place-items-center rounded-2xl bg-red-500/10 text-red-400"><AlertTriangle size={20} aria-hidden /></span>
           <p className="mb-5 text-sm text-ink-muted">{error}</p>
-          <Button variant="primary" onClick={() => router.push('/reset-password')}>Request a new link</Button>
+          <Button variant="primary" onClick={() => router.push('/reset-password')}>{t("requestNew")}</Button>
         </div>
       )}
 
       {ready && (
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleUpdate(); }}>
-          <Field label="New password">
-            <PasswordInput autoComplete="new-password" placeholder="At least 8 characters" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <Field label={t("newPassword")}>
+            <PasswordInput autoComplete="new-password" placeholder={t("newPlaceholder")} value={password} onChange={(e) => setPassword(e.target.value)} />
           </Field>
-          <Field label="Confirm new password">
-            <PasswordInput autoComplete="new-password" placeholder="Repeat new password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+          <Field label={t("confirmPassword")}>
+            <PasswordInput autoComplete="new-password" placeholder={t("confirmPlaceholder")} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
           </Field>
           {error && <Alert>{error}</Alert>}
           <Button type="submit" variant="primary" size="lg" disabled={loading} className="w-full">
-            {loading ? <><Spinner size={17} /> Updating…</> : "Update password"}
+            {loading ? <><Spinner size={17} /> {t("updating")}</> : t("submit")}
           </Button>
         </form>
       )}

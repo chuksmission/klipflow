@@ -2,13 +2,18 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { supabase } from "../lib/supabase";
 import { getDeviceFingerprint } from "../lib/fingerprint";
 import { MailCheck } from "lucide-react";
 import AuthShell, { AuthDivider, GoogleButton, PasswordInput } from "../components/AuthShell";
 import { Alert, Button, Field, Input, Spinner } from "../components/ui";
+import { useAuthErrorMessage } from "../lib/auth-errors";
 
 export default function SignUp() {
+  const t = useTranslations("signup");
+  const a = useTranslations("authForm");
+  const authError = useAuthErrorMessage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -27,15 +32,15 @@ export default function SignUp() {
 
   const handleSignUp = async () => {
     if (!email || !password || !confirmPassword) {
-      setError("Please fill in all fields.");
+      setError(a("fillAll"));
       return;
     }
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      setError(a("mismatch"));
       return;
     }
     if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+      setError(a("tooShort"));
       return;
     }
 
@@ -54,11 +59,11 @@ export default function SignUp() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || 'Something went wrong.');
+        setError(data.error ? authError(data.error) : a("genericError"));
         return;
       }
 
-      const { error: authError } = await supabase.auth.signUp({
+      const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -66,15 +71,15 @@ export default function SignUp() {
         }
       });
 
-      if (authError) {
-        setError(authError.message);
+      if (signUpError) {
+        setError(authError(signUpError.message));
         return;
       }
 
       setSuccess(true);
 
     } catch (err) {
-      setError('Something went wrong. Please try again.');
+      setError(a("genericError"));
     } finally {
       setLoading(false);
     }
@@ -90,13 +95,13 @@ export default function SignUp() {
   if (success) {
     return (
       <AuthShell
-        title="Check your email"
-        subtitle={<>We sent a verification link to <span className="font-medium text-ink">{email}</span>. Click it to verify your account and claim your 25 free tokens.</>}
-        footer={<>Already verified? <Link href="/login" className="font-medium text-accent-text hover:text-ink">Sign in</Link></>}
+        title={t("checkEmailTitle")}
+        subtitle={t.rich("checkEmailSubtitle", { email, strong: (chunks) => <span className="font-medium text-ink">{chunks}</span> })}
+        footer={<>{t("alreadyVerified")} <Link href="/login" className="font-medium text-accent-text hover:text-ink">{t("signIn")}</Link></>}
       >
         <div className="flex items-start gap-3 rounded-xl border border-line bg-canvas p-4">
           <MailCheck size={20} className="mt-0.5 flex-shrink-0 text-accent-text" aria-hidden />
-          <p className="text-sm text-ink-muted">Don&apos;t see it? Check your spam or promotions folder. The link expires in 24 hours.</p>
+          <p className="text-sm text-ink-muted">{t("spamHint")}</p>
         </div>
       </AuthShell>
     );
@@ -104,31 +109,31 @@ export default function SignUp() {
 
   return (
     <AuthShell
-      title="Create your account"
-      subtitle="Get 25 free tokens, enough for 2 videos. No credit card required."
-      footer={<>Already have an account? <Link href="/login" className="font-medium text-accent-text hover:text-ink">Sign in</Link></>}
+      title={t("title")}
+      subtitle={t("subtitle")}
+      footer={<>{t("haveAccount")} <Link href="/login" className="font-medium text-accent-text hover:text-ink">{t("signIn")}</Link></>}
     >
       <GoogleButton onClick={signUpWithGoogle} />
       <AuthDivider />
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleSignUp(); }}>
-        <Field label="Email">
-          <Input type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="h-11" />
+        <Field label={a("email")}>
+          <Input type="email" autoComplete="email" placeholder={a("emailPlaceholder")} value={email} onChange={(e) => setEmail(e.target.value)} className="h-11" />
         </Field>
-        <Field label="Password">
-          <PasswordInput autoComplete="new-password" placeholder="At least 8 characters" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <Field label={a("password")}>
+          <PasswordInput autoComplete="new-password" placeholder={t("passwordPlaceholder")} value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
-        <Field label="Confirm password">
-          <PasswordInput autoComplete="new-password" placeholder="Repeat your password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+        <Field label={t("confirmPassword")}>
+          <PasswordInput autoComplete="new-password" placeholder={t("confirmPlaceholder")} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
         </Field>
         {error && <Alert>{error}</Alert>}
         <Button type="submit" variant="primary" size="lg" disabled={loading} className="w-full">
-          {loading ? <><Spinner size={17} /> Creating account…</> : "Create free account"}
+          {loading ? <><Spinner size={17} /> {t("creating")}</> : t("submit")}
         </Button>
         <p className="text-center text-xs leading-relaxed text-ink-subtle">
-          By signing up you agree to our{" "}
-          <Link href="/terms-of-service" className="text-ink-muted underline-offset-2 hover:text-ink hover:underline">Terms of Service</Link>
-          {" "}and{" "}
-          <Link href="/privacy-policy" className="text-ink-muted underline-offset-2 hover:text-ink hover:underline">Privacy Policy</Link>.
+          {t.rich("agree", {
+            terms: (chunks) => <Link href="/terms-of-service" className="text-ink-muted underline-offset-2 hover:text-ink hover:underline">{chunks}</Link>,
+            privacy: (chunks) => <Link href="/privacy-policy" className="text-ink-muted underline-offset-2 hover:text-ink hover:underline">{chunks}</Link>,
+          })}
         </p>
       </form>
     </AuthShell>

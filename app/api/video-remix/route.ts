@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { TranscriptionError, transcribeVideoUrl } from "../../lib/whisper";
-import { attachTask, claimCharge, getCharge, getTokenPrice, isChargeId, releaseClaim } from "../../lib/charges";
+import { readFile } from "node:fs/promises";
+import { attachTask, claimCharge, getCharge, getTokenPrice, isChargeId, refundCharge, releaseClaim } from "../../lib/charges";
 import { perSecondCost } from "../../lib/duration-pricing";
-import { mediaSeconds } from "../../lib/server-ffmpeg";
+import { download, mediaSeconds, probeMedia, runFfmpeg, workspace } from "../../lib/server-ffmpeg";
+import { getTaskStatus } from "../../lib/task-status";
+import { aspectForSize, nanoBananaTask } from "../../lib/kie-image";
+import { getPrediction, modelInfo, outputUrl, startPrediction, uriField } from "../../lib/replicate";
 
-// Transcription and the rewrite call can each take 10-40s
-export const maxDuration = 60;
+// Transcription and the rewrite call take 10-40s; the background composite
+// (Actor Swap with the original background) renders up to 30s of video
+export const maxDuration = 300;
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -42,6 +47,8 @@ const MODE_TOGGLES: Record<string, string> = {
   transcribe: "video_remix_recreate_enabled",
   rewrite: "video_remix_recreate_enabled",
   actor_swap: "video_remix_actor_swap_enabled",
+  actor_swap_start: "video_remix_actor_swap_enabled",
+  bg_restore: "video_remix_actor_swap_enabled",
 };
 
 async function modeEnabled(action: string): Promise<boolean> {
@@ -160,6 +167,165 @@ async function rewriteWithOpenAI(apiKey: string, userText: string, frames: Frame
   return JSON.parse(text);
 }
 
+// ---------------------------------------------------------------- actor swap: original background
+
+// Places the uploaded performer into the source video's opening frame
+const PLACE_PROMPT = `Image 1 is the opening frame of a video. Image 2 is a photo of a different person. Replace the person in image 1 with the person from image 2: their face, hair, skin tone, body and clothing come from image 2, in exactly the same position, pose, framing, scale and camera angle as the person in image 1. Keep everything else from image 1 exactly as it is: the background, room, props, objects, food, lighting and colours. Photorealistic, seamless, no added text.`;
+
+const REPLICATE_MATTE = "arielreplicate/robust_video_matting";
+const REPLICATE_INPAINT = "jd7h/propainter";
+// Matting, inpainting and the composite together must finish in this window
+const RESTORE_MAX_MS = 9 * 60 * 1000;
+
+interface BgState {
+  started_at?: number;
+  src_mask?: string; src_mask_url?: string;
+  new_mask?: string; new_mask_url?: string;
+  clean?: string; clean_url?: string;
+}
+
+async function bgPreserveAvailable(): Promise<boolean> {
+  const [on, kie] = await Promise.all([getSetting("remix_bg_preserve_enabled"), getSetting("kie_api_key")]);
+  return on === "true" && !!kie;
+}
+
+async function copyToStorage(url: string, path: string): Promise<string> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Download failed (${res.status})`);
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  const { error } = await supabase.storage.from("generation-inputs").upload(path, bytes, { contentType: res.headers.get("content-type") ?? "application/octet-stream", upsert: true });
+  if (error) throw new Error(`Storage upload failed: ${error.message}`);
+  return supabase.storage.from("generation-inputs").getPublicUrl(path).data.publicUrl;
+}
+
+/** First clear frame of a stored video, saved as a PNG in our storage. */
+async function openingFrame(videoUrl: string, id: string): Promise<string> {
+  const ws = await workspace("remix-frame");
+  try {
+    const out = ws.file("frame.png");
+    await runFfmpeg(["-ss", "0.15", "-i", videoUrl, "-frames:v", "1", out], 45_000);
+    const { error } = await supabase.storage.from("generation-inputs").upload(`video-remix/${id}-frame.png`, await readFile(out), { contentType: "image/png", upsert: true });
+    if (error) throw new Error(`Storage upload failed: ${error.message}`);
+    return supabase.storage.from("generation-inputs").getPublicUrl(`video-remix/${id}-frame.png`).data.publicUrl;
+  } finally {
+    await ws.cleanup();
+  }
+}
+
+async function startActTwo(key: string, characterUrl: string, body: { character_type?: string; video_url?: string; ratio?: string; body_control?: boolean; expression_intensity?: number }, forceImage = false): Promise<{ id: string } | { error: string }> {
+  const ratio = ["1280:720", "720:1280", "960:960", "1104:832", "832:1104", "1584:672"].includes(body.ratio ?? "") ? body.ratio : "1280:720";
+  const res = await fetch(`${RUNWAY_BASE}/character_performance`, {
+    method: "POST",
+    headers: runwayHeaders(key),
+    body: JSON.stringify({
+      model: "act_two",
+      // The new performer (or the source frame with them placed in it)...
+      character: { type: body.character_type === "video" && !forceImage ? "video" : "image", uri: characterUrl },
+      // ...performs what the person in the source video does
+      reference: { type: "video", uri: body.video_url },
+      ratio,
+      bodyControl: body.body_control !== false,
+      expressionIntensity: Math.min(5, Math.max(1, Math.round(body.expression_intensity ?? 3))),
+    }),
+  });
+  const data = await safeJson(res);
+  console.log("Runway character_performance:", res.status, JSON.stringify(data));
+  if (!res.ok || !data.id) return { error: runwayError(data, res.status) };
+  return { id: data.id };
+}
+
+async function matteInput(key: string, video: string) {
+  const info = await modelInfo(key, REPLICATE_MATTE);
+  const field = uriField(info, /video/i) ?? "input_video";
+  const input: Record<string, unknown> = { [field]: video };
+  // Ask for the alpha matte (white = person) rather than a green-screen render
+  for (const [name, values] of Object.entries(info.enums)) {
+    const alpha = values.find((v) => typeof v === "string" && /alpha/i.test(v));
+    if (alpha) input[name] = alpha;
+  }
+  return { version: info.version, input };
+}
+
+async function inpaintInput(key: string, video: string, mask: string) {
+  const info = await modelInfo(key, REPLICATE_INPAINT);
+  const videoField = uriField(info, /video/i, /mask/i);
+  const maskField = uriField(info, /mask/i);
+  if (!videoField || !maskField) throw new Error("The inpainting model's inputs changed.");
+  const input: Record<string, unknown> = { [videoField]: video, [maskField]: mask };
+  if (info.input.fp16?.type === "boolean") input.fp16 = true;
+  if (info.input.resize_ratio?.type === "number") input.resize_ratio = 0.5;
+  return { version: info.version, input };
+}
+
+/** Polls one prediction; returns its output URL once it has one. */
+async function predictionUrl(key: string, id: string): Promise<string | null> {
+  const p = await getPrediction(key, id);
+  if (p.status === "failed" || p.status === "canceled") throw new Error(p.error ?? "Prediction failed");
+  return p.status === "succeeded" ? outputUrl(p.output, /alpha|mask|\.mp4/i) : null;
+}
+
+// One step of: matte the original actor and the new one, inpaint the original
+// actor out of the source (a clean plate), then composite.
+async function advanceRestore(key: string, sourceUrl: string, resultUrl: string, prev: BgState, id: string) {
+  const s: BgState = { ...prev, started_at: prev.started_at ?? Date.now() };
+  if (Date.now() - s.started_at! > RESTORE_MAX_MS) return { done: true, url: resultUrl, restored: false };
+
+  if (!s.src_mask) { const m = await matteInput(key, sourceUrl); s.src_mask = (await startPrediction(key, m.version, m.input)).id; }
+  if (!s.new_mask) { const m = await matteInput(key, resultUrl); s.new_mask = (await startPrediction(key, m.version, m.input)).id; }
+  if (!s.src_mask_url) s.src_mask_url = (await predictionUrl(key, s.src_mask)) ?? undefined;
+  if (!s.new_mask_url) s.new_mask_url = (await predictionUrl(key, s.new_mask)) ?? undefined;
+  if (s.src_mask_url && !s.clean) { const p = await inpaintInput(key, sourceUrl, s.src_mask_url); s.clean = (await startPrediction(key, p.version, p.input)).id; }
+  if (s.clean && !s.clean_url) s.clean_url = (await predictionUrl(key, s.clean)) ?? undefined;
+
+  if (!(s.clean_url && s.new_mask_url && s.src_mask_url)) return { done: false, bg_state: s };
+  const url = await compositeOver(sourceUrl, s.clean_url, s.src_mask_url, resultUrl, s.new_mask_url, id);
+  return { done: true, url, restored: true };
+}
+
+/**
+ * Final picture: the source video, with the original actor's area filled from
+ * the clean plate, and the new performer (cut out with their matte) on top.
+ * Keeps the source's real, moving background at full resolution.
+ */
+async function compositeOver(source: string, clean: string, srcMask: string, result: string, newMask: string, id: string): Promise<string> {
+  const ws = await workspace("remix-bg");
+  try {
+    const files = { source: ws.file("source.mp4"), clean: ws.file("clean.mp4"), srcMask: ws.file("srcmask.mp4"), result: ws.file("result.mp4"), newMask: ws.file("newmask.mp4") };
+    await Promise.all([download(source, files.source), download(clean, files.clean), download(srcMask, files.srcMask), download(result, files.result), download(newMask, files.newMask)]);
+    const src = await probeMedia(files.source);
+    const res = await probeMedia(files.result);
+    const W = src.width - (src.width % 2) || 720;
+    const H = src.height - (src.height % 2) || 1280;
+    const fit = `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1`;
+    const out = ws.file("out.mp4");
+    await runFfmpeg([
+      "-i", files.source, "-i", files.clean, "-i", files.srcMask, "-i", files.result, "-i", files.newMask,
+      "-filter_complex", [
+        `[0:v]${fit},format=rgba[src]`,
+        `[1:v]${fit},format=rgba[clean]`,
+        // Grow the original actor's matte a little so no edge of them survives
+        `[2:v]${fit},format=gray,dilation,dilation,dilation,boxblur=6[holes]`,
+        `[clean][holes]alphamerge[fill]`,
+        `[src][fill]overlay=shortest=1[bg]`,
+        `[3:v]${fit},format=rgba[fg]`,
+        `[4:v]${fit},format=gray[fgmask]`,
+        `[fg][fgmask]alphamerge[actor]`,
+        `[bg][actor]overlay=shortest=1,format=yuv420p[v]`,
+      ].join(";"),
+      "-map", "[v]",
+      // Act-Two's own audio if it has any, otherwise the source's
+      "-map", res.hasAudio ? "3:a?" : "0:a?",
+      "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-shortest", "-movflags", "+faststart", out,
+    ], 200_000);
+    const path = `video-remix/${id}-final.mp4`;
+    const { error } = await supabase.storage.from("generation-inputs").upload(path, await readFile(out), { contentType: "video/mp4", upsert: true });
+    if (error) throw new Error(`Storage upload failed: ${error.message}`);
+    return supabase.storage.from("generation-inputs").getPublicUrl(path).data.publicUrl;
+  } finally {
+    await ws.cleanup();
+  }
+}
+
 // ---------------------------------------------------------------- handler
 
 export async function POST(req: NextRequest) {
@@ -170,7 +336,7 @@ export async function POST(req: NextRequest) {
     if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json() as {
-      action?: "restyle" | "transcribe" | "rewrite" | "actor_swap" | "cancel";
+      action?: "restyle" | "transcribe" | "rewrite" | "actor_swap" | "actor_swap_start" | "bg_restore" | "cancel";
       video_url?: string;
       prompt?: string;
       transcript?: string;
@@ -185,6 +351,12 @@ export async function POST(req: NextRequest) {
       expression_intensity?: number;
       task_id?: string;
       charge_id?: string;
+      preserve_background?: boolean;
+      bg_price?: number;
+      width?: number;
+      height?: number;
+      result_url?: string;
+      bg_state?: BgState;
     };
     const action = body.action ?? "";
 
@@ -197,13 +369,18 @@ export async function POST(req: NextRequest) {
     // our own uploads; pasted links use the browser's reading. Recreate's AI
     // steps need an open, unused Recreate charge.
     let chargeId: string | null = null;
-    const claimFor = async (pricingKey: string, fallback: number) => {
+    let extraPrice = 0;
+    const claimFor = async (pricingKey: string, fallback: number, extra?: { key: string; fallback: number }) => {
       const claimed = Math.min(30, Math.max(0, Number(body.duration) || 0));
       const measured = body.video_url?.startsWith(STORAGE_PREFIX) ? await mediaSeconds(body.video_url).catch(() => 0) : 0;
       if (measured > 30.5) return "Runway supports clips up to 30 seconds.";
       // Small differences between browser and server readings are ignored
       const seconds = measured > claimed + 1 ? measured : (claimed || measured || 30);
-      const price = perSecondCost(await getTokenPrice(pricingKey, fallback), seconds);
+      // Add-ons are priced per minute on top; the total is billed from the combined
+      // rate (as the Studio shows it), and the add-on's own share is what a fallback refunds
+      const extraRate = extra ? await getTokenPrice(extra.key, extra.fallback) : 0;
+      extraPrice = extra ? perSecondCost(extraRate, seconds) : 0;
+      const price = perSecondCost((await getTokenPrice(pricingKey, fallback)) + extraRate, seconds);
       const claim = await claimCharge(body.charge_id, price, user.id);
       if (claim.error) return claim.error;
       chargeId = body.charge_id!;
@@ -240,34 +417,92 @@ export async function POST(req: NextRequest) {
     }
 
     // ---- Mode C: Actor Swap (Runway Act-Two) ----
+    // With "preserve background" the new performer is first placed into the
+    // source video's own opening frame (Nano Banana Pro edit), so Act-Two
+    // animates them in the original setting at the original actor's position.
+    // Afterwards bg_restore puts the source's real, moving background back.
     if (action === "actor_swap") {
       if (!body.video_url?.startsWith("https://")) return NextResponse.json({ error: "A source video is required." }, { status: 400 });
       if (!body.character_url?.startsWith("https://")) return NextResponse.json({ error: "Upload the new performer." }, { status: 400 });
       const key = await getSetting("runway_api_key");
       if (!key) return NextResponse.json({ error: "Actor Swap isn't configured yet." }, { status: 503 });
-      const swapErr = await claimFor("video_remix_actor_swap", 50);
+      const preserve = body.preserve_background === true && (await bgPreserveAvailable())
+        && body.video_url.startsWith(STORAGE_PREFIX) && body.character_url.startsWith(STORAGE_PREFIX) && body.character_type !== "video";
+      const swapErr = await claimFor("video_remix_actor_swap", 50, preserve ? { key: "video_remix_bg_preserve", fallback: 20 } : undefined);
       if (swapErr) return NextResponse.json({ error: swapErr }, { status: 402 });
 
-      const ratio = ["1280:720", "720:1280", "960:960", "1104:832", "832:1104", "1584:672"].includes(body.ratio ?? "") ? body.ratio : "1280:720";
-      const res = await fetch(`${RUNWAY_BASE}/character_performance`, {
-        method: "POST",
-        headers: runwayHeaders(key),
-        body: JSON.stringify({
-          model: "act_two",
-          // The new performer...
-          character: { type: body.character_type === "video" ? "video" : "image", uri: body.character_url },
-          // ...performs what the person in the source video does
-          reference: { type: "video", uri: body.video_url },
-          ratio,
-          bodyControl: body.body_control !== false,
-          expressionIntensity: Math.min(5, Math.max(1, Math.round(body.expression_intensity ?? 3))),
-        }),
-      });
-      const data = await safeJson(res);
-      console.log("Runway character_performance:", res.status, JSON.stringify(data));
-      if (!res.ok || !data.id) { await release(); return NextResponse.json({ error: runwayError(data, res.status) }, { status: 400 }); }
-      if (chargeId) await attachTask(chargeId, data.id, "runway");
-      return NextResponse.json({ success: true, task_id: data.id, provider: "runway" });
+      if (preserve) {
+        try {
+          const frame = await openingFrame(body.video_url, chargeId!);
+          const aspect = aspectForSize(Number(body.width) || 720, Number(body.height) || 1280);
+          const taskId = await nanoBananaTask(await getSetting("kie_api_key"), PLACE_PROMPT, [frame, body.character_url], aspect);
+          await attachTask(chargeId!, taskId, "kie");
+          return NextResponse.json({ success: true, stage: "placing", task_id: taskId, provider: "kie", bg_price: extraPrice });
+        } catch (err) {
+          // Couldn't even start: drop the background add-on and run the plain swap
+          console.error("Background placement start:", err);
+          const r = await refundCharge(chargeId!, user.id, extraPrice).catch(() => ({ refunded: 0 }));
+          const started = await startActTwo(key, body.character_url, body);
+          if ("error" in started) { await release(); return NextResponse.json({ error: started.error }, { status: 400 }); }
+          await attachTask(chargeId!, started.id, "runway");
+          return NextResponse.json({ success: true, task_id: started.id, provider: "runway", preserved: false, bg_refunded: r.refunded ?? 0 });
+        }
+      }
+
+      const started = await startActTwo(key, body.character_url, body);
+      if ("error" in started) { await release(); return NextResponse.json({ error: started.error }, { status: 400 }); }
+      if (chargeId) await attachTask(chargeId, started.id, "runway");
+      return NextResponse.json({ success: true, task_id: started.id, provider: "runway", preserved: false });
+    }
+
+    // Step 2 of a background-preserving swap: start Act-Two from the composed
+    // frame, or fall back to the performer's own photo (refunding the add-on)
+    if (action === "actor_swap_start") {
+      const charge = isChargeId(body.charge_id) ? await getCharge(body.charge_id) : null;
+      if (!charge || charge.user_id !== user.id || charge.status !== "charged" || !body.task_id || charge.task_id !== body.task_id) {
+        return NextResponse.json({ error: "Payment required" }, { status: 402 });
+      }
+      if (!body.video_url?.startsWith(STORAGE_PREFIX) || !body.character_url?.startsWith(STORAGE_PREFIX)) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      const key = await getSetting("runway_api_key");
+      if (!key) return NextResponse.json({ error: "Actor Swap isn't configured yet." }, { status: 503 });
+      const st = await getTaskStatus(body.task_id, "kie").catch(() => null);
+      const giveUp = body.preserve_background === false;
+      if (st && !st.completed && !st.failed && !giveUp) return NextResponse.json({ error: "Still placing the performer." }, { status: 409 });
+
+      let characterUrl = body.character_url;
+      let preserved = false;
+      let refunded = 0;
+      if (st?.completed && st.video_url) {
+        characterUrl = await copyToStorage(st.video_url, `video-remix/${charge.id}-placed.png`).catch(() => st.video_url!);
+        preserved = true;
+      } else {
+        // The add-on price was returned by the first step; never more than the add-on
+        const bgPrice = Math.min(Math.max(0, Math.round(Number(body.bg_price) || 0)), Math.floor(charge.amount / 2));
+        if (bgPrice > 0) refunded = (await refundCharge(charge.id, user.id, bgPrice).catch(() => ({ refunded: 0 }))).refunded ?? 0;
+      }
+      const started = await startActTwo(key, characterUrl, body, preserved);
+      if ("error" in started) return NextResponse.json({ error: started.error }, { status: 400 });
+      await attachTask(charge.id, started.id, "runway");
+      return NextResponse.json({ success: true, task_id: started.id, provider: "runway", preserved, bg_refunded: refunded });
+    }
+
+    // Step 3: restore the source's moving background behind the new performer.
+    // Called repeatedly; each call advances the state and returns it.
+    if (action === "bg_restore") {
+      const charge = isChargeId(body.charge_id) ? await getCharge(body.charge_id) : null;
+      if (!charge || charge.user_id !== user.id || !charge.task_id) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      if (!body.video_url?.startsWith(STORAGE_PREFIX) || !body.result_url?.startsWith("https://")) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      // The result must be the Runway task this charge paid for
+      const rw = await getTaskStatus(charge.task_id, "runway").catch(() => null);
+      if (!rw?.completed || rw.video_url !== body.result_url) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      const replicateKey = await getSetting("replicate_api_key");
+      if (!replicateKey) return NextResponse.json({ done: true, url: body.result_url, restored: false });
+      try {
+        return NextResponse.json(await advanceRestore(replicateKey, body.video_url, body.result_url, body.bg_state ?? {}, charge.id));
+      } catch (err) {
+        console.error("Background restore:", err);
+        return NextResponse.json({ done: true, url: body.result_url, restored: false });
+      }
     }
 
     // ---- Mode B step 1: transcribe ----
