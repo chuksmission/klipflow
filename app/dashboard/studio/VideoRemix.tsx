@@ -7,6 +7,10 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { chargeTokens, refundCharge, refundNote } from "../../lib/token-client";
+import { perSecondCost } from "../../lib/duration-pricing";
+import { trimVideo } from "../../lib/ffmpeg-client";
+import CostSummary from "../../components/CostSummary";
+import VideoTrimmer from "./VideoTrimmer";
 import { VIDEO_MODELS, isModelVisible, savePendingGeneration, studioHref } from "../../components/catalog";
 import { Alert, Badge, Button, Field, Input, Progress, Select, Textarea, Toggle, cardClass } from "../../components/ui";
 
@@ -40,8 +44,12 @@ const MODES: Mode[] = [
 
 const STYLE_PRESETS = ["Anime", "Claymation", "Neon cyberpunk", "Watercolor painting", "Vintage 16mm film", "3D animated film", "Comic book", "Golden hour cinematic"];
 const MAX_WAIT_SECONDS = 600;
+// Actor Swap uploads longer than Runway's 30s limit are trimmed in the browser
+const RUNWAY_MAX_SECONDS = 30;
+const TRIM_SOURCE_MAX_SECONDS = 600;
+const TRIM_MESSAGE = "Runway Actor Swap supports up to 30 seconds. Select your best 30 seconds.";
 
-type Stage = "charging" | "uploading" | "transcribing" | "rewriting" | "generating" | "saving";
+type Stage = "charging" | "trimming" | "uploading" | "transcribing" | "rewriting" | "generating" | "saving";
 interface RewriteResult {
   original: { hook: string; structure: string[]; style: string };
   title: string;
@@ -139,6 +147,8 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
   const [sourceUrl, setSourceUrl] = useState("");
   const [sourceMeta, setSourceMeta] = useState<{ seconds: number; width: number; height: number } | null>(null);
   const [probing, setProbing] = useState(false);
+  const [trimStart, setTrimStart] = useState(0);
+  const [trimProgress, setTrimProgress] = useState(0);
 
   // Mode options
   const [style, setStyle] = useState("");
@@ -172,7 +182,13 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
   const modelInfo = VIDEO_MODELS.find((m) => m.id === activeModel);
 
   const rate = mode ? (tokenPricing[mode.pricingKey] ?? mode.defaultRate) : 0;
-  const cost = sourceMeta && mode ? Math.max(rate, Math.ceil((sourceMeta.seconds / 60) * rate)) : rate;
+  const needsTrim = mode?.id === "actor_swap" && sourceKind === "upload" && !!sourceMeta && sourceMeta.seconds > RUNWAY_MAX_SECONDS + 0.5;
+  const billedSeconds = sourceMeta ? (needsTrim ? RUNWAY_MAX_SECONDS : sourceMeta.seconds) : null;
+  // Runway modes bill per second (15s minimum); Recreate keeps a one-minute minimum
+  const perSecond = mode?.id === "restyle" || mode?.id === "actor_swap";
+  const cost = perSecond
+    ? perSecondCost(rate, billedSeconds ?? 0)
+    : sourceMeta && mode ? Math.max(rate, Math.ceil((sourceMeta.seconds / 60) * rate)) : rate;
 
   useEffect(() => { onBusyChange(running); }, [running, onBusyChange]);
   useEffect(() => {
@@ -181,12 +197,16 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
     return () => clearInterval(t);
   }, [running]);
 
-  const resetSource = () => { setSourceFile(null); setSourceUrl(""); setSourceMeta(null); };
+  const resetSource = () => { setSourceFile(null); setSourceUrl(""); setSourceMeta(null); setTrimStart(0); };
   const pickMode = (id: ModeId) => { setModeId(id); setError(""); setResult(null); setRewrite(null); setSourceKind("upload"); resetSource(); };
 
-  const validateDuration = (seconds: number) => {
+  const validateDuration = (seconds: number, kind: "upload" | "url" = sourceKind) => {
     if (!mode) return "";
-    if (seconds > mode.maxSeconds + 0.5) return `${mode.title} supports videos up to ${mode.maxSeconds} seconds. This one is ${Math.round(seconds)}s. Trim it first.`;
+    if (mode.id === "actor_swap" && kind === "upload") {
+      if (seconds > TRIM_SOURCE_MAX_SECONDS + 0.5) return `Upload a video up to ${TRIM_SOURCE_MAX_SECONDS / 60} minutes; you'll then pick the 30 seconds to use.`;
+    } else if (mode.id === "actor_swap" && seconds > mode.maxSeconds + 0.5) {
+      return `${TRIM_MESSAGE} This link is ${Math.round(seconds)}s: upload the file instead to choose which 30 seconds to use.`;
+    } else if (seconds > mode.maxSeconds + 0.5) return `${mode.title} supports videos up to ${mode.maxSeconds} seconds. This one is ${Math.round(seconds)}s. Trim it first.`;
     if (seconds < mode.minSeconds) return `${mode.title} needs a video of at least ${mode.minSeconds} seconds.`;
     return "";
   };
@@ -203,9 +223,9 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
     const url = URL.createObjectURL(f);
     try {
       const meta = await probeVideo(url);
-      const problem = validateDuration(meta.seconds);
+      const problem = validateDuration(meta.seconds, "upload");
       if (problem) { setError(problem); return; }
-      setSourceFile(f); setSourceMeta(meta); setError("");
+      setSourceFile(f); setSourceMeta(meta); setTrimStart(0); setError("");
     } catch {
       setError("Couldn't read this video. Try converting it to MP4.");
     } finally {
@@ -219,7 +239,7 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
     setProbing(true); setError("");
     try {
       const meta = await probeVideo(url);
-      const problem = validateDuration(meta.seconds);
+      const problem = validateDuration(meta.seconds, "url");
       if (problem) { setError(problem); setSourceMeta(null); return; }
       setSourceMeta(meta);
     } catch {
@@ -308,10 +328,25 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
       setTokenBalance(() => charge.balance);
 
       // 2. Source into our storage (or use the pasted link for Runway modes)
+      // Long Actor Swap uploads: cut the chosen 30 seconds in the browser first
+      let uploadFile = sourceFile;
+      if (needsTrim && sourceFile) {
+        setStage("trimming"); setTrimProgress(0);
+        try {
+          const clip = await trimVideo(sourceFile, trimStart, RUNWAY_MAX_SECONDS, setTrimProgress);
+          uploadFile = new File([clip], "clip.mp4", { type: "video/mp4" });
+        } catch (e) {
+          console.error("Trim error:", e);
+          await fail("Couldn't trim the video in your browser. Trim it to 30 seconds and upload again.");
+          return;
+        }
+        if (cancelRef.current) { await fail("Cancelled."); return; }
+      }
+
       setStage("uploading");
       let videoUrl = sourceUrl.trim();
-      if (sourceKind === "upload" && sourceFile) {
-        const up = await upload(sourceFile);
+      if (sourceKind === "upload" && uploadFile) {
+        const up = await upload(uploadFile);
         if (!up) { await fail("Video upload failed."); return; }
         videoUrl = up;
       }
@@ -324,7 +359,7 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
       if (mode.id === "restyle") {
         setStage("generating");
         savedPrompt = style.trim();
-        const r = await authed("/api/video-remix", { action: "restyle", video_url: videoUrl, prompt: savedPrompt, charge_id: chargeId });
+        const r = await authed("/api/video-remix", { action: "restyle", video_url: videoUrl, prompt: savedPrompt, duration: billedSeconds, charge_id: chargeId });
         if (!r.ok) { await fail(r.data.error ?? "Couldn't start the restyle."); return; }
         start = r.data;
         setRunwayTask(r.data.task_id);
@@ -334,7 +369,7 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
         setStage("generating");
         savedPrompt = "Actor swap";
         const r = await authed("/api/video-remix", {
-          action: "actor_swap", video_url: videoUrl, character_url: performerUrl, charge_id: chargeId,
+          action: "actor_swap", video_url: videoUrl, character_url: performerUrl, charge_id: chargeId, duration: billedSeconds,
           character_type: performer!.type.startsWith("video/") ? "video" : "image",
           ratio: actRatio(sourceMeta.width, sourceMeta.height), body_control: bodyControl, expression_intensity: intensity,
         });
@@ -382,7 +417,7 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
         output_type: "video",
         status: "completed",
         tokens_used: amount,
-        duration: String(mode.id === "recreate" ? duration : Math.round(sourceMeta.seconds)),
+        duration: String(mode.id === "recreate" ? duration : Math.round(billedSeconds ?? sourceMeta.seconds)),
         aspect_ratio: aspect,
         model: `Video Remix - ${mode.title}`,
         charge_id: chargeId,
@@ -427,7 +462,9 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
       { key: "generating", label: "Generating your video" }, { key: "saving", label: "Saving to your gallery" },
     ],
     actor_swap: [
-      { key: "charging", label: "Tokens reserved" }, { key: "uploading", label: "Uploading video and performer" },
+      { key: "charging", label: "Tokens reserved" },
+      ...(needsTrim ? [{ key: "trimming" as Stage, label: `Trimming your 30-second clip${stage === "trimming" ? ` (${Math.round(trimProgress * 100)}%)` : ""}` }] : []),
+      { key: "uploading", label: "Uploading video and performer" },
       { key: "generating", label: "Transferring the performance" }, { key: "saving", label: "Saving to your gallery" },
     ],
   };
@@ -547,7 +584,7 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
             </div>
           )}
           {/* Cancel only where it actually stops the work: before generation, or a Runway task */}
-          {(runwayTask || ["charging", "uploading", "transcribing", "rewriting"].includes(stage)) && (
+          {(runwayTask || ["charging", "trimming", "uploading", "transcribing", "rewriting"].includes(stage)) && (
             <div className="flex justify-center">
               <Button variant="ghost" size="sm" onClick={cancel}><Ban size={15} aria-hidden /> Cancel and refund</Button>
             </div>
@@ -580,8 +617,13 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
                   <Upload size={20} className="mb-2 text-ink-subtle" aria-hidden />
                   {sourceFile && sourceMeta
                     ? <span className="text-sm font-medium text-ink">{sourceFile.name} · {fmt(sourceMeta.seconds)}</span>
-                    : <span className="text-sm text-ink-muted">Upload a video up to {mode.maxSeconds >= 60 ? `${mode.maxSeconds / 60} minutes` : `${mode.maxSeconds} seconds`} and {Math.round(mode.maxBytes / 1024 / 1024)}MB</span>}
+                    : <span className="text-sm text-ink-muted">{mode.id === "actor_swap"
+                        ? `Upload a video up to ${Math.round(mode.maxBytes / 1024 / 1024)}MB. Longer than 30 seconds? You'll pick your best 30 seconds next.`
+                        : `Upload a video up to ${mode.maxSeconds >= 60 ? `${mode.maxSeconds / 60} minutes` : `${mode.maxSeconds} seconds`} and ${Math.round(mode.maxBytes / 1024 / 1024)}MB`}</span>}
                 </button>
+                {needsTrim && sourceFile && sourceMeta && (
+                  <VideoTrimmer file={sourceFile} duration={sourceMeta.seconds} windowSeconds={RUNWAY_MAX_SECONDS} start={trimStart} onChange={setTrimStart} message={TRIM_MESSAGE} />
+                )}
               </>
             ) : (
               <div className="flex flex-col gap-2 sm:flex-row">
@@ -657,10 +699,14 @@ export default function VideoRemix({ tokenBalance, setTokenBalance, tokenPricing
           {error && <Alert>{error}</Alert>}
 
           <div className={`${cardClass} flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between`}>
-            <p className="text-sm text-ink-muted">
-              Cost: <span className="font-semibold text-ink">{cost} tokens</span>
-              <span className="text-ink-subtle"> · {rate}/min{sourceMeta ? `, ${fmt(sourceMeta.seconds)} video` : ", minimum 1 minute"} · you have {tokenBalance}</span>
-            </p>
+            {perSecond ? (
+              <CostSummary cost={cost} ratePerMinute={rate} seconds={billedSeconds} balance={tokenBalance} rateLabel={needsTrim ? "your selected 30s" : undefined} />
+            ) : (
+              <p className="text-sm text-ink-muted">
+                Cost: <span className="font-semibold text-ink">{cost} tokens</span>
+                <span className="text-ink-subtle"> · {rate}/min{sourceMeta ? `, ${fmt(sourceMeta.seconds)} video` : ", minimum 1 minute"} · you have {tokenBalance}</span>
+              </p>
+            )}
             <Button variant="primary" size="lg" onClick={run} disabled={!sourceMeta}>
               <Repeat2 size={17} aria-hidden /> Remix video
             </Button>

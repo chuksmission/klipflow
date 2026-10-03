@@ -1,5 +1,6 @@
 // Shared AI Actor Swap definitions (used by the Studio module and the API route):
 // languages and accents, background presets, limits and per-second pricing.
+import { perSecondCost } from "./duration-pricing";
 
 export const ACTOR_SWAP_MAX_SECONDS = 120;
 export const ACT_TWO_CHUNK_SECONDS = 29;   // Runway Act-Two accepts up to 30s per job
@@ -78,10 +79,7 @@ export function ratePerMinute(c: ActorSwapChoices, r: ActorSwapRates): number {
  * cover the fixed AI steps (transcription, translation, image editing).
  */
 export function actorSwapCost(c: ActorSwapChoices, r: ActorSwapRates, seconds: number): number {
-  const rate = ratePerMinute(c, r);
-  if (rate === 0) return 0;
-  const billable = Math.max(15, seconds);
-  return Math.ceil((billable / 60) * rate);
+  return perSecondCost(ratePerMinute(c, r), seconds);
 }
 
 /** Tokens to refund when the face succeeded but the language/voice part failed. */

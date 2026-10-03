@@ -11,6 +11,7 @@ import {
   actorSwapCost, chunkCount, ratePerMinute, ratesFrom, type BackgroundMode, type VoiceGender,
 } from "../../lib/actor-swap";
 import { Alert, Badge, Button, Field, Select, Textarea, Toggle, cardClass, Progress } from "../../components/ui";
+import CostSummary from "../../components/CostSummary";
 
 const MAX_SOURCE_BYTES = 300 * 1024 * 1024;   // ffmpeg.wasm works in browser memory
 const POLL_MS = 7000;
@@ -136,6 +137,7 @@ export default function ActorSwap({ tokenBalance, setTokenBalance, tokenPricing,
   const choices = { changeFace, changeVoice, background };
   const rate = ratePerMinute(choices, rates);
   const cost = actorSwapCost(choices, rates, sourceMeta?.seconds ?? 15);
+  const rateLabel = [changeFace && "new face", changeVoice && "new voice", changeFace && background !== "model" && "new background"].filter(Boolean).join(" + ");
 
   useEffect(() => { onBusyChange(running); }, [running, onBusyChange]);
   useEffect(() => {
@@ -628,10 +630,9 @@ export default function ActorSwap({ tokenBalance, setTokenBalance, tokenPricing,
           {error && <Alert>{error}</Alert>}
 
           <div className={`${cardClass} flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between`}>
-            <p className="text-sm text-ink-muted">
-              Cost: <span className="font-semibold text-ink">{rate ? `${cost} tokens` : "-"}</span>
-              <span className="text-ink-subtle"> · {rate}/min, billed per second{sourceMeta ? ` for ${fmt(sourceMeta.seconds)}` : " (15s minimum)"} · you have {tokenBalance}</span>
-            </p>
+            {rate
+              ? <CostSummary cost={cost} ratePerMinute={rate} seconds={sourceMeta?.seconds ?? null} balance={tokenBalance} rateLabel={rateLabel} />
+              : <p className="text-sm text-ink-muted">Choose what to change to see the cost · you have {tokenBalance}</p>}
             <Button variant="primary" size="lg" onClick={run} disabled={!sourceMeta || (!changeFace && !changeVoice)}>
               <ScanFace size={17} aria-hidden /> Swap
             </Button>

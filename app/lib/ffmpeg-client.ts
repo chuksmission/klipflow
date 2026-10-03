@@ -68,6 +68,26 @@ export async function splitVideo(file: Blob, duration: number, maxSeconds = 29, 
   return out;
 }
 
+/** One exact clip (re-encoded so the cut lands on the chosen frame). */
+export async function trimVideo(file: Blob, start: number, length: number, onProgress?: (p: number) => void): Promise<Blob> {
+  const ffmpeg = await loadFFmpeg();
+  const progress = ({ progress }: { progress: number }) => onProgress?.(Math.min(1, Math.max(0, progress)));
+  ffmpeg.on("progress", progress);
+  await writeInput(ffmpeg, "trim_src", file);
+  try {
+    const code = await ffmpeg.exec([
+      "-ss", start.toFixed(3), "-i", "trim_src", "-t", length.toFixed(3),
+      "-vf", "scale='min(1280,iw)':-2", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "20",
+      "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "trimmed.mp4",
+    ]);
+    if (code !== 0) throw new Error("Couldn't trim the video.");
+    return await readBlob(ffmpeg, "trimmed.mp4", "video/mp4");
+  } finally {
+    ffmpeg.off("progress", progress);
+    await cleanup(ffmpeg, ["trim_src", "trimmed.mp4"]);
+  }
+}
+
 /** Audio track only (small mp3), for transcription of large videos. */
 export async function extractAudio(file: Blob): Promise<Blob> {
   const ffmpeg = await loadFFmpeg();

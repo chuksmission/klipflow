@@ -4,6 +4,7 @@ import { attachTask, claimCharge, getTokenPrice, refundCharge, releaseClaim } fr
 import { getTaskStatus } from "../../lib/task-status";
 import { transcribeVideoUrl } from "../../lib/whisper";
 import { speak } from "../../lib/elevenlabs";
+import { mediaSeconds } from "../../lib/server-ffmpeg";
 import {
   ACTOR_SWAP_LANGUAGES, ACTOR_SWAP_MAX_SECONDS, BACKGROUND_PRESETS, actorSwapCost, chunkCount, voicePortion,
   type ActorSwapChoices, type ActorSwapRates, type BackgroundMode, type VoiceGender,
@@ -421,13 +422,16 @@ export async function POST(req: NextRequest) {
 
     // ---- start a job (requires a paid charge covering the server-side price) ----
     if (action === "start") {
-      const seconds = Number(body.source_seconds);
+      let seconds = Number(body.source_seconds);
       const changeFace = body.change_face === true;
       const changeVoice = body.change_voice === true;
       const bgMode: BackgroundMode = ["model", "upload", "preset", "describe"].includes(body.background?.mode) ? body.background.mode : "model";
       if (!changeFace && !changeVoice) return NextResponse.json({ error: "Choose what to change." }, { status: 400 });
       if (!Number.isFinite(seconds) || seconds <= 0 || seconds > ACTOR_SWAP_MAX_SECONDS + 0.5) return NextResponse.json({ error: "Video must be 2 minutes or shorter." }, { status: 400 });
       if (!ours(body.source_url)) return NextResponse.json({ error: "Upload the source video." }, { status: 400 });
+      // Bill on the duration the server measures (never less than the browser reported)
+      const measured = await mediaSeconds(body.source_url).catch(() => 0);
+      if (measured > ACTOR_SWAP_MAX_SECONDS + 1) return NextResponse.json({ error: "Video must be 2 minutes or shorter." }, { status: 400 });
       const chunks: string[] = Array.isArray(body.chunk_urls) ? body.chunk_urls : [];
       if (changeFace) {
         if (!ours(body.reference_url)) return NextResponse.json({ error: "Upload a photo of the new person." }, { status: 400 });
@@ -442,6 +446,7 @@ export async function POST(req: NextRequest) {
       const needs = [changeFace && "runway_api_key", changeVoice && "elevenlabs_api_key", changeVoice && "heygen_api_key", changeVoice && "openai_api_key"].filter(Boolean) as string[];
       for (const k of needs) if (!(await getSetting(k))) return NextResponse.json({ error: "This option isn't configured yet." }, { status: 503 });
 
+      if (measured > seconds + 1) seconds = measured;
       const options: Options = {
         source_url: body.source_url, source_seconds: seconds, width: Number(body.width) || 1280, height: Number(body.height) || 720,
         chunk_urls: changeFace ? chunks : [], audio_url: changeVoice ? body.audio_url : null,

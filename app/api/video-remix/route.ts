@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { TranscriptionError, transcribeVideoUrl } from "../../lib/whisper";
 import { attachTask, claimCharge, getCharge, getTokenPrice, isChargeId, releaseClaim } from "../../lib/charges";
+import { perSecondCost } from "../../lib/duration-pricing";
+import { mediaSeconds } from "../../lib/server-ffmpeg";
 
 // Transcription and the rewrite call can each take 10-40s
 export const maxDuration = 60;
@@ -190,11 +192,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "This remix mode isn't available right now." }, { status: 403 });
     }
 
-    // Payment: Runway modes claim a paid, unused charge covering at least one
-    // minute's worth. Recreate's AI steps need an open, unused Recreate charge.
+    // Payment: Runway modes claim a paid, unused charge covering the clip's
+    // per-second price (15s minimum, max 30s). The duration is measured here for
+    // our own uploads; pasted links use the browser's reading. Recreate's AI
+    // steps need an open, unused Recreate charge.
     let chargeId: string | null = null;
     const claimFor = async (pricingKey: string, fallback: number) => {
-      const claim = await claimCharge(body.charge_id, await getTokenPrice(pricingKey, fallback), user.id);
+      const claimed = Math.min(30, Math.max(0, Number(body.duration) || 0));
+      const measured = body.video_url?.startsWith(STORAGE_PREFIX) ? await mediaSeconds(body.video_url).catch(() => 0) : 0;
+      if (measured > 30.5) return "Runway supports clips up to 30 seconds.";
+      // Small differences between browser and server readings are ignored
+      const seconds = measured > claimed + 1 ? measured : (claimed || measured || 30);
+      const price = perSecondCost(await getTokenPrice(pricingKey, fallback), seconds);
+      const claim = await claimCharge(body.charge_id, price, user.id);
       if (claim.error) return claim.error;
       chargeId = body.charge_id!;
       return null;
