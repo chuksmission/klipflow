@@ -6,6 +6,7 @@ import { supabase } from "../../lib/supabase";
 import { chargeTokens, refundCharge, refundNote } from "../../lib/token-client";
 import VideoRemix from "./VideoRemix";
 import ActorSwap from "./ActorSwap";
+import SeriesCloner from "./SeriesCloner";
 import { VIDEO_MODELS, getStudioModule, isModelVisible, studioHref, takePendingGeneration, type StudioModuleId, type VideoModel } from "../../components/catalog";
 
 type Model = VideoModel;
@@ -52,6 +53,7 @@ function Studio() {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [remixBusy, setRemixBusy] = useState(false);
   const [swapBusy, setSwapBusy] = useState(false);
+  const [clonerBusy, setClonerBusy] = useState(false);
 
   // Prompt Expander
   const [expandedPrompt, setExpandedPrompt] = useState("");
@@ -125,6 +127,7 @@ function Studio() {
     { id: "script_to_video", title: "Script to Video",  desc: "Turn a script into multiple video scenes with audio", badge: "New" },
     { id: "video_remix",     title: "Video Remix",      desc: "Restyle, recreate or recast any video",           badge: "New" },
     { id: "ai_actor_swap",   title: "AI Actor Swap",    desc: "Give any video a new face, language and voice",   badge: "New" },
+    { id: "series_cloner",   title: "Series Cloner",    desc: "Extract a viral series formula and make your own", badge: "New" },
     { id: "video_translator", title: "AI Video Translator", desc: "Translate any video into another language with lip-sync", badge: "New" },
     { id: "image_ad",        title: "Image Ad",         desc: "Scroll-stopping image advertisements",             badge: "Cheapest" },
     { id: "prompt",          title: "Prompt Expander",  desc: "Transform simple ideas into cinematic prompts",    badge: "Free" },
@@ -135,7 +138,8 @@ function Studio() {
   const visibleModules = modules.filter((mod) =>
     (mod.id !== "video_translator" || enabledKeys["heygen_enabled"] === true) &&
     (mod.id !== "video_remix" || enabledKeys["video_remix_enabled"] === true) &&
-    (mod.id !== "ai_actor_swap" || enabledKeys["ai_actor_swap_enabled"] === true));
+    (mod.id !== "ai_actor_swap" || enabledKeys["ai_actor_swap_enabled"] === true) &&
+    (mod.id !== "series_cloner" || enabledKeys["series_cloner_enabled"] === true));
 
   const visibleModels = ALL_MODELS.filter((m) => isModelVisible(m, enabledKeys));
 
@@ -626,7 +630,7 @@ function Studio() {
   };
 
   const goBackToModules = () => { resetForm(); router.replace("/dashboard/studio"); };
-  const isBusy = loading || vtBusy || s2vStep === "generating" || remixBusy || swapBusy;
+  const isBusy = loading || vtBusy || s2vStep === "generating" || remixBusy || swapBusy || clonerBusy;
 
   // Open the module named in the URL (sidebar links) and apply any prompt or
   // template handed over from the homepage.
@@ -674,6 +678,7 @@ function Studio() {
   const isVTModule = activeModule === "video_translator";
   const isRemixModule = activeModule === "video_remix";
   const isSwapModule = activeModule === "ai_actor_swap";
+  const isClonerModule = activeModule === "series_cloner";
 
   // Charged per minute of source video, prorated, with a minimum of one minute's worth
   const vtTokensPerMinute = tokenPricing["video_translation"] ?? 20;
@@ -698,7 +703,7 @@ function Studio() {
           <Coins size={18} className="text-accent-text flex-shrink-0" aria-hidden />
           <div className="min-w-0">
             <p className="text-ink font-medium text-sm">{tokenBalance} tokens</p>
-            {activeModule && <p className="text-ink-subtle text-xs truncate">{isVTModule ? `Video Translator · ${vtTokensPerMinute} tokens per minute` : isSwapModule ? "AI Actor Swap · billed per second of video" : `${currentModel?.name ?? ""} · ${tokenCost} tokens`}</p>}
+            {activeModule && <p className="text-ink-subtle text-xs truncate">{isVTModule ? `Video Translator · ${vtTokensPerMinute} tokens per minute` : isSwapModule ? "AI Actor Swap · billed per second of video" : isClonerModule ? "Series Cloner" : `${currentModel?.name ?? ""} · ${tokenCost} tokens`}</p>}
           </div>
         </div>
         <a href="/dashboard/billing" className="inline-flex items-center h-9 px-4 rounded-lg bg-accent hover:bg-accent-hover text-white text-sm font-medium transition-colors flex-shrink-0">Top up</a>
@@ -1234,7 +1239,19 @@ function Studio() {
         />
       )}
 
-      {activeModule && !isPromptModule && !isScriptModule && !isS2VModule && !isVTModule && !isRemixModule && !isSwapModule && !loading && !videoUrl && (
+      {isClonerModule && (
+        <SeriesCloner
+          tokenBalance={tokenBalance}
+          setTokenBalance={setTokenBalance}
+          tokenPricing={tokenPricing}
+          enabledKeys={enabledKeys}
+          settingsLoaded={settingsLoaded}
+          onBack={goBackToModules}
+          onBusyChange={setClonerBusy}
+        />
+      )}
+
+      {activeModule && !isPromptModule && !isScriptModule && !isS2VModule && !isVTModule && !isRemixModule && !isSwapModule && !isClonerModule && !loading && !videoUrl && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <button onClick={goBackToModules} className="inline-flex items-center gap-1 h-9 pl-2 pr-3 rounded-lg border border-line bg-raised text-ink text-sm hover:border-line-strong transition-colors"><ChevronLeft size={16} aria-hidden /> All tools</button>

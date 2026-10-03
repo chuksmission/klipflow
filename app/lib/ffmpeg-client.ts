@@ -83,9 +83,10 @@ export async function extractAudio(file: Blob): Promise<Blob> {
 /**
  * Join generated clips (URLs or blobs) into one video. When `audioFrom` is
  * given, its soundtrack replaces the clips' audio (used to keep the original
- * voice when only the face changes).
+ * voice when only the face changes). `keepAudio` keeps each clip's own sound
+ * instead (scene dialogue), when the clips share one format.
  */
-export async function joinClips(clips: (Blob | string)[], audioFrom?: Blob | string): Promise<Blob> {
+export async function joinClips(clips: (Blob | string)[], audioFrom?: Blob | string, keepAudio = false): Promise<Blob> {
   const ffmpeg = await loadFFmpeg();
   const names: string[] = [];
   try {
@@ -98,7 +99,7 @@ export async function joinClips(clips: (Blob | string)[], audioFrom?: Blob | str
     // join takes about a second. Fall back to re-encoding (never upscaling).
     await ffmpeg.writeFile("list.txt", names.map((n) => `file '${n}'`).join("\n"));
     names.push("list.txt");
-    let code = await ffmpeg.exec(["-f", "concat", "-safe", "0", "-i", "list.txt", "-c", "copy", "-an", "joined.mp4"]);
+    let code = await ffmpeg.exec(["-f", "concat", "-safe", "0", "-i", "list.txt", "-c", "copy", ...(keepAudio && !audioFrom ? [] : ["-an"]), "joined.mp4"]);
     if (code !== 0) {
       await cleanup(ffmpeg, ["joined.mp4"]);
       const inputs = names.filter((n) => n.endsWith(".mp4")).flatMap((n) => ["-i", n]);

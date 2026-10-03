@@ -110,6 +110,29 @@ export async function getTaskStatus(task_id: string, provider: string): Promise<
   // Endpoint: /v1/video_status.get?video_id=
   // Status values: pending, waiting, processing, completed, failed
   // ================================================================
+  // HeyGen v3 video (image animated with our own audio: Series Cloner avatar episodes)
+  if (provider === "heygen_v3") {
+    const heygenApiKey = await getSetting("heygen_api_key");
+    if (!heygenApiKey) return { error: "HeyGen not configured", httpStatus: 503 };
+    const res = await fetch(`https://api.heygen.com/v3/videos/${encodeURIComponent(task_id)}`, {
+      headers: { "x-api-key": heygenApiKey, Accept: "application/json" },
+    });
+    let data: any = {};
+    try { data = await res.json(); } catch { data = {}; }
+    const job = data.data ?? data;
+    const state = job.status ?? "";
+    const isDone = state === "completed" && !!job.video_url;
+    const isFailed = state === "failed";
+    return {
+      success: true,
+      status: state,
+      video_url: isDone ? job.video_url : null,
+      completed: isDone,
+      failed: isFailed,
+      fail_reason: isFailed ? (job.failure_message ?? "HeyGen video failed") : undefined,
+    };
+  }
+
   if (provider === "heygen_avatar") {
     const heygenApiKey = await getSetting("heygen_api_key");
     if (!heygenApiKey) {

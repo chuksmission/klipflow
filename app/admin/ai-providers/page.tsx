@@ -158,6 +158,15 @@ export default function AdminAIProviders() {
       models: [],
     },
     {
+      id: "series_cloner",
+      name: "Series Cloner",
+      desc: "Studio module. Analysis needs OpenAI (GPT-4o Vision + Whisper) and Claude (OpenAI as fallback); storyboards and videos need Kie; avatar videos need HeyGen and ElevenLabs",
+      docsUrl: "https://platform.openai.com/docs/guides/vision",
+      enabledKey: "series_cloner_enabled",
+      fields: [],
+      models: [],
+    },
+    {
       id: "anthropic",
       name: "Anthropic Claude",
       desc: "Claude AI for script writing and prompt expansion",

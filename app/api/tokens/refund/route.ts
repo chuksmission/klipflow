@@ -53,6 +53,14 @@ export async function POST(req: NextRequest) {
       }
       if (age < ACTOR_SWAP_TIMEOUT_MS) return NextResponse.json({ error: "This job is still processing." }, { status: 409 });
       if (job) await supabase.from("actor_swap_jobs").update({ status: "failed", error: "Timed out.", updated_at: new Date().toISOString() }).eq("id", job.id);
+    } else if (charge.provider === "series_cloner") {
+      // An analysis can be refunded only if it never delivered a formula.
+      // Episodes settle themselves (partial refunds) as each step finishes.
+      const [kind, id] = (charge.task_id ?? "").split(":");
+      if (kind !== "formula") return NextResponse.json({ error: "This episode settles automatically." }, { status: 409 });
+      const { data: formula } = await supabase.from("series_formulas").select("id, status").eq("id", id).eq("user_id", user.id).maybeSingle();
+      if (formula?.status === "ready") return NextResponse.json({ error: "This analysis was delivered, so it can't be refunded." }, { status: 409 });
+      if (formula) await supabase.from("series_formulas").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", formula.id);
     } else if (charge.task_id && charge.provider) {
       const status = await getTaskStatus(charge.task_id, charge.provider).catch(() => null);
       if (status?.completed) {
