@@ -1822,35 +1822,6 @@
         }
       }
     },
-    "creators": {
-      "title": "Imeundwa kwa KlipflowAI",
-      "subtitle": "Wabunifu duniani kote wanasimulia hadithi kubwa zaidi wakiwa na timu ndogo.",
-      "previous": "Mbunifu aliyetangulia",
-      "next": "Mbunifu anayefuata",
-      "sample": "Mfano",
-      "people": {
-        "maya": {
-          "niche": "Usimulizi wa faceless · Lagos",
-          "quote": "Ninachapisha kipindi kipya kila siku na hadhira yangu inadhani nina timu nzima ya utayarishaji."
-        },
-        "leo": {
-          "niche": "Filamu za chapa · Paris",
-          "quote": "Tunawasilisha mielekeo mitatu kwa wateja ndani ya mchana mmoja badala ya wiki nzima."
-        },
-        "sofia": {
-          "niche": "Video za muziki · Mexico City",
-          "quote": "Hatimaye picha zinalingana na nyimbo ninazozisikia kichwani mwangu."
-        },
-        "arjun": {
-          "niche": "Kozi za mtandaoni · Bangalore",
-          "quote": "Rekodi moja, lugha kumi na mbili. Kozi zangu zinawafikia wanafunzi nisioweza kuwafikia awali."
-        },
-        "amina": {
-          "niche": "Biashara mtandaoni · Nairobi",
-          "quote": "Sasa kila bidhaa katika duka langu ina tangazo lake la video."
-        }
-      }
-    },
     "powered": {
       "title": "Inaendeshwa na modeli bora za AI duniani",
       "subtitle": "Modeli zinazoongoza, mahali pamoja, kwa akaunti moja."

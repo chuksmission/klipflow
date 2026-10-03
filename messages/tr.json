@@ -1822,35 +1822,6 @@
         }
       }
     },
-    "creators": {
-      "title": "KlipflowAI ile yapıldı",
-      "subtitle": "Dünyanın dört bir yanındaki içerik üreticileri daha küçük ekiplerle daha büyük hikâyeler anlatıyor.",
-      "previous": "Önceki içerik üreticisi",
-      "next": "Sonraki içerik üreticisi",
-      "sample": "Örnek",
-      "people": {
-        "maya": {
-          "niche": "Faceless hikâye anlatımı · Lagos",
-          "quote": "Her gün yeni bir bölüm yayınlıyorum ve izleyicilerim koca bir prodüksiyon ekibim olduğunu sanıyor."
-        },
-        "leo": {
-          "niche": "Marka filmleri · Paris",
-          "quote": "Müşterilere üç farklı yönü bir hafta yerine bir öğleden sonrada sunuyoruz."
-        },
-        "sofia": {
-          "niche": "Müzik klipleri · Mexico City",
-          "quote": "Görüntüler sonunda kafamda duyduğum şarkılarla uyuşuyor."
-        },
-        "arjun": {
-          "niche": "Online kurslar · Bangalore",
-          "quote": "Tek kayıt, on iki dil. Kurslarım daha önce asla ulaşamadığım öğrencilere ulaşıyor."
-        },
-        "amina": {
-          "niche": "E-ticaret · Nairobi",
-          "quote": "Mağazamdaki her ürünün artık kendi video reklamı var."
-        }
-      }
-    },
     "powered": {
       "title": "Dünyanın en iyi yapay zekâ modelleriyle güçlendirildi",
       "subtitle": "Önde gelen modeller, tek yerde, tek hesapla."

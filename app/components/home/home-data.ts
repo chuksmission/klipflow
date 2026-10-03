@@ -65,19 +65,6 @@ export const USE_CASES: { id: string; cards: UseCase[] }[] = [
 ];
 
 /**
- * Creator spotlight. PLACEHOLDERS for launch: these are sample profiles, shown
- * with a "Sample" label. Replace with real creators (and their permission)
- * before promoting the section; set `sample: false` on real entries.
- */
-export const CREATORS: { id: string; name: string; hue: number; sample: boolean }[] = [
-  { id: "maya", name: "Maya Okafor", hue: 265, sample: true },
-  { id: "leo", name: "Léo Martin", hue: 200, sample: true },
-  { id: "sofia", name: "Sofía Reyes", hue: 330, sample: true },
-  { id: "arjun", name: "Arjun Mehta", hue: 35, sample: true },
-  { id: "amina", name: "Amina Hassan", hue: 160, sample: true },
-];
-
-/**
  * "Powered by" marquee. Only providers KlipflowAI actually calls are shown
  * (`live: true`); flip the others on when they're integrated.
  */

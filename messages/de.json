@@ -1822,35 +1822,6 @@
         }
       }
     },
-    "creators": {
-      "title": "Gemacht mit KlipflowAI",
-      "subtitle": "Creator auf der ganzen Welt erzählen größere Geschichten mit kleineren Teams.",
-      "previous": "Vorheriger Creator",
-      "next": "Nächster Creator",
-      "sample": "Beispiel",
-      "people": {
-        "maya": {
-          "niche": "Faceless Storytelling · Lagos",
-          "quote": "Ich veröffentliche jeden Tag eine neue Folge und mein Publikum glaubt, ich hätte ein ganzes Produktionsteam."
-        },
-        "leo": {
-          "niche": "Markenfilme · Paris",
-          "quote": "Wir präsentieren Kunden drei Richtungen an einem Nachmittag statt in einer Woche."
-        },
-        "sofia": {
-          "niche": "Musikvideos · Mexiko-Stadt",
-          "quote": "Die Bilder passen endlich zu den Songs, die ich im Kopf höre."
-        },
-        "arjun": {
-          "niche": "Onlinekurse · Bangalore",
-          "quote": "Eine Aufnahme, zwölf Sprachen. Meine Kurse erreichen Lernende, die ich vorher nie erreicht hätte."
-        },
-        "amina": {
-          "niche": "E-Commerce · Nairobi",
-          "quote": "Jedes Produkt in meinem Shop hat jetzt seine eigene Videoanzeige."
-        }
-      }
-    },
     "powered": {
       "title": "Angetrieben von den besten KI-Modellen der Welt",
       "subtitle": "Die führenden Modelle, an einem Ort, mit einem Konto."

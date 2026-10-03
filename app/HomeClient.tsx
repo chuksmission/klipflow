@@ -16,7 +16,6 @@ import FeatureStack from "./components/home/FeatureStack";
 import DemoCarousel from "./components/home/DemoCarousel";
 import LanguageSection from "./components/home/LanguageSection";
 import UseCases from "./components/home/UseCases";
-import CreatorSpotlight from "./components/home/CreatorSpotlight";
 import PoweredBy from "./components/home/PoweredBy";
 import ClosingCta from "./components/home/ClosingCta";
 import SiteFooter from "./components/home/SiteFooter";
@@ -128,8 +127,7 @@ export default function HomeClient({ socialLinks }: { socialLinks: SocialLink[] 
     const demos = DEMO_SLIDES.map((s) => showcase.find((i) => i.type === "demo_video" && moduleForGenerationType(i.type, i.model) === s.module) ?? null);
     const useCases: Record<string, ShowcaseItem | null> = {};
     for (const u of USE_CASES) for (const card of u.cards) useCases[`${u.id}/${card.id}`] = card.types.length ? pickClip(showcase, card.types, used, true) : null;
-    const creatorClips = showcase.filter((i) => i.output_type !== "image" && i.type !== "demo_video" && i.video_url);
-    return { hero, features, demos, useCases, creatorClips };
+    return { hero, features, demos, useCases };
   }, [showcase]);
 
   const ecomSavings: Record<string, string> = { monthly: '', sixmonths: t("save14"), yearly: t("save20") };
@@ -176,7 +174,6 @@ export default function HomeClient({ socialLinks }: { socialLinks: SocialLink[] 
         <LanguageSection clip={media.hero} onStart={() => openModule("video_translator")} />
         <span id="templates" className="block scroll-mt-16" />
         <UseCases clips={media.useCases} onCard={openUseCase} />
-        <CreatorSpotlight clips={media.creatorClips} />
 
         {/* Community gallery: every featured clip, with "Try it" */}
         {showcase.length > 0 && (

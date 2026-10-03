@@ -1822,35 +1822,6 @@
         }
       }
     },
-    "creators": {
-      "title": "Made with KlipflowAI",
-      "subtitle": "Creators around the world are telling bigger stories with smaller teams.",
-      "previous": "Previous creator",
-      "next": "Next creator",
-      "sample": "Sample",
-      "people": {
-        "maya": {
-          "niche": "Faceless storytelling · Lagos",
-          "quote": "I publish a new episode every day and my audience thinks I have a whole production team."
-        },
-        "leo": {
-          "niche": "Brand films · Paris",
-          "quote": "We pitch three directions to clients in an afternoon instead of a week."
-        },
-        "sofia": {
-          "niche": "Music videos · Mexico City",
-          "quote": "The visuals finally match the songs I hear in my head."
-        },
-        "arjun": {
-          "niche": "Online courses · Bangalore",
-          "quote": "One recording, twelve languages. My courses reach students I never could before."
-        },
-        "amina": {
-          "niche": "E-commerce · Nairobi",
-          "quote": "Every product in my shop now has its own video ad."
-        }
-      }
-    },
     "powered": {
       "title": "Powered by the World's Best AI Models",
       "subtitle": "The leading models, in one place, with one account."
