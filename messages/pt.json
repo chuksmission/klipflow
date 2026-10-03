@@ -1639,5 +1639,265 @@
       "roast-reaction": "Roast / Reação",
       "before-after-transformation": "Transformação antes/depois"
     }
+  },
+  "landing": {
+    "nav": {
+      "features": "Recursos",
+      "demo": "Demo",
+      "useCases": "Casos de uso",
+      "pricing": "Preços",
+      "faq": "Perguntas"
+    },
+    "hero": {
+      "title": "Crie qualquer coisa. Em qualquer idioma.",
+      "subtitle": "Vídeo com IA para todos",
+      "cta": "Comece grátis",
+      "label": "Um estúdio. Todos os modelos de IA.",
+      "labelSub": "De um único prompt a uma série completa"
+    },
+    "features": {
+      "tryNow": "Experimente",
+      "soon": "Em breve",
+      "textToVideo": {
+        "title": "Texto para vídeo",
+        "desc": "Descreva uma cena e veja-a ganhar vida com Kling, Veo, Sora, Seedance e mais, com som nativo."
+      },
+      "translator": {
+        "title": "Tradutor de vídeo com IA",
+        "desc": "Traduza qualquer vídeo para outro idioma com clonagem de voz natural e sincronização labial que acompanha cada palavra."
+      },
+      "actorSwap": {
+        "title": "Troca de ator com IA",
+        "desc": "Dê a qualquer vídeo um novo rosto, uma nova voz ou um novo idioma, mantendo a atuação intacta."
+      },
+      "facelessReels": {
+        "title": "Faceless Reels",
+        "desc": "Lance uma série original de personagens de IA a partir de modelos virais, com personagens e histórias que ninguém mais tem."
+      },
+      "seriesCloner": {
+        "title": "Clonador de séries",
+        "desc": "Envie uma série viral, extraia a fórmula que a faz funcionar e crie seus próprios episódios originais."
+      },
+      "videoRemix": {
+        "title": "Remix de vídeo",
+        "desc": "Mude o estilo, recrie ou troque o elenco de qualquer vídeo: transforme o anúncio de um concorrente ou suas próprias imagens em algo novo."
+      },
+      "musicStudio": {
+        "title": "Estúdio de música com IA",
+        "desc": "Escreva e produza músicas originais e transforme-as em videoclipes. Em breve na KlipflowAI."
+      }
+    },
+    "demo": {
+      "title": "Veja em ação",
+      "subtitle": "Veja a KlipflowAI criar em tempo real",
+      "soon": "Demo em breve",
+      "tryNow": "Experimente",
+      "generate": {
+        "title": "Gere em segundos",
+        "desc": "Digite o que quer ver, escolha um modelo e clique em gerar. Seu vídeo fica pronto em instantes, com som, no formato que sua plataforma precisa.",
+        "chip": "Texto para vídeo"
+      },
+      "translate": {
+        "title": "Traduza qualquer vídeo",
+        "desc": "Envie um vídeo, escolha francês ou qualquer um dos 16 idiomas e receba-o no novo idioma com a mesma voz e sincronização labial.",
+        "chip": "Traduzir → Français"
+      },
+      "series": {
+        "title": "Monte sua série",
+        "desc": "Escolha um modelo de Faceless Reels, aprove seus personagens únicos e veja um episódio completo ser gerado, roteiro incluído.",
+        "chip": "Faceless Reels"
+      }
+    },
+    "languages": {
+      "title": "Crie em qualquer idioma",
+      "subtitle": "Seu público é global. Seu conteúdo também.",
+      "pillsLabel": "Idiomas da interface disponíveis",
+      "demoLabel": "O mesmo vídeo em três idiomas",
+      "count": "Mais de 40 idiomas e sotaques disponíveis",
+      "tryNow": "Experimente"
+    },
+    "useCases": {
+      "title": "Feito para todo criador",
+      "subtitle": "Seja o que for que você cria, existe um jeito mais rápido.",
+      "tabs": {
+        "creators": "Criadores de conteúdo",
+        "brands": "Marcas e agências",
+        "musicians": "Músicos",
+        "ecommerce": "E-commerce",
+        "educators": "Educadores",
+        "developers": "Desenvolvedores"
+      },
+      "headlines": {
+        "creators": "Crie um canal faceless em qualquer nicho sem mostrar o rosto",
+        "brands": "Transforme anúncios de concorrentes nos seus em minutos",
+        "musicians": "Gere seu videoclipe inteiro a partir de um único prompt",
+        "ecommerce": "Vídeos de demonstração de produtos em escala",
+        "educators": "Cursos em 12 idiomas",
+        "developers": "Acesso completo à API: construa sobre a KlipflowAI (em breve)"
+      },
+      "cards": {
+        "facelessChannel": {
+          "title": "Um canal faceless em qualquer nicho",
+          "desc": "Escolha um modelo viral, receba personagens únicos e uma história exclusiva e publique um episódio novo todo dia sem nunca aparecer na câmera."
+        },
+        "seriesFormula": {
+          "title": "Clone o que já funciona",
+          "desc": "Envie uma série que está bombando, deixe a KlipflowAI extrair o gancho, o ritmo e a estrutura, e crie episódios originais com a mesma fórmula."
+        },
+        "autopilot": {
+          "title": "Publique no piloto automático",
+          "desc": "Planeje, gere e agende seu conteúdo em todas as plataformas para que seus canais cresçam enquanto você foca nas ideias."
+        },
+        "shorts": {
+          "title": "Shorts cinematográficos",
+          "desc": "Transforme uma frase em um clipe vertical que prende a atenção, com som nativo, pronto para TikTok, Reels e Shorts."
+        },
+        "competitorAds": {
+          "title": "Remixe anúncios da concorrência",
+          "desc": "Pegue um anúncio que está vencendo no seu mercado, troque o produto, o estilo e os atores e lance sua versão no mesmo dia."
+        },
+        "adSpy": {
+          "title": "Espione o que funciona",
+          "desc": "Veja os anúncios que seus concorrentes estão rodando agora, descubra o que performa e transforme os melhores em briefings."
+        },
+        "ugcAds": {
+          "title": "Anúncios UGC sem criadores",
+          "desc": "Depoimentos autênticos no estilo de criadores, com atores de IA segurando seu produto, em qualquer idioma e para qualquer público."
+        },
+        "imageAds": {
+          "title": "Anúncios estáticos que convertem",
+          "desc": "Anúncios de imagem que prendem a atenção, com seu produto, seu texto e o formato certo para cada posicionamento."
+        },
+        "musicVideo": {
+          "title": "Um videoclipe com um único prompt",
+          "desc": "Descreva o clima, o cenário e a história da sua música e receba cenas cinematográficas editadas na sua faixa."
+        },
+        "visualizer": {
+          "title": "Capa animada",
+          "desc": "Dê vida à capa do seu álbum com um visual em loop para Spotify Canvas, YouTube e redes sociais."
+        },
+        "lyricReels": {
+          "title": "Série de personagens para suas músicas",
+          "desc": "Crie um personagem de IA recorrente que estrela clipes curtos para divulgar cada lançamento."
+        },
+        "productDemo": {
+          "title": "Demos de produto em escala",
+          "desc": "Transforme fotos de produtos em vídeos de demonstração caprichados para cada item do catálogo, no formato certo para cada canal."
+        },
+        "productUgc": {
+          "title": "Depoimentos para cada produto",
+          "desc": "Apresentadores de IA abrem, usam e recomendam seus produtos, com versões para cada mercado e idioma."
+        },
+        "productAds": {
+          "title": "Criativos de anúncio em massa",
+          "desc": "Gere dezenas de variações de anúncios de imagem para testar ângulos, ofertas e públicos sem sessão de fotos."
+        },
+        "productLocal": {
+          "title": "Venda em todos os idiomas",
+          "desc": "Traduza seus vídeos de produto com melhor desempenho e lance-os em novos mercados com sincronização labial."
+        },
+        "courseLanguages": {
+          "title": "Cursos em 12 idiomas",
+          "desc": "Grave sua aula uma vez e publique em francês, espanhol, árabe, hindi e mais, com sua própria voz."
+        },
+        "presenter": {
+          "title": "Um apresentador de IA para cada aula",
+          "desc": "Transforme roteiros em vídeos apresentados por um ator de IA fotorrealista quando você não puder se filmar."
+        },
+        "explainers": {
+          "title": "Vídeos explicativos a partir de um roteiro",
+          "desc": "Cole o roteiro da aula e receba um vídeo explicativo com várias cenas e visuais para cada ponto."
+        },
+        "api": {
+          "title": "API de geração de vídeo",
+          "desc": "Gere vídeos com IA por programação: envie um prompt e receba a URL do vídeo, com escolha completa de modelo. Em breve."
+        },
+        "batch": {
+          "title": "APIs de roteiro e voz",
+          "desc": "Escreva roteiros para qualquer nicho e transforme texto em locuções naturais em vários idiomas, cada um com uma única chamada. Em breve."
+        },
+        "webhooks": {
+          "title": "API de inteligência de anúncios",
+          "desc": "Consulte anúncios vencedores por nicho e tempo de veiculação e crie suas próprias ferramentas de pesquisa com nossos dados. Em breve."
+        }
+      }
+    },
+    "creators": {
+      "title": "Feito com a KlipflowAI",
+      "subtitle": "Criadores do mundo todo contam histórias maiores com equipes menores.",
+      "previous": "Criador anterior",
+      "next": "Próximo criador",
+      "sample": "Exemplo",
+      "people": {
+        "maya": {
+          "niche": "Histórias faceless · Lagos",
+          "quote": "Publico um episódio novo todo dia e meu público acha que tenho uma equipe de produção inteira."
+        },
+        "leo": {
+          "niche": "Filmes de marca · Paris",
+          "quote": "Apresentamos três direções aos clientes em uma tarde, em vez de uma semana."
+        },
+        "sofia": {
+          "niche": "Videoclipes · Cidade do México",
+          "quote": "Finalmente as imagens combinam com as músicas que ouço na minha cabeça."
+        },
+        "arjun": {
+          "niche": "Cursos online · Bangalore",
+          "quote": "Uma gravação, doze idiomas. Meus cursos chegam a alunos que eu nunca alcançava."
+        },
+        "amina": {
+          "niche": "E-commerce · Nairóbi",
+          "quote": "Agora cada produto da minha loja tem seu próprio anúncio em vídeo."
+        }
+      }
+    },
+    "powered": {
+      "title": "Movido pelos melhores modelos de IA do mundo",
+      "subtitle": "Os principais modelos, em um só lugar, com uma só conta."
+    },
+    "closing": {
+      "cta": "Experimente"
+    },
+    "footer": {
+      "tagline": "Vídeo com IA para todos. Crie qualquer coisa, em qualquer idioma.",
+      "groups": {
+        "product": "Produto",
+        "features": "Recursos",
+        "pricing": "Preços",
+        "api": "API",
+        "resources": "Recursos úteis",
+        "company": "Empresa",
+        "legal": "Jurídico"
+      },
+      "links": {
+        "studio": "Estúdio",
+        "templates": "Modelos",
+        "gallery": "Galeria",
+        "textToVideo": "Gerador de vídeo com IA",
+        "translator": "Tradutor de vídeo",
+        "facelessReels": "Faceless reels",
+        "adSpy": "Espião de anúncios",
+        "plans": "Planos",
+        "freeTrial": "Comece grátis",
+        "apiDocs": "Documentação da API",
+        "blog": "Blog",
+        "academy": "Academia",
+        "faq": "Perguntas frequentes",
+        "about": "Sobre",
+        "contact": "Contato",
+        "privacy": "Política de privacidade",
+        "terms": "Termos de serviço",
+        "refund": "Política de reembolso"
+      },
+      "social": {
+        "tiktok": "KlipflowAI no TikTok",
+        "instagram": "KlipflowAI no Instagram",
+        "x": "KlipflowAI no X",
+        "youtube": "KlipflowAI no YouTube",
+        "discord": "KlipflowAI no Discord",
+        "facebook": "KlipflowAI no Facebook",
+        "linkedin": "KlipflowAI no LinkedIn"
+      }
+    }
   }
 }

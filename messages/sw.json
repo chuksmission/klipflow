@@ -1639,5 +1639,265 @@
       "roast-reaction": "Roast / Mwitikio",
       "before-after-transformation": "Mabadiliko Kabla/Baada"
     }
+  },
+  "landing": {
+    "nav": {
+      "features": "Vipengele",
+      "demo": "Onyesho",
+      "useCases": "Matumizi",
+      "pricing": "Bei",
+      "faq": "Maswali"
+    },
+    "hero": {
+      "title": "Unda chochote. Kwa lugha yoyote.",
+      "subtitle": "Video za AI kwa kila mtu",
+      "cta": "Anza bure",
+      "label": "Studio moja. Kila modeli ya AI.",
+      "labelSub": "Kutoka maelezo moja hadi mfululizo mzima"
+    },
+    "features": {
+      "tryNow": "Jaribu sasa",
+      "soon": "Inakuja hivi karibuni",
+      "textToVideo": {
+        "title": "Maandishi kuwa video",
+        "desc": "Eleza onyesho na uone likiwa hai kwa Kling, Veo, Sora, Seedance na zaidi, pamoja na sauti asilia."
+      },
+      "translator": {
+        "title": "Mtafsiri wa video wa AI",
+        "desc": "Tafsiri video yoyote kwa lugha nyingine kwa uigaji wa sauti wa asili na midomo inayolingana na kila neno."
+      },
+      "actorSwap": {
+        "title": "Kubadilisha mwigizaji kwa AI",
+        "desc": "Ipe video yoyote uso mpya, sauti mpya au lugha mpya huku uigizaji ukibaki kama ulivyo."
+      },
+      "facelessReels": {
+        "title": "Faceless Reels",
+        "desc": "Anzisha mfululizo asilia wa wahusika wa AI kutoka violezo vinavyovuma, wenye wahusika na hadithi ambazo hakuna mwingine anazo."
+      },
+      "seriesCloner": {
+        "title": "Kinakili mfululizo",
+        "desc": "Pakia mfululizo unaovuma, toa fomula inayoufanya ufanikiwe, na uunde vipindi vyako asilia."
+      },
+      "videoRemix": {
+        "title": "Remix ya video",
+        "desc": "Badilisha mtindo, unda upya au badilisha waigizaji wa video yoyote: geuza tangazo la mshindani au picha zako kuwa kitu kipya."
+      },
+      "musicStudio": {
+        "title": "Studio ya muziki ya AI",
+        "desc": "Andika na utayarishe nyimbo asilia, kisha zigeuze kuwa video za muziki. Inakuja hivi karibuni kwenye KlipflowAI."
+      }
+    },
+    "demo": {
+      "title": "Ione ikifanya kazi",
+      "subtitle": "Tazama KlipflowAI ikiunda kwa wakati halisi",
+      "soon": "Onyesho linakuja hivi karibuni",
+      "tryNow": "Jaribu sasa",
+      "generate": {
+        "title": "Unda kwa sekunde",
+        "desc": "Andika unachotaka kuona, chagua modeli na ubonyeze unda. Video yako iko tayari papo hapo, ikiwa na sauti, katika umbo jukwaa lako linalohitaji.",
+        "chip": "Maandishi kuwa video"
+      },
+      "translate": {
+        "title": "Tafsiri video yoyote",
+        "desc": "Pakia video, chagua Kifaransa au lugha yoyote kati ya 16, na uipate kwa lugha mpya ikiwa na sauti ileile na midomo inayolingana.",
+        "chip": "Tafsiri → Français"
+      },
+      "series": {
+        "title": "Jenga mfululizo wako",
+        "desc": "Chagua kiolezo cha Faceless Reels, idhinisha wahusika wako wa kipekee, na utazame kipindi kizima kikiundwa pamoja na hati yake.",
+        "chip": "Faceless Reels"
+      }
+    },
+    "languages": {
+      "title": "Unda kwa lugha yoyote",
+      "subtitle": "Hadhira yako iko duniani kote. Maudhui yako pia.",
+      "pillsLabel": "Lugha za kiolesura zinazotumika",
+      "demoLabel": "Video ileile kwa lugha tatu",
+      "count": "Lugha na lafudhi zaidi ya 40",
+      "tryNow": "Jaribu sasa"
+    },
+    "useCases": {
+      "title": "Imeundwa kwa kila mbunifu",
+      "subtitle": "Chochote unachounda, kuna njia ya haraka zaidi.",
+      "tabs": {
+        "creators": "Waundaji wa maudhui",
+        "brands": "Chapa na mashirika",
+        "musicians": "Wanamuziki",
+        "ecommerce": "Biashara mtandaoni",
+        "educators": "Waelimishaji",
+        "developers": "Wasanidi programu"
+      },
+      "headlines": {
+        "creators": "Jenga chaneli ya faceless katika niche yoyote bila kuonyesha uso wako",
+        "brands": "Geuza matangazo ya washindani kuwa yako kwa dakika",
+        "musicians": "Unda video yako nzima ya muziki kutoka maelezo moja",
+        "ecommerce": "Video za maonyesho ya bidhaa kwa wingi",
+        "educators": "Maudhui ya kozi kwa lugha 12",
+        "developers": "Ufikiaji kamili wa API: jenga juu ya KlipflowAI (inakuja hivi karibuni)"
+      },
+      "cards": {
+        "facelessChannel": {
+          "title": "Chaneli ya faceless katika niche yoyote",
+          "desc": "Chagua kiolezo kinachovuma, pata wahusika wa kipekee na hadithi yako peke yako, kisha chapisha kipindi kipya kila siku bila kuonekana kamwe kwenye kamera."
+        },
+        "seriesFormula": {
+          "title": "Nakili kinachofanya kazi",
+          "desc": "Pakia mfululizo unaopanda chati, KlipflowAI itoe kivutio, mwendo na muundo wake, na uunde vipindi asilia kwa fomula ileile."
+        },
+        "autopilot": {
+          "title": "Chapisha kiotomatiki",
+          "desc": "Panga, unda na ratibu maudhui yako kwenye majukwaa yote ili chaneli zako zikue wakati unazingatia mawazo."
+        },
+        "shorts": {
+          "title": "Video fupi za kisinema",
+          "desc": "Geuza sentensi moja kuwa klipu wima inayovutia, yenye sauti asilia, tayari kwa TikTok, Reels na Shorts."
+        },
+        "competitorAds": {
+          "title": "Remix matangazo ya washindani",
+          "desc": "Chukua tangazo linaloshinda katika soko lako, badilisha bidhaa, mtindo na waigizaji, na uzindue toleo lako siku hiyohiyo."
+        },
+        "adSpy": {
+          "title": "Fuatilia kinachofanya kazi",
+          "desc": "Vinjari matangazo ambayo washindani wako wanaendesha sasa hivi, ona yanayofanya vizuri na ugeuze bora zaidi kuwa maelekezo."
+        },
+        "ugcAds": {
+          "title": "Matangazo ya UGC bila waundaji",
+          "desc": "Ushuhuda halisi wa mtindo wa waundaji na waigizaji wa AI wakishika bidhaa yako, kwa lugha yoyote na kwa hadhira yoyote."
+        },
+        "imageAds": {
+          "title": "Matangazo ya picha yanayouza",
+          "desc": "Matangazo ya picha yanayovutia yenye bidhaa yako, maneno yako na umbo sahihi kwa kila nafasi."
+        },
+        "musicVideo": {
+          "title": "Video ya muziki kutoka maelezo moja",
+          "desc": "Eleza hisia, mazingira na hadithi ya wimbo wako, upate maonyesho ya kisinema yaliyohaririwa kwa wimbo wako."
+        },
+        "visualizer": {
+          "title": "Jalada linalosonga",
+          "desc": "Ipe uhai picha ya albamu yako kama video inayojirudia kwa Spotify Canvas, YouTube na mitandao ya kijamii."
+        },
+        "lyricReels": {
+          "title": "Mfululizo wa mhusika kwa nyimbo zako",
+          "desc": "Unda mhusika wa AI wa kudumu anayeigiza katika klipu fupi kutangaza kila wimbo mpya."
+        },
+        "productDemo": {
+          "title": "Maonyesho ya bidhaa kwa wingi",
+          "desc": "Geuza picha za bidhaa kuwa video nadhifu za maonyesho kwa kila bidhaa katika katalogi yako, katika umbo sahihi kwa kila chaneli."
+        },
+        "productUgc": {
+          "title": "Ushuhuda kwa kila bidhaa",
+          "desc": "Watangazaji wa AI hufungua, hutumia na kupendekeza bidhaa zako, wakiwa na matoleo kwa kila soko na lugha."
+        },
+        "productAds": {
+          "title": "Matangazo mengi kwa mara moja",
+          "desc": "Unda matoleo mengi ya matangazo ya picha ili kujaribu mbinu, ofa na hadhira bila kupiga picha."
+        },
+        "productLocal": {
+          "title": "Uza kwa kila lugha",
+          "desc": "Tafsiri video zako za bidhaa zinazofanya vizuri zaidi na uzizindue katika masoko mapya zikiwa na midomo inayolingana."
+        },
+        "courseLanguages": {
+          "title": "Kozi kwa lugha 12",
+          "desc": "Rekodi somo lako mara moja na ulichapishe kwa Kifaransa, Kihispania, Kiarabu, Kihindi na zaidi, kwa sauti yako mwenyewe."
+        },
+        "presenter": {
+          "title": "Mtangazaji wa AI kwa kila somo",
+          "desc": "Geuza hati kuwa video zinazowasilishwa na mwigizaji wa AI anayeonekana halisi pale usipoweza kujirekodi."
+        },
+        "explainers": {
+          "title": "Video za maelezo kutoka hati",
+          "desc": "Bandika hati ya somo lako upate video ya maelezo yenye maonyesho kadhaa na picha kwa kila hoja."
+        },
+        "api": {
+          "title": "API ya kuunda video",
+          "desc": "Unda video za AI kwa programu: tuma maelezo, upate URL ya video, ukiwa na uchaguzi kamili wa modeli. Inakuja hivi karibuni."
+        },
+        "batch": {
+          "title": "API za hati na sauti",
+          "desc": "Andika hati kwa niche yoyote na ugeuze maandishi kuwa sauti asilia kwa lugha nyingi, kila moja kwa ombi moja. Inakuja hivi karibuni."
+        },
+        "webhooks": {
+          "title": "API ya ujasusi wa matangazo",
+          "desc": "Tafuta matangazo yanayoshinda kwa niche na muda wa kuendeshwa, na ujenge zana zako za utafiti juu ya data yetu. Inakuja hivi karibuni."
+        }
+      }
+    },
+    "creators": {
+      "title": "Imeundwa kwa KlipflowAI",
+      "subtitle": "Wabunifu duniani kote wanasimulia hadithi kubwa zaidi wakiwa na timu ndogo.",
+      "previous": "Mbunifu aliyetangulia",
+      "next": "Mbunifu anayefuata",
+      "sample": "Mfano",
+      "people": {
+        "maya": {
+          "niche": "Usimulizi wa faceless · Lagos",
+          "quote": "Ninachapisha kipindi kipya kila siku na hadhira yangu inadhani nina timu nzima ya utayarishaji."
+        },
+        "leo": {
+          "niche": "Filamu za chapa · Paris",
+          "quote": "Tunawasilisha mielekeo mitatu kwa wateja ndani ya mchana mmoja badala ya wiki nzima."
+        },
+        "sofia": {
+          "niche": "Video za muziki · Mexico City",
+          "quote": "Hatimaye picha zinalingana na nyimbo ninazozisikia kichwani mwangu."
+        },
+        "arjun": {
+          "niche": "Kozi za mtandaoni · Bangalore",
+          "quote": "Rekodi moja, lugha kumi na mbili. Kozi zangu zinawafikia wanafunzi nisioweza kuwafikia awali."
+        },
+        "amina": {
+          "niche": "Biashara mtandaoni · Nairobi",
+          "quote": "Sasa kila bidhaa katika duka langu ina tangazo lake la video."
+        }
+      }
+    },
+    "powered": {
+      "title": "Inaendeshwa na modeli bora za AI duniani",
+      "subtitle": "Modeli zinazoongoza, mahali pamoja, kwa akaunti moja."
+    },
+    "closing": {
+      "cta": "Jaribu sasa"
+    },
+    "footer": {
+      "tagline": "Video za AI kwa kila mtu. Unda chochote, kwa lugha yoyote.",
+      "groups": {
+        "product": "Bidhaa",
+        "features": "Vipengele",
+        "pricing": "Bei",
+        "api": "API",
+        "resources": "Rasilimali",
+        "company": "Kampuni",
+        "legal": "Kisheria"
+      },
+      "links": {
+        "studio": "Studio",
+        "templates": "Violezo",
+        "gallery": "Matunzio",
+        "textToVideo": "Kiunda video cha AI",
+        "translator": "Mtafsiri wa video",
+        "facelessReels": "Faceless reels",
+        "adSpy": "Upelelezi wa matangazo",
+        "plans": "Mipango",
+        "freeTrial": "Anza bure",
+        "apiDocs": "Nyaraka za API",
+        "blog": "Blogu",
+        "academy": "Akademia",
+        "faq": "Maswali",
+        "about": "Kuhusu",
+        "contact": "Wasiliana",
+        "privacy": "Sera ya faragha",
+        "terms": "Masharti ya huduma",
+        "refund": "Sera ya kurejesha pesa"
+      },
+      "social": {
+        "tiktok": "KlipflowAI kwenye TikTok",
+        "instagram": "KlipflowAI kwenye Instagram",
+        "x": "KlipflowAI kwenye X",
+        "youtube": "KlipflowAI kwenye YouTube",
+        "discord": "KlipflowAI kwenye Discord",
+        "facebook": "KlipflowAI kwenye Facebook",
+        "linkedin": "KlipflowAI kwenye LinkedIn"
+      }
+    }
   }
 }

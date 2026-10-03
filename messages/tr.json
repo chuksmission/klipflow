@@ -1639,5 +1639,265 @@
       "roast-reaction": "Roast / Tepki",
       "before-after-transformation": "Öncesi/Sonrası Dönüşüm"
     }
+  },
+  "landing": {
+    "nav": {
+      "features": "Özellikler",
+      "demo": "Demo",
+      "useCases": "Kullanım alanları",
+      "pricing": "Fiyatlar",
+      "faq": "SSS"
+    },
+    "hero": {
+      "title": "Her şeyi yarat. Her dilde.",
+      "subtitle": "Herkes için yapay zekâ videosu",
+      "cta": "Ücretsiz başla",
+      "label": "Tek stüdyo. Tüm yapay zekâ modelleri.",
+      "labelSub": "Tek bir komuttan koca bir diziye"
+    },
+    "features": {
+      "tryNow": "Hemen dene",
+      "soon": "Yakında",
+      "textToVideo": {
+        "title": "Metinden videoya",
+        "desc": "Bir sahneyi anlat; Kling, Veo, Sora, Seedance ve daha fazlasıyla doğal sesiyle hayata geçişini izle."
+      },
+      "translator": {
+        "title": "Yapay zekâ video çevirmeni",
+        "desc": "Herhangi bir videoyu doğal ses klonlama ve her kelimeye uyan dudak senkronuyla başka bir dile çevir."
+      },
+      "actorSwap": {
+        "title": "Yapay zekâ oyuncu değişimi",
+        "desc": "Performansı bozmadan her videoya yeni bir yüz, yeni bir ses ya da yeni bir dil ver."
+      },
+      "facelessReels": {
+        "title": "Faceless Reels",
+        "desc": "Viral şablonlardan, kimsede olmayan karakter ve hikâyelerle özgün bir yapay zekâ karakter dizisi başlat."
+      },
+      "seriesCloner": {
+        "title": "Dizi kopyalayıcı",
+        "desc": "Viral bir diziyi yükle, onu başarılı kılan formülü çıkar ve kendi özgün bölümlerini üret."
+      },
+      "videoRemix": {
+        "title": "Video remiks",
+        "desc": "Her videonun stilini, çekimini ya da oyuncularını değiştir: Rakibinin reklamını ya da kendi görüntülerini yepyeni bir şeye dönüştür."
+      },
+      "musicStudio": {
+        "title": "Yapay zekâ müzik stüdyosu",
+        "desc": "Özgün şarkılar yaz ve üret, sonra onları klibe dönüştür. Yakında KlipflowAI'da."
+      }
+    },
+    "demo": {
+      "title": "İş başında gör",
+      "subtitle": "KlipflowAI'ın gerçek zamanlı üretimini izle",
+      "soon": "Demo yakında",
+      "tryNow": "Hemen dene",
+      "generate": {
+        "title": "Saniyeler içinde üret",
+        "desc": "Görmek istediğini yaz, bir model seç ve üret'e bas. Videon sesiyle birlikte, platformunun istediği formatta anında hazır.",
+        "chip": "Metinden videoya"
+      },
+      "translate": {
+        "title": "Her videoyu çevir",
+        "desc": "Bir video yükle, Fransızcayı ya da 16 dilden birini seç ve aynı ses ve dudak senkronuyla yeni dilde geri al.",
+        "chip": "Çevir → Français"
+      },
+      "series": {
+        "title": "Dizini kur",
+        "desc": "Bir Faceless Reels şablonu seç, sana özel karakterleri onayla ve senaryosuyla birlikte tam bir bölümün üretilişini izle.",
+        "chip": "Faceless Reels"
+      }
+    },
+    "languages": {
+      "title": "Her dilde üret",
+      "subtitle": "Kitlen küresel. İçeriğin de öyle.",
+      "pillsLabel": "Desteklenen arayüz dilleri",
+      "demoLabel": "Aynı video üç dilde",
+      "count": "40'tan fazla dil ve aksan desteklenir",
+      "tryNow": "Hemen dene"
+    },
+    "useCases": {
+      "title": "Her içerik üreticisi için",
+      "subtitle": "Ne üretirsen üret, daha hızlı bir yolu var.",
+      "tabs": {
+        "creators": "İçerik üreticileri",
+        "brands": "Markalar ve ajanslar",
+        "musicians": "Müzisyenler",
+        "ecommerce": "E-ticaret",
+        "educators": "Eğitmenler",
+        "developers": "Geliştiriciler"
+      },
+      "headlines": {
+        "creators": "Yüzünü göstermeden her nişte faceless bir kanal kur",
+        "brands": "Rakip reklamlarını dakikalar içinde kendi reklamına dönüştür",
+        "musicians": "Tüm klibini tek bir komuttan üret",
+        "ecommerce": "Ölçekli ürün tanıtım videoları",
+        "educators": "12 dilde kurs içeriği",
+        "developers": "Tam API erişimi: KlipflowAI üzerine inşa et (yakında)"
+      },
+      "cards": {
+        "facelessChannel": {
+          "title": "Her nişte faceless bir kanal",
+          "desc": "Viral bir şablon seç, kimsede olmayan karakterler ve sana özel bir hikâye al, kameraya hiç çıkmadan her gün yeni bir bölüm yayınla."
+        },
+        "seriesFormula": {
+          "title": "İşe yarayanı kopyala",
+          "desc": "Yükselişteki bir diziyi yükle, KlipflowAI kancasını, temposunu ve yapısını çıkarsın; aynı formülle özgün bölümler üret."
+        },
+        "autopilot": {
+          "title": "Otomatik pilotta paylaş",
+          "desc": "İçeriklerini tüm platformlarda planla, üret ve zamanla; sen fikirlere odaklanırken kanalların büyüsün."
+        },
+        "shorts": {
+          "title": "Sinematik kısa videolar",
+          "desc": "Tek bir cümleyi doğal sesli, kaydırmayı durduran dikey bir klibe dönüştür; TikTok, Reels ve Shorts için hazır."
+        },
+        "competitorAds": {
+          "title": "Rakip reklamlarını remiksle",
+          "desc": "Pazarında kazanan bir reklamı al, ürünü, stili ve oyuncuları değiştir ve kendi versiyonunu aynı gün yayınla."
+        },
+        "adSpy": {
+          "title": "İşe yarayanı keşfet",
+          "desc": "Rakiplerinin şu an yayında olan reklamlarına göz at, neyin performans gösterdiğini gör ve en iyilerini brief'e dönüştür."
+        },
+        "ugcAds": {
+          "title": "İçerik üreticisi olmadan UGC reklamlar",
+          "desc": "Ürününü tutan yapay zekâ oyuncularla, her dilde ve her kitle için samimi, içerik üreticisi tarzında tanıklıklar."
+        },
+        "imageAds": {
+          "title": "Dönüşüm getiren görsel reklamlar",
+          "desc": "Ürünün, metnin ve her yerleşim için doğru formatla dikkat çeken görsel reklamlar."
+        },
+        "musicVideo": {
+          "title": "Tek komutla bir klip",
+          "desc": "Şarkının havasını, mekânını ve hikâyesini anlat; parçana göre kurgulanmış sinematik sahneler al."
+        },
+        "visualizer": {
+          "title": "Hareketli albüm kapağı",
+          "desc": "Albüm kapağını Spotify Canvas, YouTube ve sosyal medya için döngüde oynayan bir görsele dönüştür."
+        },
+        "lyricReels": {
+          "title": "Şarkıların için karakter dizisi",
+          "desc": "Her yeni çıkışı tanıtan kısa kliplerde rol alan, kalıcı bir yapay zekâ karakteri yarat."
+        },
+        "productDemo": {
+          "title": "Ölçekli ürün tanıtımları",
+          "desc": "Ürün fotoğraflarını kataloğundaki her ürün için, her kanala uygun formatta özenli tanıtım videolarına dönüştür."
+        },
+        "productUgc": {
+          "title": "Her ürün için tanıklık",
+          "desc": "Yapay zekâ sunucular ürünlerini kutudan çıkarır, kullanır ve önerir; her pazar ve dil için ayrı versiyonlarla."
+        },
+        "productAds": {
+          "title": "Toplu reklam görselleri",
+          "desc": "Fotoğraf çekimine gerek kalmadan açıları, teklifleri ve kitleleri test etmek için onlarca görsel reklam varyasyonu üret."
+        },
+        "productLocal": {
+          "title": "Her dilde sat",
+          "desc": "En iyi performans gösteren ürün videolarını çevir ve dudak senkronuyla yeni pazarlarda yayınla."
+        },
+        "courseLanguages": {
+          "title": "12 dilde kurslar",
+          "desc": "Dersini bir kez kaydet; kendi sesinle Fransızca, İspanyolca, Arapça, Hintçe ve daha fazla dilde yayınla."
+        },
+        "presenter": {
+          "title": "Her ders için yapay zekâ sunucu",
+          "desc": "Kendini çekemediğinde senaryoları fotogerçekçi bir yapay zekâ oyuncunun sunduğu videolara dönüştür."
+        },
+        "explainers": {
+          "title": "Senaryodan açıklama videoları",
+          "desc": "Ders senaryonu yapıştır; her nokta için görsellerle çok sahneli bir açıklama videosu al."
+        },
+        "api": {
+          "title": "Video üretim API'si",
+          "desc": "Yapay zekâ videolarını programla üret: bir komut gönder, video URL'sini al, tam model seçimiyle. Yakında."
+        },
+        "batch": {
+          "title": "Senaryo ve ses API'leri",
+          "desc": "Her niş için senaryo yaz ve metni birçok dilde doğal seslendirmeye dönüştür, her biri tek çağrıyla. Yakında."
+        },
+        "webhooks": {
+          "title": "Reklam istihbaratı API'si",
+          "desc": "Kazanan reklamları niş ve yayın süresine göre sorgula ve verilerimiz üzerine kendi araştırma araçlarını kur. Yakında."
+        }
+      }
+    },
+    "creators": {
+      "title": "KlipflowAI ile yapıldı",
+      "subtitle": "Dünyanın dört bir yanındaki içerik üreticileri daha küçük ekiplerle daha büyük hikâyeler anlatıyor.",
+      "previous": "Önceki içerik üreticisi",
+      "next": "Sonraki içerik üreticisi",
+      "sample": "Örnek",
+      "people": {
+        "maya": {
+          "niche": "Faceless hikâye anlatımı · Lagos",
+          "quote": "Her gün yeni bir bölüm yayınlıyorum ve izleyicilerim koca bir prodüksiyon ekibim olduğunu sanıyor."
+        },
+        "leo": {
+          "niche": "Marka filmleri · Paris",
+          "quote": "Müşterilere üç farklı yönü bir hafta yerine bir öğleden sonrada sunuyoruz."
+        },
+        "sofia": {
+          "niche": "Müzik klipleri · Mexico City",
+          "quote": "Görüntüler sonunda kafamda duyduğum şarkılarla uyuşuyor."
+        },
+        "arjun": {
+          "niche": "Online kurslar · Bangalore",
+          "quote": "Tek kayıt, on iki dil. Kurslarım daha önce asla ulaşamadığım öğrencilere ulaşıyor."
+        },
+        "amina": {
+          "niche": "E-ticaret · Nairobi",
+          "quote": "Mağazamdaki her ürünün artık kendi video reklamı var."
+        }
+      }
+    },
+    "powered": {
+      "title": "Dünyanın en iyi yapay zekâ modelleriyle güçlendirildi",
+      "subtitle": "Önde gelen modeller, tek yerde, tek hesapla."
+    },
+    "closing": {
+      "cta": "Hemen dene"
+    },
+    "footer": {
+      "tagline": "Herkes için yapay zekâ videosu. Her şeyi, her dilde yarat.",
+      "groups": {
+        "product": "Ürün",
+        "features": "Özellikler",
+        "pricing": "Fiyatlar",
+        "api": "API",
+        "resources": "Kaynaklar",
+        "company": "Şirket",
+        "legal": "Yasal"
+      },
+      "links": {
+        "studio": "Stüdyo",
+        "templates": "Şablonlar",
+        "gallery": "Galeri",
+        "textToVideo": "Yapay zekâ video oluşturucu",
+        "translator": "Video çevirmeni",
+        "facelessReels": "Faceless reels",
+        "adSpy": "Reklam casusu",
+        "plans": "Planlar",
+        "freeTrial": "Ücretsiz başla",
+        "apiDocs": "API belgeleri",
+        "blog": "Blog",
+        "academy": "Akademi",
+        "faq": "SSS",
+        "about": "Hakkımızda",
+        "contact": "İletişim",
+        "privacy": "Gizlilik politikası",
+        "terms": "Hizmet şartları",
+        "refund": "İade politikası"
+      },
+      "social": {
+        "tiktok": "TikTok'ta KlipflowAI",
+        "instagram": "Instagram'da KlipflowAI",
+        "x": "X'te KlipflowAI",
+        "youtube": "YouTube'da KlipflowAI",
+        "discord": "Discord'da KlipflowAI",
+        "facebook": "Facebook'ta KlipflowAI",
+        "linkedin": "LinkedIn'de KlipflowAI"
+      }
+    }
   }
 }

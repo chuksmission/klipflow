@@ -145,3 +145,75 @@ button:not(:disabled),
 .kf-prose table { width: 100%; border-collapse: collapse; font-size: 0.95em; }
 .kf-prose th, .kf-prose td { border-bottom: 1px solid var(--kf-border); padding: 0.6em 0.75em; text-align: left; }
 .kf-prose th { color: var(--kf-text); font-weight: 600; }
+
+/* ===================================================================== homepage
+   Cinematic landing page: intro portal, marquees, waves. Pure CSS transforms;
+   the little JS on the page only sets classes and scroll progress (--p). */
+
+/* Intro: wordmark → icon → glowing ring → oval portal that opens onto the hero.
+   Shown once: an inline script adds html.kf-intro-on on the first visit. */
+.kf-intro { display: none; }
+html.kf-intro-on .kf-intro { display: block; }
+html.kf-intro-on body { overflow: hidden; }
+
+.kf-intro__backdrop { animation: kf-fade-out 0.15s ease-out 0.82s both; }
+.kf-intro__mark { animation: kf-mark 0.95s cubic-bezier(.2,.7,.2,1) both; }
+.kf-intro__word { animation: kf-word 0.95s cubic-bezier(.6,0,.2,1) both; }
+.kf-intro__icon { animation: kf-icon 0.95s cubic-bezier(.6,0,.2,1) both; }
+/* The ring (glow, spins in 3D) and the hole (the black mask with an oval
+   opening) are separate, so the 3D spin never uncovers the page early. Both
+   grow by size rather than scale, so the mask's spread stays full-screen. */
+.kf-intro__ring, .kf-intro__hole { position: absolute; left: 50%; top: 50%; translate: -50% -50%; border-radius: 50%; }
+.kf-intro__ring {
+  border: 2px solid rgb(196 181 253 / 0.95);
+  box-shadow: 0 0 22px 4px rgb(139 108 255 / 0.85), inset 0 0 16px 2px rgb(139 108 255 / 0.55);
+  animation: kf-size 1.35s cubic-bezier(.65,0,.35,1) 0.85s both, kf-spin 0.5s ease-in-out 0.85s both, kf-ring-fade 1.35s linear 0.85s both;
+}
+.kf-intro__hole {
+  box-shadow: 0 0 0 150vmax var(--kf-canvas);
+  animation: kf-hole 1.35s cubic-bezier(.65,0,.35,1) 0.85s both;
+}
+@keyframes kf-fade-out { to { opacity: 0; } }
+@keyframes kf-mark { 0% { opacity: 0; transform: scale(.94); filter: blur(6px); } 35% { opacity: 1; transform: none; filter: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes kf-word { 0%, 40% { max-width: 12em; opacity: 1; margin-inline-start: .45em; } 72%, 100% { max-width: 0; opacity: 0; margin-inline-start: 0; } }
+@keyframes kf-icon { 0%, 70% { transform: none; } 100% { transform: rotate(90deg) scale(.85); } }
+@keyframes kf-size { 0%, 35% { width: 72px; height: 72px; } 50% { width: 112px; height: 156px; } 100% { width: 250vmax; height: 330vmax; } }
+@keyframes kf-hole { 0%, 35% { width: 0; height: 0; } 50% { width: 108px; height: 152px; } 100% { width: 250vmax; height: 330vmax; } }
+@keyframes kf-spin { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
+@keyframes kf-ring-fade { 0% { opacity: 0; } 6% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+
+/* Marquees (logo rows, language pills): two copies of the row slide left forever */
+.kf-marquee { mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
+.kf-marquee__track { display: flex; width: max-content; animation: kf-marquee var(--kf-speed, 40s) linear infinite; }
+.kf-marquee__track--reverse { animation-direction: reverse; }
+.kf-marquee:hover .kf-marquee__track { animation-play-state: paused; }
+@keyframes kf-marquee { to { transform: translateX(-50%); } }
+[dir="rtl"] .kf-marquee__track { animation-name: kf-marquee-rtl; }
+@keyframes kf-marquee-rtl { to { transform: translateX(50%); } }
+
+/* Progress dash in the demo carousel */
+.kf-dash-fill { animation: kf-dash var(--kf-dash, 20s) linear both; transform-origin: left; }
+[dir="rtl"] .kf-dash-fill { transform-origin: right; }
+@keyframes kf-dash { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* Placeholder "video": slow drifting violet light for cards with no clip yet */
+.kf-ambient { background:
+  radial-gradient(60% 80% at var(--x1, 20%) 30%, rgb(109 74 255 / 0.35), transparent 70%),
+  radial-gradient(50% 70% at var(--x2, 80%) 80%, rgb(34 211 238 / 0.10), transparent 70%),
+  #0d0b16;
+  animation: kf-drift 14s ease-in-out infinite alternate; background-size: 140% 140%; }
+@keyframes kf-drift { from { background-position: 0% 0%; } to { background-position: 100% 100%; } }
+
+/* Closing CTA waves */
+.kf-wave { animation: kf-wave 18s ease-in-out infinite alternate; }
+.kf-wave--slow { animation-duration: 26s; animation-direction: alternate-reverse; }
+@keyframes kf-wave { from { transform: translateX(-6%) translateY(0); } to { transform: translateX(6%) translateY(-4%); } }
+
+/* Fake cursor in the demo placeholders */
+.kf-cursor { animation: kf-cursor 6s ease-in-out infinite; }
+@keyframes kf-cursor {
+  0%, 8%   { transform: translate(12%, 72%); }
+  35%, 48% { transform: translate(64%, 36%); }
+  75%, 88% { transform: translate(86%, 82%); }
+  100%     { transform: translate(12%, 72%); }
+}

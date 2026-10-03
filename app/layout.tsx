@@ -110,7 +110,7 @@ export default async function RootLayout({
 }>) {
   const locale = (await getLocale()) as Locale;
   return (
-    <html
+    <html suppressHydrationWarning
       lang={locale}
       dir={isRtl(locale) ? "rtl" : "ltr"}
       className={`${geistSans.variable} ${geistMono.variable} ${notoArabic.variable} ${notoDevanagari.variable} ${notoEmoji.variable} h-full antialiased`}

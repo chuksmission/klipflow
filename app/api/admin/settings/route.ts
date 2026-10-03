@@ -46,10 +46,12 @@ export async function POST(req: NextRequest) {
 
     const { settings } = await req.json();
     for (const setting of settings) {
+      // Only overwrite the category when one is sent, so saving a value never
+      // drops an existing row out of its category
       await supabase
         .from("admin_settings")
         .upsert(
-          { key: setting.key, value: setting.value, category: setting.category ?? null, updated_at: new Date().toISOString() },
+          { key: setting.key, value: setting.value, ...(setting.category ? { category: setting.category } : {}), updated_at: new Date().toISOString() },
           { onConflict: "key" }
         );
     }
