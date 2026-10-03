@@ -2,7 +2,9 @@
 // browser. Recording needs a live CDP connection with record=true on the
 // stealth route (headful); the result is a WebM returned over CDP as base64.
 // Docs: https://docs.browserless.io/baas/monitor-sessions/screen-recording
-import { chromium, type Locator, type Page } from "playwright-core";
+// playwright-core is loaded only when a recording starts (see recordWalkthrough),
+// so the Demo Studio route still loads if the package fails to load in production
+import type { Locator, Page } from "playwright-core";
 import { MAX_RECORD_SECONDS, type DemoStep, type StepResult } from "./demo-studio";
 
 export const DEMO_SITE = process.env.NEXT_PUBLIC_APP_URL?.startsWith("https://")
@@ -166,6 +168,12 @@ export { CURSOR_SCRIPT };
 export async function recordWalkthrough(input: RecordInput): Promise<RecordOutput> {
   const base = (input.endpoint || "wss://production-sfo.browserless.io").replace(/\/$/, "");
   const ws = `${base}?token=${encodeURIComponent(input.apiKey)}&headless=false&stealth&record=true&timeout=280000`;
+  let chromium: typeof import("playwright-core").chromium;
+  try {
+    ({ chromium } = await import("playwright-core"));
+  } catch (e) {
+    throw new Error(`The browser automation library couldn't load on the server: ${e instanceof Error ? e.message : String(e)}`);
+  }
   const browser = await chromium.connectOverCDP(ws, { timeout: 30_000 });
   try {
     // Recording only works on the session's existing context and page
