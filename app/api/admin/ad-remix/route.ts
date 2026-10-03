@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { TranscriptionError, transcribeVideoUrl } from "../../../lib/whisper";
+import { STUDIO_MODULES } from "../../../components/catalog";
 
 // Whisper and the analysis call can each take 10-40s
 export const maxDuration = 60;
@@ -110,11 +111,15 @@ const ANALYSIS_SCHEMA = {
   additionalProperties: false,
 };
 
+// Built from the Studio module list so new tools are always included
+const TOOL_LIST = STUDIO_MODULES.map((m) => `${m.title} (${m.desc.toLowerCase()})`).join("; ");
+
 const ANALYSIS_SYSTEM = `You are a senior direct-response creative strategist. You study a competitor's video ad, explain why it works, then rewrite it as an original ad for KlipflowAI.
 
 About KlipflowAI (the only facts you may claim):
 - An AI video platform at klipflowai.com for creators and e-commerce brands
-- Generates videos from text or images with models like Kling, Veo, Sora and Seedance: UGC-style ads, product videos, AI presenters, faceless reels, script-to-video and video translation
+- Generates videos from text or images with models like Kling, Veo, Sora and Seedance
+- Studio tools: ${TOOL_LIST}
 - New users get 25 free tokens, no credit card required
 
 Analysis: describe what the ad actually does, using the transcript and the frames (frames are in time order; the first three cover the opening seconds). Be specific and practical.
@@ -211,6 +216,7 @@ export async function POST(req: NextRequest) {
       frames?: Frame[];
       duration?: number;
       notes?: string;
+      feature?: string;
       script?: string;
       avatar_id?: string;
       voice_id?: string;
@@ -234,6 +240,7 @@ export async function POST(req: NextRequest) {
     // ---- 2. Analysis + KlipflowAI rewrite ----
     if (body.action === "analyze") {
       const frames = (body.frames ?? []).filter((f) => typeof f.data_url === "string" && f.data_url.startsWith("data:image/")).slice(0, 8);
+      const focus = STUDIO_MODULES.find((m) => m.id === body.feature);
       const timeline = (body.segments ?? []).length
         ? body.segments!.map((s) => `[${s.start.toFixed(1)}s-${s.end.toFixed(1)}s] ${s.text}`).join("\n")
         : (body.transcript?.trim() || "(no speech detected: the ad may be music or text only)");
@@ -242,6 +249,7 @@ export async function POST(req: NextRequest) {
         `Frames attached at: ${frames.map((f) => `${f.time.toFixed(1)}s`).join(", ") || "none"}.`,
         `Timestamped transcript:\n${timeline}`,
         body.notes?.trim() ? `Notes from the admin: ${body.notes.trim()}` : "",
+        focus ? `Feature to promote: ${focus.title} (${focus.desc}). The new hook, scenes and call to action focus on what this tool does for the viewer.` : "Feature to promote: choose the KlipflowAI tool that best fits this ad's structure and audience.",
         "Analyse this ad, then rewrite it for KlipflowAI following the rules.",
       ].filter(Boolean).join("\n\n");
 

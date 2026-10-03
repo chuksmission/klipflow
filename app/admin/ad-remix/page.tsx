@@ -6,7 +6,7 @@ import {
   Mic, Plus, Repeat2, Sparkles, Trash2, Upload, UserRound,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
-import { VIDEO_MODELS, isModelVisible } from "../../components/catalog";
+import { STUDIO_MODULES, VIDEO_MODELS, isModelVisible } from "../../components/catalog";
 import { Alert, Badge, Button, Field, Input, PageHeader, Progress, Select, Textarea, cardClass } from "../../components/ui";
 
 // ---------------------------------------------------------------- types
@@ -126,6 +126,7 @@ export default function AdRemix() {
   const [file, setFile] = useState<File | null>(null);
   const [fileSeconds, setFileSeconds] = useState(0);
   const [notes, setNotes] = useState("");
+  const [feature, setFeature] = useState("");
   const [phase, setPhase] = useState<Phase>("upload");
   const [analyzeStage, setAnalyzeStage] = useState<AnalyzeStage>("uploading");
   const [transcript, setTranscript] = useState<{ text: string; segments: Segment[]; language: string | null } | null>(null);
@@ -238,7 +239,7 @@ export default function AdRemix() {
 
       setAnalyzeStage("analyzing");
       const an = await apiPost("/api/admin/ad-remix", {
-        action: "analyze", transcript: t.text, segments: t.segments, frames, duration: fileSeconds, notes,
+        action: "analyze", transcript: t.text, segments: t.segments, frames, duration: fileSeconds, notes, feature,
       });
       if (!an.ok) throw new Error(an.data.error ?? "Analysis failed.");
       const a: Analysis = an.data.analysis;
@@ -467,6 +468,12 @@ export default function AdRemix() {
               </>
             )}
           </button>
+          <Field label="Feature to promote" hint="The KlipflowAI version is written around this tool">
+            <Select value={feature} onChange={(e) => setFeature(e.target.value)}>
+              <option value="">Best fit (AI picks)</option>
+              {STUDIO_MODULES.map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
+            </Select>
+          </Field>
           <Field label="Notes for the analysis (optional)" hint="e.g. who the ad targets, or what to emphasise in the KlipflowAI version">
             <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Target e-commerce store owners. Emphasise speed." />
           </Field>

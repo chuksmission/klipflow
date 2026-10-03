@@ -15,7 +15,7 @@ interface ShowcaseFeature {
   category: string;        // default showcase category
   input?: "image" | "image-optional";
   audioOnly?: boolean;     // restrict to models with native audio
-  comingSoon?: boolean;    // feature not built yet; demo generated with text to video
+  illustrative?: boolean;  // needs the user's own footage, so the demo is a text-to-video illustration
 }
 
 const FEATURES: ShowcaseFeature[] = [
@@ -28,9 +28,9 @@ const FEATURES: ShowcaseFeature[] = [
   { id: "video_translator", label: "AI Video Translator", pipeline: "translate", type: "video_translation", category: "translation" },
   { id: "prompt",           label: "Prompt Expander",     pipeline: "video",     type: "text_to_video",     category: "cinematic" },
   { id: "script",           label: "Script Writer",       pipeline: "video",     type: "text_to_video",     category: "faceless" },
-  { id: "video_remix",      label: "Video Remix",         pipeline: "video",     type: "text_to_video",     category: "cinematic", comingSoon: true },
-  { id: "series_cloner",    label: "Series Cloner",       pipeline: "video",     type: "text_to_video",     category: "faceless", comingSoon: true },
-  { id: "actor_swap",       label: "AI Actor Swap",       pipeline: "video",     type: "text_to_video",     category: "ugc", comingSoon: true },
+  { id: "video_remix",      label: "Video Remix",         pipeline: "video",     type: "video_remix",       category: "cinematic", illustrative: true },
+  { id: "series_cloner",    label: "Series Cloner",       pipeline: "video",     type: "series_cloner",     category: "faceless", illustrative: true },
+  { id: "actor_swap",       label: "AI Actor Swap",       pipeline: "video",     type: "ai_actor_swap",     category: "ugc", illustrative: true },
 ];
 
 const TRANSLATE_LANGUAGES = ["Spanish", "French", "German", "Portuguese", "Italian", "Japanese", "Chinese", "Arabic", "Hindi", "Bulgarian", "Dutch", "Polish", "Korean", "Turkish", "Russian"];
@@ -437,12 +437,12 @@ export default function ShowcaseStudio() {
 
             <Field label="Feature to showcase">
               <Select value={featureId} onChange={(e) => selectFeature(e.target.value)}>
-                {FEATURES.map((f) => <option key={f.id} value={f.id}>{f.label}{f.comingSoon ? " (not built yet)" : ""}</option>)}
+                {FEATURES.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
               </Select>
             </Field>
 
-            {feature.comingSoon && (
-              <Alert tone="warning">{feature.label} isn&apos;t built yet, so this demo is generated with text to video using a prompt written to illustrate it.</Alert>
+            {feature.illustrative && (
+              <Alert tone="info">{feature.label} works on the user&apos;s own footage, so this demo is a text-to-video clip written to illustrate it. &ldquo;Use this&rdquo; on the homepage opens {feature.label}.</Alert>
             )}
 
             {feature.pipeline === "translate" ? (
