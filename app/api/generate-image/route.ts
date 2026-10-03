@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { attachTask, claimCharge, getTokenPrice, isAdminRequest, releaseClaim } from "../../lib/charges";
+import { imageTextInstruction, parseOutputLanguage } from "../../lib/output-language";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,21 +35,26 @@ export async function POST(req: NextRequest) {
     image_url?: string;
     aspect_ratio?: string;
     charge_id?: string;
+    language?: string;
+    accent?: string;
   } = { prompt: "" };
 
   try {
     body = await req.json();
 
     const {
-      prompt,
+      prompt: rawPrompt,
       image_url,
       aspect_ratio = "1:1",
       charge_id,
     } = body;
 
-    if (!prompt) {
+    if (!rawPrompt) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
+    // Text drawn into the image follows the output language (English needs no note)
+    const outputLanguage = parseOutputLanguage(body.language, body.accent);
+    const prompt = outputLanguage && outputLanguage.code !== "en" ? `${rawPrompt}\n\n${imageTextInstruction(outputLanguage)}` : rawPrompt;
 
     // Payment: a paid, unused charge that covers this generation, or an admin
     // (admin tools spend the separate showcase balance)

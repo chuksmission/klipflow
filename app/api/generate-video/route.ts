@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { attachTask, claimCharge, isAdminRequest, releaseClaim, videoModelPrice } from "../../lib/charges";
+import { parseOutputLanguage, speechInstruction } from "../../lib/output-language";
+import { VIDEO_MODELS } from "../../components/catalog";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -38,13 +40,15 @@ export async function POST(req: NextRequest) {
     model?: string;
     with_audio?: boolean;
     charge_id?: string;
+    language?: string;
+    accent?: string;
   } = { prompt: "" };
 
   try {
     body = await req.json();
 
     const {
-      prompt,
+      prompt: rawPrompt,
       mode = "text_to_video",
       image_url,
       duration = "5",
@@ -53,9 +57,15 @@ export async function POST(req: NextRequest) {
       charge_id,
     } = body;
 
-    if (!prompt) {
+    if (!rawPrompt) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
+
+    // Output language: models that generate their own audio are told what the
+    // speech should sound like; for silent models it is only saved as metadata
+    const outputLanguage = parseOutputLanguage(body.language, body.accent);
+    const speaks = VIDEO_MODELS.find((m) => m.id === model)?.hasSound === true;
+    const prompt = outputLanguage && speaks ? `${rawPrompt}\n\n${speechInstruction(outputLanguage)}` : rawPrompt;
 
     // Payment: a paid, unused charge that covers this generation, or an admin
     // (admin tools spend the separate showcase balance)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { parseOutputLanguage, writingInstruction } from "../../../lib/output-language";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -161,6 +162,8 @@ export async function POST(req: NextRequest) {
       action?: "prompts" | "charge" | "refund" | "set_balance";
       feature?: string;
       aspect_ratio?: string;
+      language?: string;
+      accent?: string;
       amount?: number;
       balance?: number;
     };
@@ -171,7 +174,11 @@ export async function POST(req: NextRequest) {
       if (!brief) return NextResponse.json({ error: "Unknown feature" }, { status: 400 });
 
       const orientation = body.aspect_ratio === "9:16" ? "vertical 9:16 (TikTok / Reels)" : body.aspect_ratio === "1:1" ? "square 1:1" : "horizontal 16:9 widescreen";
-      const userMessage = `Feature to showcase: ${brief}\nAspect ratio: ${orientation}\n\nWrite 3 demo prompts for this feature.`;
+      const outputLanguage = parseOutputLanguage(body.language, body.accent);
+      const languageNote = outputLanguage && (outputLanguage.code !== "en" || outputLanguage.accent)
+        ? `\nLanguage: ${writingInstruction(outputLanguage)} Write the titles and prompts in ${outputLanguage.name}, and any spoken lines in ${outputLanguage.name}${outputLanguage.accent ? ` with a ${outputLanguage.accent} accent` : ""}.`
+        : "";
+      const userMessage = `Feature to showcase: ${brief}\nAspect ratio: ${orientation}${languageNote}\n\nWrite 3 demo prompts for this feature.`;
 
       const [claudeKey, openaiKey] = await Promise.all([getSetting("claude_api_key"), getSetting("openai_api_key")]);
       if (!claudeKey && !openaiKey) {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseOutputLanguage, writingInstruction } from "../../lib/output-language";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -24,7 +25,8 @@ export async function POST(req: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { idea, aspect_ratio } = await req.json();
+    const { idea, aspect_ratio, language, accent } = await req.json();
+    const outputLanguage = parseOutputLanguage(language, accent);
     if (!idea) return NextResponse.json({ error: "Idea is required" }, { status: 400 });
 
     const claudeKey = await getSetting("claude_api_key");
@@ -51,7 +53,7 @@ Rules:
 - Make it vivid, specific, and cinematic
 - Include: subject, action, environment, lighting, camera movement, mood, visual style
 - Keep it under 200 words
-- Optimized for ${orientation}`,
+- Optimized for ${orientation}${outputLanguage ? `\n- ${writingInstruction(outputLanguage)} Any spoken lines are in ${outputLanguage.name}${outputLanguage.accent ? ` with a ${outputLanguage.accent} accent` : ""}.` : ""}`,
         messages: [
           {
             role: "user",

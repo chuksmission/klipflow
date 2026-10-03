@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseOutputLanguage, writingInstruction } from "../../lib/output-language";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -24,7 +25,8 @@ export async function POST(req: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { topic, format, duration, platform } = await req.json();
+    const { topic, format, duration, platform, language, accent } = await req.json();
+    const outputLanguage = parseOutputLanguage(language, accent);
     if (!topic) return NextResponse.json({ error: "Topic is required" }, { status: 400 });
 
     const claudeKey = await getSetting("claude_api_key");
@@ -57,7 +59,7 @@ Rules:
 - Use conversational, punchy language
 - Include [VISUAL CUE] tags to indicate what should be shown on screen
 - Script style: ${formatLabel}
-- Output the script only, no explanations or preamble`,
+- Output the script only, no explanations or preamble${outputLanguage ? `\n- ${writingInstruction(outputLanguage)} Keep the HOOK, BODY and CTA labels and [VISUAL CUE] tags in English.` : ""}`,
         messages: [
           {
             role: "user",

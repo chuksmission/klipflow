@@ -7,6 +7,8 @@ import { chargeTokens, refundCharge, refundNote } from "../../lib/token-client";
 import VideoRemix from "./VideoRemix";
 import ActorSwap from "./ActorSwap";
 import SeriesCloner from "./SeriesCloner";
+import LanguageAccentSelector, { DEFAULT_LANGUAGE, type LanguageChoice } from "../../components/LanguageAccentSelector";
+import PromptTranslateBanner from "../../components/PromptTranslateBanner";
 import { VIDEO_MODELS, getStudioModule, isModelVisible, studioHref, takePendingGeneration, type StudioModuleId, type VideoModel } from "../../components/catalog";
 
 type Model = VideoModel;
@@ -54,6 +56,8 @@ function Studio() {
   const [remixBusy, setRemixBusy] = useState(false);
   const [swapBusy, setSwapBusy] = useState(false);
   const [clonerBusy, setClonerBusy] = useState(false);
+  // Output language & accent, shared by the prompt-based modules (defaults to English)
+  const [outputLang, setOutputLang] = useState<LanguageChoice>(DEFAULT_LANGUAGE);
 
   // Prompt Expander
   const [expandedPrompt, setExpandedPrompt] = useState("");
@@ -235,7 +239,7 @@ function Studio() {
       const res = await fetch("/api/expand-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
-        body: JSON.stringify({ idea: prompt, aspect_ratio: aspectRatio }),
+        body: JSON.stringify({ idea: prompt, aspect_ratio: aspectRatio, language: outputLang.language, accent: outputLang.accent }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Failed to expand prompt."); setExpandLoading(false); return; }
@@ -254,7 +258,7 @@ function Studio() {
       const res = await fetch("/api/write-script", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
-        body: JSON.stringify({ topic: scriptTopic, format: scriptFormat, platform: scriptPlatform, duration: scriptDuration }),
+        body: JSON.stringify({ topic: scriptTopic, format: scriptFormat, platform: scriptPlatform, duration: scriptDuration, language: outputLang.language, accent: outputLang.accent }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Failed to write script."); setScriptLoading(false); return; }
@@ -525,7 +529,7 @@ function Studio() {
       let refImageUrl = imageUrlInput;
       if (imageFile && !useUrl) { const uploaded = await uploadImage(imageFile); if (uploaded) refImageUrl = uploaded; }
       const imgAspectRatio = aspectRatio === "9:16" ? "2:3" : aspectRatio === "1:1" ? "1:1" : "3:2";
-      const res = await fetch("/api/generate-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, image_url: refImageUrl || undefined, aspect_ratio: imgAspectRatio, charge_id: chargeId }) });
+      const res = await fetch("/api/generate-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, image_url: refImageUrl || undefined, aspect_ratio: imgAspectRatio, charge_id: chargeId, language: outputLang.language, accent: outputLang.accent }) });
       const data = await res.json() as { task_id?: string; error?: string };
       if (!res.ok || !data.task_id) { setLoading(false); await imgRefund(data.error ?? "Failed to start generation."); return; }
       let generationComplete = false;
@@ -538,7 +542,7 @@ function Studio() {
             setVideoUrl(sd.video_url); setProgress(100); setLoading(false); clearInterval(poll);
             try {
               const { data: { session: fs } } = await supabase.auth.getSession();
-              if (fs) { await fetch("/api/generations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + fs.access_token }, body: JSON.stringify({ type: "text_to_image", prompt, image_url: sd.video_url, output_type: "image", status: "completed", tokens_used: tokenCostImg, charge_id: chargeId }) }); }
+              if (fs) { await fetch("/api/generations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + fs.access_token }, body: JSON.stringify({ type: "text_to_image", prompt, image_url: sd.video_url, output_type: "image", status: "completed", tokens_used: tokenCostImg, charge_id: chargeId, language: outputLang.language, accent: outputLang.accent }) }); }
             } catch (e) { console.error("Save error:", e); }
           } else if (sd.failed) {
             setLoading(false); clearInterval(poll);
@@ -581,7 +585,7 @@ function Studio() {
       const capturedProvider = providerRef.current;
       const capturedMode = needsImage ? "image_to_video" : "text_to_video";
       const useAudio = modelData?.hasSound === true;
-      const res = await fetch("/api/generate-video", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, mode: capturedMode, image_url: imageUrl || undefined, duration: String(duration), aspect_ratio: aspectRatio, model: selectedModel, with_audio: useAudio, charge_id: chargeId }) });
+      const res = await fetch("/api/generate-video", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, mode: capturedMode, image_url: imageUrl || undefined, duration: String(duration), aspect_ratio: aspectRatio, model: selectedModel, with_audio: useAudio, charge_id: chargeId, language: outputLang.language, accent: outputLang.accent }) });
       const data = await res.json() as { task_id?: string; error?: string; provider?: string };
       if (!res.ok || !data.task_id) { setLoading(false); await videoRefund(data.error ?? "Failed to start generation."); return; }
       const genProvider = data.provider ?? capturedProvider;
@@ -593,7 +597,7 @@ function Studio() {
           if (sd.completed && sd.video_url) {
             if (timedOut) return; generationComplete = true; clearTimeout(timeoutHandle);
             setVideoUrl(sd.video_url); setProgress(100); setLoading(false); clearInterval(poll);
-            try { const { data: { session: fs } } = await supabase.auth.getSession(); if (fs) { await fetch("/api/generations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + fs.access_token }, body: JSON.stringify({ type: capturedModule, prompt, video_url: sd.video_url, status: "completed", tokens_used: capturedCost, duration, aspect_ratio: aspectRatio, model: capturedModel, charge_id: chargeId }) }); } } catch (e) { console.error("Save error:", e); }
+            try { const { data: { session: fs } } = await supabase.auth.getSession(); if (fs) { await fetch("/api/generations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + fs.access_token }, body: JSON.stringify({ type: capturedModule, prompt, video_url: sd.video_url, status: "completed", tokens_used: capturedCost, duration, aspect_ratio: aspectRatio, model: capturedModel, charge_id: chargeId, language: outputLang.language, accent: outputLang.accent }) }); } } catch (e) { console.error("Save error:", e); }
           } else if (sd.failed) {
             setLoading(false); clearInterval(poll);
             await videoRefund("Generation failed.");
@@ -743,6 +747,8 @@ function Studio() {
               <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Your simple idea</label>
               <textarea placeholder="e.g. cat playing piano, sunset over mountains, product showcase..." value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-3 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm resize-none" />
             </div>
+            <PromptTranslateBanner text={prompt} onTextChange={setPrompt} target={outputLang} />
+            <LanguageAccentSelector label="Output Language & Accent" value={outputLang} onChange={setOutputLang} />
             <div>
               <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Target Format</label>
               <select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm">
@@ -789,6 +795,8 @@ function Studio() {
               <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Video Topic</label>
               <textarea placeholder="e.g. 5 signs your gut health is ruined, how I made $10k with AI..." value={scriptTopic} onChange={(e) => setScriptTopic(e.target.value)} rows={3} className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-3 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm resize-none" />
             </div>
+            <PromptTranslateBanner text={scriptTopic} onTextChange={setScriptTopic} target={outputLang} />
+            <LanguageAccentSelector label="Output Language & Accent" value={outputLang} onChange={setOutputLang} />
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-ink-muted text-[13px] font-medium mb-1.5 block">Platform</label>
@@ -1312,6 +1320,8 @@ function Studio() {
                 className="w-full bg-canvas border border-line hover:border-line-strong rounded-xl px-4 py-3 text-white placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition text-sm resize-none"
               />
             </div>
+            <PromptTranslateBanner text={prompt} onTextChange={setPrompt} target={outputLang} />
+            <LanguageAccentSelector label="Output Language & Accent" value={outputLang} onChange={setOutputLang} />
             {showModels && (
               <>
                 <div>

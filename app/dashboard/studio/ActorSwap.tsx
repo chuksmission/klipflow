@@ -10,8 +10,9 @@ import {
   ACTOR_SWAP_LANGUAGES, ACTOR_SWAP_MAX_SECONDS, ACT_TWO_CHUNK_SECONDS, BACKGROUND_PRESETS,
   actorSwapCost, chunkCount, ratePerMinute, ratesFrom, type BackgroundMode, type VoiceGender,
 } from "../../lib/actor-swap";
-import { Alert, Badge, Button, Field, Select, Textarea, Toggle, cardClass, Progress } from "../../components/ui";
+import { Alert, Badge, Button, Field, Textarea, Toggle, cardClass, Progress } from "../../components/ui";
 import CostSummary from "../../components/CostSummary";
+import LanguageAccentSelector from "../../components/LanguageAccentSelector";
 
 const MAX_SOURCE_BYTES = 300 * 1024 * 1024;   // ffmpeg.wasm works in browser memory
 const POLL_MS = 7000;
@@ -178,10 +179,6 @@ export default function ActorSwap({ tokenBalance, setTokenBalance, tokenPricing,
     setFile(f); setError("");
   };
 
-  const pickLanguage = (code: string) => {
-    setLanguageCode(code);
-    setAccent(ACTOR_SWAP_LANGUAGES.find((l) => l.code === code)?.accents[0] ?? "");
-  };
 
   // ---- job loop (shared by new runs and resumed ones) ----
   const credit = (j: JobView) => {
@@ -594,20 +591,11 @@ export default function ActorSwap({ tokenBalance, setTokenBalance, tokenPricing,
           {changeVoice && (
             <section className={`${cardClass} space-y-4 p-5`}>
               <h3 className="font-semibold">New language and voice</h3>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="1. Language">
-                  <Select value={languageCode} onChange={(e) => pickLanguage(e.target.value)}>
-                    <option value="" disabled>Choose a language</option>
-                    {ACTOR_SWAP_LANGUAGES.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
-                  </Select>
-                </Field>
-                <Field label="2. Accent">
-                  <Select value={accent} onChange={(e) => setAccent(e.target.value)} disabled={!language}>
-                    {!language && <option value="">Choose a language first</option>}
-                    {language?.accents.map((a) => <option key={a} value={a}>{a}</option>)}
-                  </Select>
-                </Field>
-              </div>
+              <LanguageAccentSelector
+                value={{ language: languageCode, accent }}
+                onChange={(v) => { setLanguageCode(v.language); setAccent(v.accent); }}
+                languageLabel="1. Language" accentLabel="2. Accent" allowEmpty
+              />
               <Field label="3. Voice">
                 <div className="inline-flex rounded-lg border border-line p-0.5" role="radiogroup" aria-label="Voice">
                   {(["female", "male"] as const).map((g) => (

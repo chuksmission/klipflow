@@ -5,6 +5,8 @@ import { CheckCircle2, Circle, Coins, ExternalLink, ImagePlus, Loader2, RefreshC
 import { supabase } from "../../lib/supabase";
 import { SHOWCASE_CATEGORIES, VIDEO_MODELS, isModelVisible } from "../../components/catalog";
 import { Alert, Badge, Button, Field, Input, PageHeader, Progress, Select, Textarea, cardClass } from "../../components/ui";
+import LanguageAccentSelector, { DEFAULT_LANGUAGE, type LanguageChoice } from "../../components/LanguageAccentSelector";
+import PromptTranslateBanner from "../../components/PromptTranslateBanner";
 
 type Pipeline = "video" | "image" | "translate";
 interface ShowcaseFeature {
@@ -101,6 +103,7 @@ export default function ShowcaseStudio() {
   const [featSort, setFeatSort] = useState("0");
   const [featuring, setFeaturing] = useState(false);
   const [featured, setFeatured] = useState(false);
+  const [outputLang, setOutputLang] = useState<LanguageChoice>(DEFAULT_LANGUAGE);
 
   const imageRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLInputElement>(null);
@@ -163,7 +166,7 @@ export default function ShowcaseStudio() {
       if (!headers) return;
       const res = await fetch("/api/admin/showcase-studio", {
         method: "POST", headers,
-        body: JSON.stringify({ action: "prompts", feature: featureId, aspect_ratio: aspectRatio }),
+        body: JSON.stringify({ action: "prompts", feature: featureId, aspect_ratio: aspectRatio, language: outputLang.language, accent: outputLang.accent }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Couldn't generate prompts."); return; }
@@ -295,7 +298,7 @@ export default function ShowcaseStudio() {
         startRes = await fetch("/api/generate-image", {
           // Admin login stands in for a token charge (admin tools spend the showcase balance)
           method: "POST", headers: (await authHeaders()) ?? { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt, aspect_ratio: imgAspect }),
+          body: JSON.stringify({ prompt, aspect_ratio: imgAspect, language: outputLang.language, accent: outputLang.accent }),
         });
       } else if (feature.pipeline === "translate") {
         const headers = await authHeaders();
@@ -315,6 +318,7 @@ export default function ShowcaseStudio() {
             aspect_ratio: aspectRatio,
             model: activeModel,
             with_audio: currentModel?.hasSound === true,
+            language: outputLang.language, accent: outputLang.accent,
           }),
         });
       }
@@ -343,6 +347,7 @@ export default function ShowcaseStudio() {
             aspect_ratio: feature.pipeline === "translate" ? undefined : aspectRatio,
             model: feature.pipeline === "translate" ? "HeyGen Translate" : feature.pipeline === "image" ? "gpt-image-1.5" : activeModel,
             provider: start.provider ?? null,
+            ...(feature.pipeline === "translate" ? {} : { language: outputLang.language, accent: outputLang.accent }),
           }),
         });
         const saved = await saveRes.json();
@@ -489,6 +494,9 @@ export default function ShowcaseStudio() {
                 <Field label="Prompt" hint="Pick a suggestion above and edit it here, or write your own.">
                   <Textarea rows={5} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe the shot: subject, action, setting, lighting, camera movement, mood" />
                 </Field>
+                <PromptTranslateBanner text={prompt} onTextChange={setPrompt} target={outputLang} />
+                <LanguageAccentSelector label="Output Language & Accent" value={outputLang} onChange={setOutputLang} />
+                <p className="-mt-1 text-xs text-ink-subtle">Suggestions are written in this language: change it, then refresh the suggestions.</p>
 
                 {showImageInput && (
                   <div>

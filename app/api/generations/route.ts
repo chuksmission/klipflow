@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { completeCharge, isChargeId } from "../../lib/charges";
+import { parseOutputLanguage } from "../../lib/output-language";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -62,6 +63,8 @@ export async function POST(req: NextRequest) {
       model?: string;
       provider?: string;
       charge_id?: string;
+      language?: string;
+      accent?: string;
     };
 
     const {
@@ -87,24 +90,29 @@ export async function POST(req: NextRequest) {
     const finalOutputType = output_type ?? (image_url && !video_url ? "image" : "video");
     const finalUrl = video_url || image_url;
 
-    const { data, error } = await supabase
-      .from("generations")
-      .insert({
-        user_id: user.id,
-        type: type ?? "text_to_video",
-        prompt: prompt ?? "",
-        video_url: finalUrl,
-        output_type: finalOutputType,
-        status: status ?? "completed",
-        tokens_used: tokens_used ?? 0,
-        duration: duration ?? null,
-        aspect_ratio: aspect_ratio ?? null,
-        model: model ?? null,
-        provider: provider ?? null,
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+    const row: Record<string, unknown> = {
+      user_id: user.id,
+      type: type ?? "text_to_video",
+      prompt: prompt ?? "",
+      video_url: finalUrl,
+      output_type: finalOutputType,
+      status: status ?? "completed",
+      tokens_used: tokens_used ?? 0,
+      duration: duration ?? null,
+      aspect_ratio: aspect_ratio ?? null,
+      model: model ?? null,
+      provider: provider ?? null,
+      created_at: new Date().toISOString(),
+    };
+    const outputLanguage = parseOutputLanguage(body.language, body.accent);
+    if (outputLanguage) { row.language = outputLanguage.code; row.accent = outputLanguage.accent || null; }
+
+    let { data, error } = await supabase.from("generations").insert(row).select().single();
+    // Before supabase/generation_language.sql is run the columns don't exist yet: save without them
+    if (error && outputLanguage && /language|accent/.test(error.message)) {
+      delete row.language; delete row.accent;
+      ({ data, error } = await supabase.from("generations").insert(row).select().single());
+    }
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
